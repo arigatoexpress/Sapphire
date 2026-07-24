@@ -477,7 +477,7 @@ class SignalPipeline:
         path = SIGNALS_DIR / f"{today}.jsonl"
         if not path.exists():
             return []
-        lines = path.read_text().strip().splitlines()[-n:]
+        lines = path.read_text(encoding="utf-8").strip().splitlines()[-n:]
         result = []
         for line in lines:
             with contextlib.suppress(json.JSONDecodeError):
@@ -499,7 +499,7 @@ class SignalPipeline:
         if not PAPER_TRADING_LOG.exists():
             return False
         try:
-            lines = PAPER_TRADING_LOG.read_text().splitlines()
+            lines = PAPER_TRADING_LOG.read_text(encoding="utf-8").splitlines()
         except OSError as e:
             log.warning("paper log read failed: %s", e)
             return False
@@ -566,7 +566,7 @@ class SignalPipeline:
             path = SIGNALS_DIR / f"{(today - timedelta(days=delta)).isoformat()}.jsonl"
             if not path.exists():
                 continue
-            lines = path.read_text().splitlines()
+            lines = path.read_text(encoding="utf-8").splitlines()
             updated = False
             new_lines = []
             for line in lines:
@@ -672,7 +672,7 @@ class SignalPipeline:
         files = sorted(SIGNALS_DIR.glob("*.jsonl"))
         for f in files[-30:]:  # last 30 days
             try:
-                content = f.read_text()
+                content = f.read_text(encoding="utf-8")
             except OSError:
                 continue
             for line in content.strip().splitlines():
@@ -1113,7 +1113,7 @@ class SignalPipeline:
             }
         total = open_count = wins = losses = 0
         total_pnl = 0.0
-        for line in PAPER_TRADING_LOG.read_text().strip().splitlines():
+        for line in PAPER_TRADING_LOG.read_text(encoding="utf-8").strip().splitlines():
             try:
                 r = json.loads(line)
                 total += 1

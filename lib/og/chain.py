@@ -38,7 +38,7 @@ def _load_signal_verifier_address(network_name: str) -> str:
             f"deployments file missing: {DEPLOYMENTS_FILE}. "
             "Run: python3 scripts/deploy_og_chain.py --network <network>"
         )
-    deployments = json.loads(DEPLOYMENTS_FILE.read_text())
+    deployments = json.loads(DEPLOYMENTS_FILE.read_text(encoding="utf-8"))
     key = f"og_{network_name}"
     block = deployments.get(key)
     if not block:
@@ -58,7 +58,7 @@ def _load_abi() -> list[dict[str, Any]]:
             f"ABI file missing: {ABI_FILE}. "
             "It is written by scripts/deploy_og_chain.py during compile."
         )
-    return json.loads(ABI_FILE.read_text())
+    return json.loads(ABI_FILE.read_text(encoding="utf-8"))
 
 
 def strategy_id_from_name(name: str) -> bytes:

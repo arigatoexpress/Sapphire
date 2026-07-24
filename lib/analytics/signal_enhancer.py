@@ -220,7 +220,7 @@ class SignalEnhancer:
                     / "predictions.json"
                 )
                 if pred_path.exists():
-                    data = json.loads(pred_path.read_text())
+                    data = json.loads(pred_path.read_text(encoding="utf-8"))
                     predictions = data.get("predictions") if isinstance(data, dict) else data
                     kronos: dict[str, tuple[str, float]] = {}
                     if isinstance(predictions, list):

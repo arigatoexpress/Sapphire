@@ -237,7 +237,7 @@ def test_discover_picks_newest_and_respects_window(fake_ready):
     # newest (not old, not stale)
     assert "20" in by_platform["linkedin"].path.name
     # stale file must be excluded
-    assert not any("stale" in i.path.read_text() for i in items)
+    assert not any("stale" in i.path.read_text(encoding="utf-8") for i in items)
 
 
 def test_discover_skips_already_published(fake_ready, monkeypatch):
@@ -316,7 +316,7 @@ def test_run_writes_ledger_only_for_live_success(fake_ready, monkeypatch):
     monkeypatch.setattr(base.PublisherClient, "_http_json", fake_http)
     auto_publish.run(platforms=["linkedin", "substack"])
 
-    ledger = json.loads(ledger_path.read_text())
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
     assert len(ledger) == 2
     for entry in ledger.values():
         assert entry["remote_id"] == "remote-123"

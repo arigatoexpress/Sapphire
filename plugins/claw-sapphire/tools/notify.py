@@ -95,12 +95,12 @@ def get_bot_token() -> str | None:
     # File-based secrets
     for path in SECRET_PATHS:
         if path.exists():
-            return path.read_text().strip()
+            return path.read_text(encoding="utf-8").strip()
 
     # Check .env files in Sapphire repo
     env_path = Path.home() / "Code" / "Sapphire" / "services" / "control-plane" / ".env"
     if env_path.exists():
-        for line in env_path.read_text().splitlines():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
             if line.startswith("TELEGRAM_BOT_TOKEN="):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
 
@@ -123,7 +123,7 @@ def get_chat_id() -> str | None:
     ]:
         path = prefix / "telegram_chat_id"
         if path.exists():
-            return path.read_text().strip()
+            return path.read_text(encoding="utf-8").strip()
 
     return None
 

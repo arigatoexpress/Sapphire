@@ -32,7 +32,7 @@ def test_matching_threats_pass_and_write_reports(tmp_path: Path) -> None:
         if not path.name.endswith(".envelope.json")
     )
     assert {path.suffix for path in reports} == {".json", ".md"}
-    payload = json.loads(next(path for path in reports if path.suffix == ".json").read_text())
+    payload = json.loads(next(path for path in reports if path.suffix == ".json").read_text(encoding="utf-8"))
     assert payload["verdict"] == "PASS"
     assert payload["summary"]["rows_compared"] == 1
     assert sorted(path.name for path in report_dir.glob("*.envelope.json")) == sorted(
@@ -129,7 +129,7 @@ def test_nearest_run_snapshot_selection_writes_selection_metadata(tmp_path: Path
     payload = json.loads(
         next(
             path for path in report_dir.glob("*.json") if not path.name.endswith(".envelope.json")
-        ).read_text()
+        ).read_text(encoding="utf-8")
     )
     assert payload["selection"]["mode"] == "nearest_run_snapshot"
     assert payload["selection"]["local"]["run_timestamp"] == "2026-04-26T17:03:50Z"

@@ -257,7 +257,7 @@ def test_appends_activation_to_audit_log(clock, recorders, tmp_path):
 
     assert ks.check(90_000) is True
 
-    lines = audit_path.read_text().splitlines()
+    lines = audit_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     record = json.loads(lines[0])
     assert record["event_type"] == "kill_switch.activated"
@@ -275,7 +275,7 @@ def test_appends_deactivation_to_audit_log(switch, clock, tmp_path):
 
     assert ks.check_recovery(0.025) is True
 
-    records = [json.loads(line) for line in audit_path.read_text().splitlines()]
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
     assert [r["event_type"] for r in records] == [
         "kill_switch.activated",
         "kill_switch.deactivated",
@@ -303,7 +303,7 @@ def test_manual_activate_and_deactivate_can_suppress_notify(clock, recorders, tm
     assert pub.events[-1][0] == "kill_switch.deactivated"
     assert notifier.messages == []
 
-    records = [json.loads(line) for line in audit_path.read_text().splitlines()]
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
     assert [r["event_type"] for r in records] == [
         "kill_switch.activated",
         "kill_switch.deactivated",
@@ -514,7 +514,7 @@ def test_audit_path_resolves_from_explicit_env_var(clock, monkeypatch, tmp_path)
     clock.advance(hours=1)
     ks.check(90_000)
     assert audit_target.exists()
-    record = json.loads(audit_target.read_text().splitlines()[0])
+    record = json.loads(audit_target.read_text(encoding="utf-8").splitlines()[0])
     assert record["event_type"] == "kill_switch.activated"
 
 
@@ -532,7 +532,7 @@ def test_audit_path_resolves_from_state_dir(clock, monkeypatch, tmp_path):
     ks.check(90_000)
     expected = tmp_path / "audit" / "kill_switch.jsonl"
     assert expected.exists()
-    records = [json.loads(line) for line in expected.read_text().splitlines()]
+    records = [json.loads(line) for line in expected.read_text(encoding="utf-8").splitlines()]
     assert records[0]["event_type"] == "kill_switch.activated"
 
 
@@ -601,6 +601,6 @@ def test_force_activate_records_supplied_portfolio_value_in_audit(clock, recorde
         audit_path=audit_path,
     )
     assert ks.force_activate("ops halt", portfolio_value=125_000.0, notify=False) is True
-    record = json.loads(audit_path.read_text().splitlines()[0])
+    record = json.loads(audit_path.read_text(encoding="utf-8").splitlines()[0])
     assert record["portfolio_value"] == 125_000.0
     assert ks.status().peak_all_time == 125_000.0

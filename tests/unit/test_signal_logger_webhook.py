@@ -312,14 +312,14 @@ def test_signals_accepts_valid_payload_and_logs(signal_logger, client):
     assert body["execution"] == "LOGGED_ONLY"
     assert body["signal_id"] == "test-1"
 
-    signals = signal_logger.SIGNALS_PATH.read_text().strip().splitlines()
+    signals = signal_logger.SIGNALS_PATH.read_text(encoding="utf-8").strip().splitlines()
     assert len(signals) == 1
     record = json.loads(signals[0])
     assert record["symbol"] == "BTC-USD"
     assert record["execution"] == "LOGGED_ONLY"
     assert record["source"] == "webhook"
 
-    events = signal_logger.EVENTS_PATH.read_text().strip().splitlines()
+    events = signal_logger.EVENTS_PATH.read_text(encoding="utf-8").strip().splitlines()
     assert len(events) == 1
     event = json.loads(events[0])
     assert event["type"] == "signal.received"
@@ -359,7 +359,7 @@ def test_signals_handles_alternative_side_field(signal_logger, client):
     )
 
     assert response.status_code == 200
-    record = json.loads(signal_logger.SIGNALS_PATH.read_text().strip().splitlines()[-1])
+    record = json.loads(signal_logger.SIGNALS_PATH.read_text(encoding="utf-8").strip().splitlines()[-1])
     assert record["action"] == "BUY"
 
 
@@ -368,7 +368,7 @@ def test_signals_default_fields_when_missing(signal_logger, client):
     response = client.post("/api/signals", json={"secret": "test-secret"})
 
     assert response.status_code == 200
-    record = json.loads(signal_logger.SIGNALS_PATH.read_text().strip().splitlines()[-1])
+    record = json.loads(signal_logger.SIGNALS_PATH.read_text(encoding="utf-8").strip().splitlines()[-1])
     assert record["symbol"] == "UNKNOWN"
     assert record["action"] == "UNKNOWN"
     assert record["strategy"] == "unknown"

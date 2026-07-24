@@ -272,7 +272,7 @@ def test_event_bus_publish_on_dead_redis_uses_fallback(tmp_path: Path):
         bus.publish("signal.generated", {"i": i})
 
     assert fallback.exists()
-    lines = [line for line in fallback.read_text().splitlines() if line.strip()]
+    lines = [line for line in fallback.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert len(lines) == 5
 
 

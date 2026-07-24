@@ -105,7 +105,7 @@ def test_run_media_factory_writes_readiness_artifacts_and_status(tmp_path):
     assert summary["telegram_sends_made"] is False
     assert summary["publish_actions_made"] is False
     assert (run_dir / "factory_run.json").is_file()
-    assert (run_dir / "image" / "prompt.md").read_text() == (
+    assert (run_dir / "image" / "prompt.md").read_text(encoding="utf-8") == (
         "# Image Readiness\n"
         "\n"
         "Headline: Unit Market Pulse\n"
@@ -131,8 +131,8 @@ def test_run_media_factory_writes_readiness_artifacts_and_status(tmp_path):
         "Safety: dry-run only; no image API call was made.\n"
     )
 
-    audio = json.loads((run_dir / "audio" / "readiness.json").read_text())
-    video = json.loads((run_dir / "video" / "storyboard.json").read_text())
+    audio = json.loads((run_dir / "audio" / "readiness.json").read_text(encoding="utf-8"))
+    video = json.loads((run_dir / "video" / "storyboard.json").read_text(encoding="utf-8"))
     assert audio["script"] == "Unit voiceover script."
     assert audio["live_calls_allowed"] is False
     assert video["storyboard"] == [{"brief": "Open", "scene": 1, "seconds": "0-6"}]

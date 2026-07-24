@@ -102,7 +102,7 @@ def load_watermark(object_type: str, *, base_dir: Path | None = None) -> dict[st
     if not path.is_file():
         return {}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(data, dict):
             return data
     except (OSError, json.JSONDecodeError):
@@ -191,7 +191,7 @@ class SyncState:
         if not path.is_file():
             return cls()
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             return cls(
                 files=data.get("files", {}),
                 last_sync=data.get("last_sync"),
@@ -289,7 +289,7 @@ def load_sync_history(root: Path | None = None, *, limit: int = 50) -> list[dict
         return []
     entries: list[dict[str, Any]] = []
     try:
-        for line in history_path.read_text().strip().split("\n"):
+        for line in history_path.read_text(encoding="utf-8").strip().split("\n"):
             if line.strip():
                 try:
                     entries.append(json.loads(line))

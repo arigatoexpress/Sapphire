@@ -131,7 +131,7 @@ def test_write_work_order_creates_order_and_manifest(tmp_path):
     assert result["manifest"]["inputs"][0]["path"] == (
         "data/content/drafts/20260427_0607_market_pulse.json"
     )
-    saved = json.loads(order_path.read_text())
+    saved = json.loads(order_path.read_text(encoding="utf-8"))
     assert saved["work_order_path"] == result["work_order"]["work_order_path"]
 
 

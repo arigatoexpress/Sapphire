@@ -444,7 +444,7 @@ def _hydrate_addresses() -> None:
     if deployments_file is None:
         return
     try:
-        deployments = json.loads(deployments_file.read_text())
+        deployments = json.loads(deployments_file.read_text(encoding="utf-8"))
     except Exception:
         return
 

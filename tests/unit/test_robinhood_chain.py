@@ -386,7 +386,7 @@ class TestDeployScript:
             }
         }
         dep_file.write_text(json.dumps(data, indent=2))
-        loaded = json.loads(dep_file.read_text())
+        loaded = json.loads(dep_file.read_text(encoding="utf-8"))
         assert loaded["robinhood_testnet"]["chain_id"] == 46630
         assert (
             loaded["robinhood_testnet"]["contracts"]["SapphireSignalVerifier"]["address"] == "0xAA"
@@ -402,7 +402,7 @@ class TestDeployScript:
     def test_foundry_toml_has_correct_chain_id(self):
         foundry_toml = ROOT / "foundry.toml"
         assert foundry_toml.exists()
-        content = foundry_toml.read_text()
+        content = foundry_toml.read_text(encoding="utf-8")
         assert "46630" in content
         assert "robinhood_testnet" in content
 

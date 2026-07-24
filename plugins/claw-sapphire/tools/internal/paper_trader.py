@@ -109,7 +109,7 @@ def _normalize_portfolio(pf: dict) -> dict:
 
 def _load_portfolio() -> dict:
     if PORTFOLIO_FILE.exists():
-        return _normalize_portfolio(json.loads(PORTFOLIO_FILE.read_text()))
+        return _normalize_portfolio(json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8")))
     return _normalize_portfolio(
         {
             "capital": INITIAL_CAPITAL,

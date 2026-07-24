@@ -50,7 +50,7 @@ def test_identical_artifacts_pass_and_write_reports(tmp_path: Path) -> None:
     assert exit_code == 0
     reports = sorted(report_dir.glob("shadow-comparison-*"))
     assert {path.suffix for path in reports} == {".json", ".md"}
-    payload = json.loads(next(path for path in reports if path.suffix == ".json").read_text())
+    payload = json.loads(next(path for path in reports if path.suffix == ".json").read_text(encoding="utf-8"))
     assert payload["verdict"] == "PASS"
     assert payload["summary"]["rows_compared"] == 4
     assert payload["summary"]["leaderboard_top3_order_equal"] is True
@@ -161,14 +161,14 @@ def test_metadata_summary_surfaces_bar_fingerprint_drift(tmp_path: Path) -> None
         == 0
     )
 
-    payload = json.loads(next(path for path in report_dir.glob("*.json")).read_text())
+    payload = json.loads(next(path for path in report_dir.glob("*.json")).read_text(encoding="utf-8"))
     metadata = payload["summary"]["metadata"]
     assert metadata["source"]["git_sha_equal"] is True
     assert metadata["source"]["yfinance_version_equal"] is True
     assert metadata["bar_fingerprints"]["status"] == "different"
     assert metadata["bar_fingerprints"]["matched"] == 1
     assert metadata["bar_fingerprints"]["differing"] == 1
-    markdown = next(path for path in report_dir.glob("*.md")).read_text()
+    markdown = next(path for path in report_dir.glob("*.md")).read_text(encoding="utf-8")
     assert "Bar-set fingerprint: different" in markdown
 
 
@@ -248,7 +248,7 @@ def test_nearest_backtest_artifact_selection_writes_metadata(tmp_path: Path) -> 
     )
 
     assert exit_code == 0
-    payload = json.loads(next(report_dir.glob("*.json")).read_text())
+    payload = json.loads(next(report_dir.glob("*.json")).read_text(encoding="utf-8"))
     assert payload["selection"]["mode"] == "nearest_backtest_artifact"
     assert payload["selection"]["local"]["run_timestamp"] == "2026-04-26T04:00:03Z"
     assert payload["selection"]["remote"]["run_timestamp"] == "2026-04-26T04:36:20Z"

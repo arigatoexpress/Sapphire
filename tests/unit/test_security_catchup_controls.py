@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _load_gitleaks_rule(rule_id: str) -> dict[str, object]:
-    config = tomllib.loads((ROOT / ".gitleaks-docs.toml").read_text())
+    config = tomllib.loads((ROOT / ".gitleaks-docs.toml").read_text(encoding="utf-8"))
     for rule in config.get("rules", []):
         if rule.get("id") == rule_id:
             return rule
@@ -29,7 +29,7 @@ def test_docs_plist_secret_rule_matches_docs_plist_excerpt() -> None:
 
 
 def test_dashboard_rejects_known_default_password() -> None:
-    app_source = (ROOT / "services/dashboard/app.py").read_text()
+    app_source = (ROOT / "services/dashboard/app.py").read_text(encoding="utf-8")
 
     assert re.search(r"""["']sapphire["']""", app_source)
     assert "WEAK_AUTH_PASSWORDS" in app_source
@@ -42,7 +42,7 @@ def test_dashboard_rejects_known_default_password() -> None:
 
 
 def test_dashboard_startup_reads_secret_file() -> None:
-    start_script = (ROOT / "services/dashboard/start.sh").read_text()
+    start_script = (ROOT / "services/dashboard/start.sh").read_text(encoding="utf-8")
 
     assert (
         'DASHBOARD_PASSWORD_FILE="$HOME/.config/sapphire-secrets/dashboard_password"'

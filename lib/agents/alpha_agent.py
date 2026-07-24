@@ -141,7 +141,7 @@ class AlphaAgent(BaseAgent):
 
         for path in sorted(self.signals_dir.glob("*.jsonl")):
             try:
-                raw_lines = path.read_text().splitlines()
+                raw_lines = path.read_text(encoding="utf-8").splitlines()
             except OSError:
                 continue
             for raw_line in raw_lines:
@@ -162,7 +162,7 @@ class AlphaAgent(BaseAgent):
         if not self.portfolio_file.exists():
             return {"positions": []}
         try:
-            return json.loads(self.portfolio_file.read_text())
+            return json.loads(self.portfolio_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return {"positions": []}
 

@@ -55,7 +55,7 @@ class StubClient:
 @pytest.mark.asyncio
 async def test_quote_swap_returns_kumbaya_quote_for_known_pair() -> None:
     """quote_swap routes to Kumbaya and returns the best fee tier."""
-    quote_hex = (FIXT_DIR / "quote_1weth_usdm_3000.hex").read_text().strip()
+    quote_hex = (FIXT_DIR / "quote_1weth_usdm_3000.hex").read_text(encoding="utf-8").strip()
     # The router probes 4 fee tiers — stub all 4 with the same response so
     # the fixture returns a usable QuoteResult on each call. The router
     # picks the one with highest amount_out (all equal here, returns first).

@@ -83,8 +83,8 @@ def _load_cached(address: str, cache_dir: pathlib.Path) -> dict[str, Any] | None
         return None
     try:
         return {
-            "abi": json.loads(abi_path.read_text()),
-            "meta": json.loads(meta_path.read_text()),
+            "abi": json.loads(abi_path.read_text(encoding="utf-8")),
+            "meta": json.loads(meta_path.read_text(encoding="utf-8")),
         }
     except (json.JSONDecodeError, OSError):
         return None
@@ -264,4 +264,4 @@ def load_pinned_abi(rel_path: str, *, base_dir: pathlib.Path | None = None) -> l
     target = root / rel_path
     if not target.exists():
         raise AbiFetchError(f"pinned ABI missing: {target}")
-    return json.loads(target.read_text())
+    return json.loads(target.read_text(encoding="utf-8"))

@@ -42,7 +42,7 @@ def _load_probes(filename: str) -> list[dict]:
     path = FIXTURES / filename
     if not path.exists():
         return []
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(

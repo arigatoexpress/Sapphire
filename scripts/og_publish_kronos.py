@@ -123,7 +123,7 @@ def main() -> int:
         return 1
 
     log.info("Reading %s", pred_path)
-    document = json.loads(pred_path.read_text())
+    document = json.loads(pred_path.read_text(encoding="utf-8"))
     predictions = document.get("predictions", {})
     if not predictions:
         log.error("predictions object is empty")

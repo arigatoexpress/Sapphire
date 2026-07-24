@@ -79,5 +79,5 @@ def test_usage_ledger_records_counts(tmp_path, monkeypatch):
     )
 
     assert out == {"hour": 1, "day": 1}
-    data = json.loads(usage.read_text())
+    data = json.loads(usage.read_text(encoding="utf-8"))
     assert data["santiment"]["daily"]["2026-04-28"] == 1

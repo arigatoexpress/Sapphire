@@ -59,7 +59,7 @@ def test_mirror_alpha_halt_and_resume_without_duplicate_notify(tmp_path):
         "kill_switch.deactivated",
     ]
     records = [
-        json.loads(line) for line in (tmp_path / "kill_switch.jsonl").read_text().splitlines()
+        json.loads(line) for line in (tmp_path / "kill_switch.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert records[0]["reason"] == "alpha_control: Manual command from Telegram"
     assert records[1]["reason"] == "alpha_control: Manual command from Telegram"
@@ -133,7 +133,7 @@ def test_mirror_blank_reason_falls_back_to_active_default(tmp_path):
     )
 
     assert mirror_alpha_kill_switch(True, "   ", switch=switch)
-    record = json.loads((tmp_path / "kill_switch.jsonl").read_text().splitlines()[0])
+    record = json.loads((tmp_path / "kill_switch.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert record["reason"] == "alpha_control: manual kill switch"
 
 
@@ -149,7 +149,7 @@ def test_mirror_blank_reason_falls_back_to_resume_default(tmp_path):
 
     assert mirror_alpha_kill_switch(False, "", switch=switch)
     records = [
-        json.loads(line) for line in (tmp_path / "kill_switch.jsonl").read_text().splitlines()
+        json.loads(line) for line in (tmp_path / "kill_switch.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     # The last record is the bridged deactivation.
     assert records[-1]["reason"] == "alpha_control: manual resume"
@@ -169,7 +169,7 @@ def test_mirror_custom_source_prefix(tmp_path):
         switch=switch,
         source="security_console",
     )
-    record = json.loads((tmp_path / "kill_switch.jsonl").read_text().splitlines()[0])
+    record = json.loads((tmp_path / "kill_switch.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert record["reason"] == "security_console: ops drill"
 
 
@@ -225,5 +225,5 @@ def test_mirror_strips_surrounding_whitespace_in_reason(tmp_path):
     )
 
     assert mirror_alpha_kill_switch(True, "  user halt  ", switch=switch)
-    record = json.loads((tmp_path / "kill_switch.jsonl").read_text().splitlines()[0])
+    record = json.loads((tmp_path / "kill_switch.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert record["reason"] == "alpha_control: user halt"

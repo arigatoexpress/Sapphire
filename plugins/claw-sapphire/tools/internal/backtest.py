@@ -90,7 +90,7 @@ def run_backtest(
             time.sleep(2)
             subprocess.run(
                 ["tv", "pine", "set"],
-                input=script_path.read_text(),
+                input=script_path.read_text(encoding="utf-8"),
                 capture_output=True,
                 text=True,
                 timeout=10,
@@ -149,7 +149,7 @@ def show_history() -> None:
         print("No backtest history. Run a backtest first.")
         return
 
-    lines = BACKTEST_PATH.read_text().strip().splitlines()
+    lines = BACKTEST_PATH.read_text(encoding="utf-8").strip().splitlines()
     print(f"\n{'=' * 60}")
     print(f"  BACKTEST HISTORY ({len(lines)} runs)")
     print(f"{'=' * 60}\n")

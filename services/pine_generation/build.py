@@ -156,7 +156,7 @@ def load_best_per_symbol(directory: Path | None = None) -> list[dict[str, Any]]:
         return []
     latest = candidates[-1]
     try:
-        payload = json.loads(latest.read_text())
+        payload = json.loads(latest.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return []
     rows = payload.get("results")

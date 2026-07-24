@@ -30,7 +30,7 @@ def load() -> dict:
     """Load runtime policy from file."""
     if POLICY_PATH.exists():
         try:
-            return {**DEFAULT_POLICY, **json.loads(POLICY_PATH.read_text())}
+            return {**DEFAULT_POLICY, **json.loads(POLICY_PATH.read_text(encoding="utf-8"))}
         except json.JSONDecodeError:
             pass
     return DEFAULT_POLICY.copy()

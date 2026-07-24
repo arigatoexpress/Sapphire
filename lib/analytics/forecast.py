@@ -48,7 +48,7 @@ def _load_kronos() -> dict[str, Any]:
     if f is None:
         return {"generated_at": None, "predictions": {}, "source_file": None}
     try:
-        raw = f.read_text()
+        raw = f.read_text(encoding="utf-8")
     except OSError:
         return {"generated_at": None, "predictions": {}, "source_file": None}
     try:
@@ -100,7 +100,7 @@ def _load_ta_latest_per_symbol() -> dict[str, dict[str, Any]]:
     if not TRADING_PREDICTIONS.exists():
         return {}
     try:
-        raw = TRADING_PREDICTIONS.read_text()
+        raw = TRADING_PREDICTIONS.read_text(encoding="utf-8")
     except OSError:
         return {}
 

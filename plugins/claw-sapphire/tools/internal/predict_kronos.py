@@ -432,7 +432,7 @@ def _save_intelligence_snapshot(result: dict, symbol: str) -> None:
 
         pred_file = out_dir / "predictions.json"
         if pred_file.exists():
-            existing = json.loads(pred_file.read_text())
+            existing = json.loads(pred_file.read_text(encoding="utf-8"))
         else:
             existing = {"generated_at": datetime.now(UTC).isoformat(), "predictions": {}}
 

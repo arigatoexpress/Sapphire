@@ -84,7 +84,7 @@ def _fetch_prices(symbols: list[str]) -> dict[str, float]:
 
 def _load() -> dict:
     if WALLET_FILE.exists():
-        return json.loads(WALLET_FILE.read_text())
+        return json.loads(WALLET_FILE.read_text(encoding="utf-8"))
     return {
         "balances": {"USDC": STARTING_USDC},
         "history": [],

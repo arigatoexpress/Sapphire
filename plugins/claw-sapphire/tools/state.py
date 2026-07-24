@@ -31,7 +31,7 @@ BACKOFF_HOURS_PER_ATTEMPT = 2
 def _load() -> dict:
     if STATE_PATH.exists():
         try:
-            return json.loads(STATE_PATH.read_text())
+            return json.loads(STATE_PATH.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             pass
     return {"issues": {}, "metrics": {}}

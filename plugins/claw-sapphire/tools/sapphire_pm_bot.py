@@ -407,7 +407,7 @@ def _preview(text: str, limit: int = 200) -> str:
 
 def _read_secret_file(path: Path) -> str:
     try:
-        return path.read_text().strip()
+        return path.read_text(encoding="utf-8").strip()
     except OSError:
         return ""
 
@@ -1251,7 +1251,7 @@ def _handle_digest_morning() -> dict[str, Any]:
     candidate = _MORNING_DIGEST_LOG / f"{today}.md"
     if candidate.exists():
         try:
-            content = candidate.read_text()[:3500]
+            content = candidate.read_text(encoding="utf-8")[:3500]
             return _response(content, "MarkdownV2")
         except OSError as e:
             return _response(

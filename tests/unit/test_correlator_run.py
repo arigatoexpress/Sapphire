@@ -76,11 +76,11 @@ def test_run_once_writes_jsonl_and_envelope(isolated) -> None:
     assert jsonl_path.exists()
     assert envelope_path.exists()
 
-    rows = [json.loads(line) for line in jsonl_path.read_text().splitlines() if line.strip()]
+    rows = [json.loads(line) for line in jsonl_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert {r["symbol"] for r in rows} == {"BTC", "ETH"}
     assert all(r["consensus"] == "PARTIAL_BULL" for r in rows)
 
-    envelope = json.loads(envelope_path.read_text())
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
     assert envelope["generator"] == "services.correlator.run"
     assert envelope["version"] == "0.1.0"
     assert envelope["signals_appended"] == 2
@@ -106,7 +106,7 @@ def test_run_once_appends_to_existing_file(isolated) -> None:
         publish=False,
     )
     jsonl_path = runner._output_path(out_root, now=FROZEN_NOW)
-    rows = [line for line in jsonl_path.read_text().splitlines() if line.strip()]
+    rows = [line for line in jsonl_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert len(rows) == 2
 
 
@@ -121,7 +121,7 @@ def test_run_once_emits_a_signal_with_provenance(isolated) -> None:
         publish=False,
     )
     jsonl_path = Path(result["jsonl_path"])
-    row = json.loads(jsonl_path.read_text().splitlines()[0])
+    row = json.loads(jsonl_path.read_text(encoding="utf-8").splitlines()[0])
     assert "provenance_envelope" in row
     assert row["provenance_envelope"]["generator"] == "lib.correlator.engine"
 

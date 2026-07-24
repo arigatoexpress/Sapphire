@@ -183,7 +183,7 @@ def _load_jsonl_records(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     records: list[dict[str, Any]] = []
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -287,7 +287,7 @@ def _load_daily_loss_usd(daily_loss_file: Path) -> float:
     if not daily_loss_file.exists():
         return 0.0
     try:
-        data = json.loads(daily_loss_file.read_text())
+        data = json.loads(daily_loss_file.read_text(encoding="utf-8"))
         if data.get("date") == str(date.today()):
             return float(data.get("loss_usd", 0.0))
     except (json.JSONDecodeError, TypeError, ValueError):
@@ -302,7 +302,7 @@ def _record_loss_usd(daily_loss_file: Path, loss_usd: float) -> None:
     current = 0.0
     if daily_loss_file.exists():
         try:
-            data = json.loads(daily_loss_file.read_text())
+            data = json.loads(daily_loss_file.read_text(encoding="utf-8"))
             if data.get("date") == today:
                 current = float(data.get("loss_usd", 0.0))
         except (json.JSONDecodeError, TypeError, ValueError):
@@ -714,7 +714,7 @@ def _acquire_single_instance_lock(lock_path: Path = LOCK_PATH) -> bool:
             return True
         except FileExistsError:
             try:
-                holder_pid = int(lock_path.read_text().strip())
+                holder_pid = int(lock_path.read_text(encoding="utf-8").strip())
             except (ValueError, OSError):
                 holder_pid = 0
             if holder_pid > 0:
@@ -733,7 +733,7 @@ def _acquire_single_instance_lock(lock_path: Path = LOCK_PATH) -> bool:
 def _release_single_instance_lock(lock_path: Path = LOCK_PATH) -> None:
     """Release the lock only if this process owns it."""
     try:
-        if int(lock_path.read_text().strip()) == os.getpid():
+        if int(lock_path.read_text(encoding="utf-8").strip()) == os.getpid():
             lock_path.unlink()
     except (ValueError, OSError):
         pass

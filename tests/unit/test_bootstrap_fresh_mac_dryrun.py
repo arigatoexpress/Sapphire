@@ -59,7 +59,7 @@ def test_bootstrap_dry_run_traces_without_writing(tmp_path: Path) -> None:
 
 
 def test_demo_secrets_example_is_inert() -> None:
-    content = SECRETS_EXAMPLE.read_text()
+    content = SECRETS_EXAMPLE.read_text(encoding="utf-8")
     required_closed_gates = [
         "SAPPHIRE_DEMO_MODE=1",
         "SAPPHIRE_LIVE_MODE=0",
@@ -79,12 +79,12 @@ def test_demo_secrets_example_is_inert() -> None:
 
 
 def test_demo_launchagent_templates_exist_and_bootstrap_forces_runatload_false() -> None:
-    script = BOOTSTRAP.read_text()
+    script = BOOTSTRAP.read_text(encoding="utf-8")
     assert 'payload["RunAtLoad"] = False' in script
 
     relpaths = [
         line.strip()
-        for line in LAUNCHAGENT_LIST.read_text().splitlines()
+        for line in LAUNCHAGENT_LIST.read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.startswith("#")
     ]
     assert relpaths
@@ -98,7 +98,7 @@ def test_demo_launchagent_templates_exist_and_bootstrap_forces_runatload_false()
 
 
 def test_teardown_preserves_secrets_unless_placeholder_reset_requested() -> None:
-    content = TEARDOWN.read_text()
+    content = TEARDOWN.read_text(encoding="utf-8")
     assert "SAPPHIRE_BOOTSTRAP_RESET_SECRETS" in content
     assert "PLACEHOLDER_DO_NOT_USE" in content
     assert "preserved" in content

@@ -238,7 +238,7 @@ def _load_daily_spend() -> float:
     if not LIMITS_FILE.exists():
         return 0.0
     try:
-        data = json.loads(LIMITS_FILE.read_text())
+        data = json.loads(LIMITS_FILE.read_text(encoding="utf-8"))
         if data.get("date") == today:
             return float(data.get("spent", 0.0))
     except (json.JSONDecodeError, KeyError, ValueError):
@@ -276,7 +276,7 @@ def _record_spend(amount: float) -> None:
         fcntl.flock(lock_f, fcntl.LOCK_EX)
         try:
             try:
-                data = json.loads(LIMITS_FILE.read_text()) if LIMITS_FILE.exists() else {}
+                data = json.loads(LIMITS_FILE.read_text(encoding="utf-8")) if LIMITS_FILE.exists() else {}
             except (json.JSONDecodeError, OSError):
                 data = {}
             if data.get("date") != today:
@@ -333,7 +333,7 @@ def _try_consume_daily_budget(amount: float, limit: float) -> tuple[bool, float]
         fcntl.flock(lock_f, fcntl.LOCK_EX)
         try:
             try:
-                data = json.loads(LIMITS_FILE.read_text()) if LIMITS_FILE.exists() else {}
+                data = json.loads(LIMITS_FILE.read_text(encoding="utf-8")) if LIMITS_FILE.exists() else {}
             except (json.JSONDecodeError, OSError):
                 data = {}
             if data.get("date") != today:
@@ -379,7 +379,7 @@ def _poll_pending(code: str) -> str | None:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         status = data.get("status", "pending")
         if status in ("approved", "denied"):
             path.unlink(missing_ok=True)
@@ -404,7 +404,7 @@ def _cleanup_expired_pending(now: float | None = None) -> int:
     removed = 0
     for path in PENDING_DIR.glob("*.json"):
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             expires = float(data.get("expires", 0))
         except (json.JSONDecodeError, OSError, TypeError, ValueError):
             continue
@@ -468,7 +468,7 @@ def _approve_pending(code: str) -> bool:
     if not path.exists():
         return False
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("status") != "pending":
             return False
         if time.time() > data.get("expires", 0):
@@ -487,7 +487,7 @@ def _deny_pending(code: str) -> bool:
     if not path.exists():
         return False
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("status") != "pending":
             return False
         if time.time() > data.get("expires", 0):
@@ -525,7 +525,7 @@ def _send_confirmation_request(
             Path.home() / ".config" / "sapphire" / "telegram_bot_token",
         ]:
             if p.exists():
-                token = p.read_text().strip()
+                token = p.read_text(encoding="utf-8").strip()
                 break
     if not chat_id:
         for p in [
@@ -533,7 +533,7 @@ def _send_confirmation_request(
             Path.home() / ".config" / "sapphire" / "telegram_chat_id",
         ]:
             if p.exists():
-                chat_id = p.read_text().strip()
+                chat_id = p.read_text(encoding="utf-8").strip()
                 break
 
     if not token or not chat_id:
@@ -828,7 +828,7 @@ class ConfirmationFirewall:
         results = []
         for p in PENDING_DIR.glob("*.json"):
             try:
-                data = json.loads(p.read_text())
+                data = json.loads(p.read_text(encoding="utf-8"))
                 if data.get("status") == "pending" and time.time() < data.get("expires", 0):
                     results.append(data)
             except (json.JSONDecodeError, OSError):

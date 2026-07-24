@@ -79,7 +79,7 @@ def _load_jsonl(path: Path, *, max_lines: int = 5000) -> list[dict[str, Any]]:
 
 def _load_json(path: Path) -> dict[str, Any]:
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
 

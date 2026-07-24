@@ -51,7 +51,7 @@ def test_save_results_uses_default_results_dir(tmp_path, monkeypatch):
     path = save_results([_empty_result()], metadata={"test": True})
     assert path.parent == tmp_path / "default"
     assert path.exists()
-    payload = json.loads(path.read_text())
+    payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["metadata"] == {"test": True}
     assert payload["total_backtests"] == 1
 

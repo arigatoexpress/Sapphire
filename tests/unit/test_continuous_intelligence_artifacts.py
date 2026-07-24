@@ -26,7 +26,7 @@ def test_snapshot_write_materializes_jsonl_without_execution(tmp_path) -> None:
     written = artifacts.snapshot_tasks(plan, artifact_dir=tmp_path, write=True)
 
     target = tmp_path / artifacts.TASK_SNAPSHOT_FILE
-    rows = [json.loads(line) for line in target.read_text().splitlines()]
+    rows = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines()]
     assert written["write_enabled"] is True
     assert len(rows) == plan["totals"]["tasks"]
     assert rows[0]["record_type"] == "continuous_intelligence_task_snapshot"
@@ -96,7 +96,7 @@ def test_lease_write_materializes_jsonl(tmp_path) -> None:
         limit=1,
     )
 
-    rows = [json.loads(line) for line in (tmp_path / artifacts.LEASE_FILE).read_text().splitlines()]
+    rows = [json.loads(line) for line in (tmp_path / artifacts.LEASE_FILE).read_text(encoding="utf-8").splitlines()]
     assert lease["write_enabled"] is True
     assert len(rows) == 1
     assert rows[0]["agent_id"] == "mac-local"
@@ -139,7 +139,7 @@ def test_record_task_result_write_is_opt_in(tmp_path) -> None:
         write=True,
     )
     rows = [
-        json.loads(line) for line in (tmp_path / artifacts.RESULT_FILE).read_text().splitlines()
+        json.loads(line) for line in (tmp_path / artifacts.RESULT_FILE).read_text(encoding="utf-8").splitlines()
     ]
     assert written["write_enabled"] is True
     assert rows[0]["status"] == "blocked"
@@ -228,9 +228,9 @@ def test_daily_autonomy_packet_write_appends_ledgers_and_latest(tmp_path) -> Non
     assert (tmp_path / artifacts.LEASE_FILE).exists()
     packet_rows = [
         json.loads(line)
-        for line in (tmp_path / artifacts.DAILY_PACKET_FILE).read_text().splitlines()
+        for line in (tmp_path / artifacts.DAILY_PACKET_FILE).read_text(encoding="utf-8").splitlines()
     ]
-    latest = json.loads((tmp_path / artifacts.DAILY_PACKET_LATEST_FILE).read_text())
+    latest = json.loads((tmp_path / artifacts.DAILY_PACKET_LATEST_FILE).read_text(encoding="utf-8"))
     assert len(packet_rows) == 1
     assert packet_rows[0]["record_type"] == "continuous_intelligence_daily_autonomy_packet"
     assert latest["packet_id"] == packet["packet_id"]

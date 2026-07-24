@@ -296,7 +296,7 @@ class ModelMonitor:
         if not manifest_path.exists():
             return None
         try:
-            return json.loads(manifest_path.read_text())
+            return json.loads(manifest_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
             log.warning("Failed to read manifest %s: %s", manifest_path, exc)
             return None

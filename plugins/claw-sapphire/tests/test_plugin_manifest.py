@@ -10,7 +10,7 @@ MANIFEST_PATH = PLUGIN_ROOT / "plugin.json"
 
 
 def _load_manifest() -> dict:
-    return json.loads(MANIFEST_PATH.read_text())
+    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
 def test_manifest_registered_tools_are_intentional():

@@ -99,7 +99,7 @@ def _read_secret_file(name: str) -> str | None:
     path = _secrets_dir() / name
     try:
         if path.is_file():
-            return path.read_text().strip() or None
+            return path.read_text(encoding="utf-8").strip() or None
     except OSError as exc:
         log.warning("Failed to read secret %s: %s", path, exc)
     return None

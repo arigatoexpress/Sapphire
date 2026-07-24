@@ -243,7 +243,7 @@ def action_validate(payload: dict[str, Any]) -> dict[str, Any]:
             p = Path(path)
             if not p.exists() or not p.is_file():
                 return {"ok": False, "error": f"pine file not found: {path}"}
-            src = p.read_text()
+            src = p.read_text(encoding="utf-8")
     if src is None:
         return {
             "ok": False,
@@ -299,7 +299,7 @@ def action_push_to_tv(payload: dict[str, Any]) -> dict[str, Any]:
             p = Path(path)
             if not p.exists():
                 return {"ok": False, "error": f"pine file not found: {path}"}
-            src = p.read_text()
+            src = p.read_text(encoding="utf-8")
     if not isinstance(src, str) or not src.strip():
         return {
             "ok": False,

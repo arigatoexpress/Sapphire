@@ -113,7 +113,7 @@ def list_drafts(limit: int = 50) -> list[dict]:
     out = []
     for p in files:
         try:
-            data = json.loads(p.read_text())
+            data = json.loads(p.read_text(encoding="utf-8"))
             data["manifest_path"] = str(p.relative_to(REPO_ROOT))
             out.append(data)
         except json.JSONDecodeError:

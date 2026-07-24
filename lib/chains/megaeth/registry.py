@@ -75,7 +75,7 @@ class ProtocolRegistry:
         path = pathlib.Path(path) if path is not None else DEFAULT_REGISTRY_PATH
         if not path.exists():
             raise FileNotFoundError(f"protocol registry not found: {path}")
-        raw = yaml.safe_load(path.read_text()) or {}
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         if not isinstance(raw, dict):
             raise ValueError(f"protocol registry root must be a mapping, got {type(raw).__name__}")
         entries: dict[str, ProtocolEntry] = {}

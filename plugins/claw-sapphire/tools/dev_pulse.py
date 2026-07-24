@@ -199,7 +199,7 @@ def _jsonl_records(path: Path) -> tuple[list[dict], list[str]]:
     if not path.exists():
         return records, errors
     try:
-        lines = path.read_text().splitlines()
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as e:
         return records, [f"{path.name}: {e}"]
     for line_no, line in enumerate(lines, start=1):
@@ -227,7 +227,7 @@ def _read_json_object(path: Path) -> tuple[dict, str | None]:
     if not path.exists():
         return {}, None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         return {}, f"{path.name}: {e}"
     if not isinstance(data, dict):

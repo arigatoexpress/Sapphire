@@ -40,7 +40,7 @@ def test_geocode_writes_negative_cache_on_miss(temp_store, monkeypatch):
     monkeypatch.setattr(geocoder, "_rate_limited_get", lambda *_a, **_k: [])
     lat, lng = geocoder.geocode("nonexistent address xyz")
     assert lat is None and lng is None
-    cache = json.loads((temp_store / "geocache.json").read_text())
+    cache = json.loads((temp_store / "geocache.json").read_text(encoding="utf-8"))
     assert any(v.get("miss") for v in cache.values())
 
 

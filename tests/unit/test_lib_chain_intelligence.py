@@ -432,7 +432,7 @@ def _make_snapshot(regime: Regime = Regime.RISK_ON, score: float = 0.4) -> Chain
 def test_write_last_state_persists_minimal_payload(isolated_data):
     snap = _make_snapshot()
     chain_mod._write_last_state(snap)
-    state = json.loads(chain_mod.LAST_STATE_FILE.read_text())
+    state = json.loads(chain_mod.LAST_STATE_FILE.read_text(encoding="utf-8"))
     assert state["regime"] == "RISK_ON"
     assert state["score"] == 0.4
     assert state["unix_ts"] == 1000
@@ -441,7 +441,7 @@ def test_write_last_state_persists_minimal_payload(isolated_data):
 def test_append_history_writes_jsonl_entry_with_required_fields(isolated_data):
     snap = _make_snapshot()
     chain_mod._append_history(snap)
-    lines = chain_mod.HISTORY_FILE.read_text().splitlines()
+    lines = chain_mod.HISTORY_FILE.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     entry = json.loads(lines[0])
     # Contract enforced by correlation engine: kind/state/unix_ts must exist
@@ -456,7 +456,7 @@ def test_append_history_appends_without_overwriting(isolated_data):
     snap2 = _make_snapshot(regime=Regime.RISK_OFF, score=-0.4)
     chain_mod._append_history(snap1)
     chain_mod._append_history(snap2)
-    lines = chain_mod.HISTORY_FILE.read_text().splitlines()
+    lines = chain_mod.HISTORY_FILE.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     assert json.loads(lines[0])["state"] == "RISK_ON"
     assert json.loads(lines[1])["state"] == "RISK_OFF"

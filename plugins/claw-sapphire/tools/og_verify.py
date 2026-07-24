@@ -98,7 +98,7 @@ def main() -> None:
             sys.exit(3)
 
         try:
-            envelope = json.loads(tmp_path.read_text())
+            envelope = json.loads(tmp_path.read_text(encoding="utf-8"))
         except Exception as exc:
             print(
                 json.dumps(

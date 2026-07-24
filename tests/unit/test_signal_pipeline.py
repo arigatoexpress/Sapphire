@@ -171,7 +171,7 @@ class TestAuditTrail:
         pl, sig_dir = pipeline
         pl.process(_raw())
         f = list(sig_dir.glob("*.jsonl"))[0]
-        for line in f.read_text().strip().splitlines():
+        for line in f.read_text(encoding="utf-8").strip().splitlines():
             data = json.loads(line)
             assert "symbol" in data
 
@@ -180,7 +180,7 @@ class TestAuditTrail:
         pl.process(_raw(symbol="BTC"))
         pl.process(_raw(symbol="ETH"))
         f = list(sig_dir.glob("*.jsonl"))[0]
-        lines = [l for l in f.read_text().strip().splitlines() if l.strip()]
+        lines = [l for l in f.read_text(encoding="utf-8").strip().splitlines() if l.strip()]
         assert len(lines) == 2
 
     def test_audit_path_in_result(self, pipeline):
@@ -202,7 +202,7 @@ class TestOutcomeWriteback:
         assert ok is True
         # Verify the JSONL was updated
         f = list(sig_dir.glob("*.jsonl"))[0]
-        for line in f.read_text().strip().splitlines():
+        for line in f.read_text(encoding="utf-8").strip().splitlines():
             if not line.strip():
                 continue
             data = json.loads(line)
@@ -217,7 +217,7 @@ class TestOutcomeWriteback:
         pid = result.scored.pipeline_id
         pl.update_signal_outcome(pid, "loss", -150.0)
         f = list(sig_dir.glob("*.jsonl"))[0]
-        for line in f.read_text().strip().splitlines():
+        for line in f.read_text(encoding="utf-8").strip().splitlines():
             if not line.strip():
                 continue
             data = json.loads(line)
@@ -280,7 +280,7 @@ class TestOutcomeWriteback:
         # Both outcomes should be in the file
         f = list(sig_dir.glob("*.jsonl"))[0]
         outcomes = {}
-        for line in f.read_text().strip().splitlines():
+        for line in f.read_text(encoding="utf-8").strip().splitlines():
             if not line.strip():
                 continue
             data = json.loads(line)

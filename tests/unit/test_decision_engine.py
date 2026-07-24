@@ -190,7 +190,7 @@ class TestDecisionEngine:
         )
         logs = list((tmp_path / "decisions").glob("*.jsonl"))
         assert len(logs) == 1
-        record = json.loads(logs[0].read_text().strip().splitlines()[0])
+        record = json.loads(logs[0].read_text(encoding="utf-8").strip().splitlines()[0])
         assert record["symbol"] == "BTC"
         assert record["verdict"] == "ALLOW"
         assert "regime_penalty" in record["rules_fired"]

@@ -316,7 +316,7 @@ def _read_last_state() -> dict | None:
     if not LAST_STATE_FILE.exists():
         return None
     try:
-        return json.loads(LAST_STATE_FILE.read_text())
+        return json.loads(LAST_STATE_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
 

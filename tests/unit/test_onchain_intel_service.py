@@ -27,7 +27,7 @@ def test_write_snapshot_writes_latest_and_archive(tmp_path):
     assert paths["latest_path"] == str(latest)
     assert latest.exists()
     assert (tmp_path / "latest" / "onchain_intel.json.envelope.json").exists()
-    assert json.loads(latest.read_text())["schema_version"] == "0.2.0"
+    assert json.loads(latest.read_text(encoding="utf-8"))["schema_version"] == "0.2.0"
     assert (tmp_path / "latest" / "archive").exists()
 
 

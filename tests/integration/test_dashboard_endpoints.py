@@ -181,7 +181,7 @@ def test_opportunities_reads_signals_jsonl(app_client, tmp_path, monkeypatch):
     # Recreate the signals path under tmp_path per the endpoint's layout
     target = tmp_path / "Code" / "Sapphire" / "data"
     target.mkdir(parents=True)
-    (target / "trading_signals.jsonl").write_text(fake_signals.read_text())
+    (target / "trading_signals.jsonl").write_text(fake_signals.read_text(encoding="utf-8"))
 
     r = client.get("/api/opportunities", headers={"Authorization": _AUTH})
     assert r.status_code == 200

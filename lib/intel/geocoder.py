@@ -35,7 +35,7 @@ def _load_cache() -> dict[str, dict[str, Any]]:
     if not GEOCACHE_FILE.exists():
         return {}
     try:
-        return json.loads(GEOCACHE_FILE.read_text())
+        return json.loads(GEOCACHE_FILE.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
 

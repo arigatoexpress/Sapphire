@@ -259,4 +259,4 @@ class PerformanceTracker:
     def _read_lines(self) -> list[str]:
         if not self._file.exists():
             return []
-        return [l for l in self._file.read_text().splitlines() if l.strip()]
+        return [l for l in self._file.read_text(encoding="utf-8").splitlines() if l.strip()]

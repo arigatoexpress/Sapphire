@@ -91,7 +91,7 @@ def _grade_from_score_value(score: Any) -> str | None:
 def _load_state() -> dict:
     if STATE_FILE.exists():
         try:
-            return json.loads(STATE_FILE.read_text())
+            return json.loads(STATE_FILE.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             log.warning("state file corrupted, starting fresh")
     return {}
@@ -161,7 +161,7 @@ def transform_signals(files: list[Path]) -> Iterator[dict]:
     """
     now = _now_iso()
     for fp in files:
-        # Stream line-by-line; the prior `.read_text().splitlines()` loaded
+        # Stream line-by-line; the prior `.read_text(encoding="utf-8").splitlines()` loaded
         # the entire JSONL into memory twice (once as text, once as list),
         # which is expensive for multi-MB signal-days.
         try:
@@ -214,7 +214,7 @@ def transform_predictions(files: list[Path]) -> Iterator[dict]:
     now = _now_iso()
     for fp in files:
         try:
-            data = json.loads(fp.read_text())
+            data = json.loads(fp.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             log.warning("predictions read failed %s: %s", fp, e)
             continue
@@ -265,7 +265,7 @@ def transform_threats(files: list[Path]) -> Iterator[dict]:
     now = _now_iso()
     for fp in files:
         try:
-            data = json.loads(fp.read_text())
+            data = json.loads(fp.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             log.warning("threats read failed %s: %s", fp, e)
             continue
@@ -330,7 +330,7 @@ def transform_regime(files: list[Path]) -> Iterator[dict]:
     now = _now_iso()
     for fp in files:
         try:
-            snap = json.loads(fp.read_text())
+            snap = json.loads(fp.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             log.warning("regime read failed %s: %s", fp, e)
             continue
@@ -413,7 +413,7 @@ def transform_leads(files: list[Path]) -> Iterator[dict]:
             yield from _transform_houston_leads_jsonl(fp, now=now)
             continue
         try:
-            data = json.loads(fp.read_text())
+            data = json.loads(fp.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             log.warning("leads read failed %s: %s", fp, e)
             continue

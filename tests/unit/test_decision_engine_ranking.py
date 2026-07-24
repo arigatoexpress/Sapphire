@@ -339,7 +339,7 @@ class TestRegimeShiftStateFile:
         engine.scan_alerts({"regime": "TREND_UP"})
         state_path = tmp_path / "last_regime.json"
         assert state_path.exists()
-        record = json.loads(state_path.read_text())
+        record = json.loads(state_path.read_text(encoding="utf-8"))
         assert record["regime"] == "TREND_UP"
         assert "ts" in record
 
@@ -347,7 +347,7 @@ class TestRegimeShiftStateFile:
         engine.scan_alerts({"regime": "TREND_UP"})
         # Now a scan with unknown regime — must not overwrite.
         engine.scan_alerts({})
-        record = json.loads((tmp_path / "last_regime.json").read_text())
+        record = json.loads((tmp_path / "last_regime.json").read_text(encoding="utf-8"))
         assert record["regime"] == "TREND_UP"
 
     def test_corrupt_state_file_treated_as_empty(self, engine, tmp_path):

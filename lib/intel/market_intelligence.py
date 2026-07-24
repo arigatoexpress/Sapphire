@@ -853,7 +853,7 @@ def _load_raw_snapshot() -> dict | None:
     if not SNAPSHOT_FILE.exists():
         return None
     try:
-        return json.loads(SNAPSHOT_FILE.read_text())
+        return json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))
     except Exception:
         return None
 

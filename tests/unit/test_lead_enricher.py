@@ -250,7 +250,7 @@ def test_enrich_pipeline_filters_by_grade(tmp_path, monkeypatch):
     result = le.enrich_pipeline(pipeline, grade_filter="A")
     assert result["enriched_count"] == 1
     # Verify on-disk rewrite
-    reloaded = json.loads(pipeline.read_text())
+    reloaded = json.loads(pipeline.read_text(encoding="utf-8"))
     assert "enriched_leads" in reloaded
     assert len(reloaded["enriched_leads"]) == 1
     # Merged fields into source lead
@@ -371,7 +371,7 @@ def test_enrich_pipeline_merges_geo_into_lead(tmp_path):
     )
     out = enrich_pipeline(pipeline)
     assert out["enriched_count"] == 1
-    reloaded = json.loads(pipeline.read_text())
+    reloaded = json.loads(pipeline.read_text(encoding="utf-8"))
     lead = reloaded["leads"][0]
     assert lead["latitude"] is not None
     assert lead["longitude"] is not None

@@ -601,7 +601,7 @@ class SapphireCtl:
             "import json\n"
             f"env_file = Path('{env_path}')\n"
             f"updates = json.loads('''{updates_json}''')\n"
-            "lines = env_file.read_text().splitlines() if env_file.exists() else []\n"
+            "lines = env_file.read_text(encoding="utf-8").splitlines() if env_file.exists() else []\n"
             "out = []\n"
             "seen = set()\n"
             "for ln in lines:\n"

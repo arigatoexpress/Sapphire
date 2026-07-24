@@ -125,7 +125,7 @@ def test_shadow_history_appends_compact_run_records(tmp_path):
     first = controller.write_shadow_history(report, history)
     second = controller.write_shadow_history(report, history)
 
-    rows = [line for line in history.read_text().splitlines() if line]
+    rows = [line for line in history.read_text(encoding="utf-8").splitlines() if line]
     assert len(rows) == 2
     assert first["record_type"] == "shadow_controller_run"
     assert first["report_sha256"] == second["report_sha256"]

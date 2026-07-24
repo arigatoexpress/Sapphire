@@ -204,7 +204,7 @@ def handle_callback(
 
     if action == _CB_VIEW:
         try:
-            body = json.loads(pending.read_text()).get("body", "")
+            body = json.loads(pending.read_text(encoding="utf-8")).get("body", "")
         except Exception as e:
             body = f"(failed to read draft: {e})"
         # Preview up to first 3500 chars (Telegram fits ~4096 in one message)

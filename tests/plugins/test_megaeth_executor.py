@@ -301,7 +301,7 @@ def test_trade_log_appended_on_block(
     ex.send_transaction(good_tx)
     log_path = Path(policy.trade_log_path)
     assert log_path.exists()
-    rows = [json.loads(line) for line in log_path.read_text().splitlines() if line]
+    rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines() if line]
     assert rows[-1]["status"] == "blocked"
     assert "killswitch_active" in rows[-1]["blockers"]
 

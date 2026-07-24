@@ -593,7 +593,7 @@ def _load_quota_config() -> dict:
     config_path = os.getenv("INFERENCE_QUOTAS_FILE", "").strip()
     if not raw and config_path:
         try:
-            raw = Path(config_path).expanduser().read_text().strip()
+            raw = Path(config_path).expanduser().read_text(encoding="utf-8").strip()
         except OSError as exc:
             log.warning("Could not read inference quota config file: %s", exc)
             raw = ""

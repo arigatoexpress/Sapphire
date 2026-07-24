@@ -238,7 +238,7 @@ def _execute_tool(name: str, args: dict) -> str:
     elif name == "get_prediction_history":
         pred_path = Path.home() / "Code" / "Sapphire" / "data" / "trading_predictions.jsonl"
         if pred_path.exists():
-            preds = [json.loads(l) for l in pred_path.read_text().strip().splitlines() if l.strip()]
+            preds = [json.loads(l) for l in pred_path.read_text(encoding="utf-8").strip().splitlines() if l.strip()]
             scored = [p for p in preds if p.get("correct") is not None]
             correct = sum(1 for p in scored if p["correct"])
             return json.dumps(

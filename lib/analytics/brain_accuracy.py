@@ -97,7 +97,7 @@ def _load_decisions() -> list[dict[str, Any]]:
     if not DECISIONS_FILE.exists():
         return []
     records = []
-    for line in DECISIONS_FILE.read_text().splitlines():
+    for line in DECISIONS_FILE.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue

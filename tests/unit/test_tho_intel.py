@@ -279,6 +279,6 @@ class TestNoHardcodedSecrets:
     """Guard against regressions that bake the PIN back into source."""
 
     def test_pin_not_in_tho_intel(self):
-        src = (INTERNAL / "tho_intel.py").read_text()
+        src = (INTERNAL / "tho_intel.py").read_text(encoding="utf-8")
         assert '"4832"' not in src, "Hardcoded PIN must not appear in source"
         assert "'4832'" not in src

@@ -9,7 +9,7 @@ FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "redteam"
 
 
 def _load(name: str) -> list[dict]:
-    return json.loads((FIXTURES / name).read_text())
+    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
 def test_risk_kernel_rejects_at_least_95_percent_of_leakage_set() -> None:

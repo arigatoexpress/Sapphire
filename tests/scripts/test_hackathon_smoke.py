@@ -177,7 +177,7 @@ def test_target_robinhood_dry_run(tmp_path: Path) -> None:
     assert "DRY-RUN COMPLETE" in result.stderr
     # The robinhood section should appear in the appended summary.
     assert SUMMARY_FILE.exists(), "submission_artifacts.md should have been written"
-    contents = SUMMARY_FILE.read_text()
+    contents = SUMMARY_FILE.read_text(encoding="utf-8")
     assert "Robinhood Chain (London Buildathon" in contents
     assert "Chain ID: 46630" in contents
 
@@ -213,7 +213,7 @@ def test_target_both_dry_run(tmp_path: Path) -> None:
     )
     assert "DRY-RUN COMPLETE" in result.stderr
     assert SUMMARY_FILE.exists(), "submission_artifacts.md should have been written"
-    contents = SUMMARY_FILE.read_text()
+    contents = SUMMARY_FILE.read_text(encoding="utf-8")
     # Both sections present.
     assert "0G (APAC Buildathon" in contents
     assert "Robinhood Chain (London Buildathon" in contents

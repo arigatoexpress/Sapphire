@@ -119,7 +119,7 @@ def _cache_get(key: str) -> Any | None:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if time.time() - data.get("_ts", 0) > CACHE_TTL_SECS:
             return None
         return data.get("value")
@@ -370,7 +370,7 @@ def enrich_pipeline(pipeline_path: Path, grade_filter: str = "A") -> dict[str, A
         return {"error": f"not found: {pipeline_path}"}
 
     try:
-        doc = json.loads(pipeline_path.read_text())
+        doc = json.loads(pipeline_path.read_text(encoding="utf-8"))
     except Exception as e:
         return {"error": f"bad JSON: {e}"}
 

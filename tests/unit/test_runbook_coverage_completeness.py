@@ -33,7 +33,7 @@ def _audit_rows() -> list[dict[str, str]]:
     row that includes cron + availability columns). Walk each pipe-row
     and locate the score column dynamically.
     """
-    text = AUDIT_FILE.read_text()
+    text = AUDIT_FILE.read_text(encoding="utf-8")
     rows: list[dict[str, str]] = []
     for raw_line in text.splitlines():
         line = raw_line.strip()
@@ -94,7 +94,7 @@ def test_audit_has_meaningful_size():
 
 def test_audit_has_rubric_section():
     """The doc must define the 1-5 rubric explicitly so scores are calibrated."""
-    text = AUDIT_FILE.read_text()
+    text = AUDIT_FILE.read_text(encoding="utf-8")
     assert "Scoring rubric" in text or "scoring rubric" in text, (
         "audit must include a scoring rubric explanation"
     )
@@ -107,7 +107,7 @@ def test_audit_has_rubric_section():
 
 def test_audit_has_aggregate_section():
     """The doc must surface aggregate scores so reviewers can scan totals."""
-    text = AUDIT_FILE.read_text()
+    text = AUDIT_FILE.read_text(encoding="utf-8")
     assert "Aggregate" in text, "audit must include an Aggregate section"
     # Spot-check at least one aggregate metric is reported.
     assert re.search(r"average", text, re.IGNORECASE), (
@@ -117,7 +117,7 @@ def test_audit_has_aggregate_section():
 
 def test_audit_has_remediation_order():
     """The doc must prioritize what to fix first — not just enumerate gaps."""
-    text = AUDIT_FILE.read_text()
+    text = AUDIT_FILE.read_text(encoding="utf-8")
     assert "Recommended remediation order" in text or "remediation" in text.lower(), (
         "audit must include a remediation-priority section"
     )
@@ -185,7 +185,7 @@ def test_every_cited_runbook_resolves():
 
 def test_audit_covers_known_critical_surfaces():
     """The audit must mention every critical-path surface explicitly."""
-    text = AUDIT_FILE.read_text().lower()
+    text = AUDIT_FILE.read_text(encoding="utf-8").lower()
     critical = [
         "alpha",
         "webhook",
@@ -278,7 +278,7 @@ def test_tranche7_uplift_runbook_files_are_operator_substantive(runbook: str):
     """New runbooks must include real operating commands and failure guidance."""
     path = OPS_DIR / runbook
     assert path.is_file(), f"missing runbook {path}"
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert len(text) > 2500, f"{runbook} is too short to be operationally useful"
     for required in ("Normal Operation", "Common Failures", "Safety Notes", "Escalation"):
         assert required in text, f"{runbook} missing {required!r} section"
@@ -291,7 +291,7 @@ def test_slos_file_exists_as_companion_artifact():
 
 def test_slos_file_marks_aspirational_explicitly():
     """SLOs that exceed current measurement must be marked 'aspirational'."""
-    text = SLO_FILE.read_text()
+    text = SLO_FILE.read_text(encoding="utf-8")
     assert "aspirational" in text.lower(), (
         "slos.md must mark at least one SLO as 'aspirational' per Lane 2 spec"
     )
@@ -303,7 +303,7 @@ def test_slos_file_marks_aspirational_explicitly():
 
 def test_slos_file_covers_availability_latency_error_freshness():
     """The SLO doc must define all four SLO axes per the lane spec."""
-    text = SLO_FILE.read_text().lower()
+    text = SLO_FILE.read_text(encoding="utf-8").lower()
     for axis in ("availability", "latency", "error rate", "freshness"):
         assert axis in text, f"slos.md must define the {axis!r} SLO axis"
 
@@ -329,5 +329,5 @@ def test_audit_count_matches_lane_spec_floor():
 )
 def test_audit_has_three_top_level_sections(section_anchor: str):
     """Audit must split into Services / LaunchAgents / Cloud routines."""
-    text = AUDIT_FILE.read_text()
+    text = AUDIT_FILE.read_text(encoding="utf-8")
     assert section_anchor in text, f"audit must have section {section_anchor!r}"

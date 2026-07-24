@@ -93,7 +93,7 @@ def _load_closed_trades() -> list[Trade]:
     # Paper portfolio history (authoritative for paper_trader exits)
     if PORTFOLIO_FILE.exists():
         try:
-            pf = json.loads(PORTFOLIO_FILE.read_text())
+            pf = json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8"))
             for t in pf.get("history") or []:
                 entry = float(t.get("entry_price") or 0.0)
                 exit_p = float(t.get("exit_price") or 0.0)
@@ -121,7 +121,7 @@ def _load_closed_trades() -> list[Trade]:
     if SIGNALS_DIR.exists():
         for f in sorted(SIGNALS_DIR.glob("*.jsonl")):
             try:
-                for line in f.read_text().splitlines():
+                for line in f.read_text(encoding="utf-8").splitlines():
                     line = line.strip()
                     if not line:
                         continue
@@ -179,7 +179,7 @@ def _collect_btc_prices() -> list[tuple[datetime, float]]:
     # From trading_signals.jsonl
     if LEGACY_SIGNALS.exists():
         try:
-            for line in LEGACY_SIGNALS.read_text().splitlines():
+            for line in LEGACY_SIGNALS.read_text(encoding="utf-8").splitlines():
                 try:
                     r = json.loads(line)
                 except json.JSONDecodeError:
@@ -197,7 +197,7 @@ def _collect_btc_prices() -> list[tuple[datetime, float]]:
     if SIGNALS_DIR.exists():
         for f in sorted(SIGNALS_DIR.glob("*.jsonl")):
             try:
-                for line in f.read_text().splitlines():
+                for line in f.read_text(encoding="utf-8").splitlines():
                     try:
                         r = json.loads(line)
                     except json.JSONDecodeError:
@@ -219,7 +219,7 @@ def _collect_btc_prices() -> list[tuple[datetime, float]]:
     # From portfolio history (exits for BTC)
     if PORTFOLIO_FILE.exists():
         try:
-            pf = json.loads(PORTFOLIO_FILE.read_text())
+            pf = json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8"))
             for t in pf.get("history") or []:
                 if "BTC" not in str(t.get("symbol") or "").upper():
                     continue

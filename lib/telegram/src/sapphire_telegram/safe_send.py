@@ -64,10 +64,10 @@ def get_bot_token(override: str | None = None) -> str | None:
     for prefix in _SECRET_PATHS:
         path = prefix / "telegram_bot_token"
         if path.exists():
-            return path.read_text().strip()
+            return path.read_text(encoding="utf-8").strip()
     env_path = Path.home() / "Code" / "Sapphire" / "services" / "control-plane" / ".env"
     if env_path.exists():
-        for line in env_path.read_text().splitlines():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
             if line.startswith("TELEGRAM_BOT_TOKEN="):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return None
@@ -87,7 +87,7 @@ def get_chat_id(override: str | None = None) -> str | None:
     for prefix in _SECRET_PATHS:
         path = prefix / "telegram_chat_id"
         if path.exists():
-            return path.read_text().strip()
+            return path.read_text(encoding="utf-8").strip()
     return None
 
 

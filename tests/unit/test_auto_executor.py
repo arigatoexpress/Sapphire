@@ -98,7 +98,7 @@ class TestRunOnceExactlyOnce:
         signal = _signal()
         for _ in range(3):
             self._run_pass(config, signal)
-        rows = [json.loads(line) for line in config.audit_log.read_text().splitlines()]
+        rows = [json.loads(line) for line in config.audit_log.read_text(encoding="utf-8").splitlines()]
         executed = [r for r in rows if r["verdict"] == "PAPER_EXECUTED"]
         assert len(executed) == 1
 
@@ -113,7 +113,7 @@ class TestSingleInstanceLock:
     def test_acquire_and_release(self, tmp_path):
         lock = tmp_path / "exec.lock"
         assert _acquire_single_instance_lock(lock) is True
-        assert lock.read_text() == str(os.getpid())
+        assert lock.read_text(encoding="utf-8") == str(os.getpid())
         _release_single_instance_lock(lock)
         assert not lock.exists()
 

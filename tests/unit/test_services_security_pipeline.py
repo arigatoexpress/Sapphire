@@ -432,7 +432,7 @@ def test_main_writes_pipeline_json_with_expected_shape(run_mod, monkeypatch):
     assert rc == 0
     out_path = module.OUTPUT_DIR / "pipeline.json"
     assert out_path.exists()
-    report = json.loads(out_path.read_text())
+    report = json.loads(out_path.read_text(encoding="utf-8"))
 
     assert report["date"] == module.TODAY
     assert "timestamp" in report
@@ -455,7 +455,7 @@ def test_main_truncates_findings_to_first_twenty(run_mod, monkeypatch):
     monkeypatch.setattr(module, "refresh_threat_intel", lambda: {})
 
     module.main()
-    report = json.loads((module.OUTPUT_DIR / "pipeline.json").read_text())
+    report = json.loads((module.OUTPUT_DIR / "pipeline.json").read_text(encoding="utf-8"))
 
     assert report["secrets"]["count"] == 50
     assert len(report["secrets"]["findings"]) == 20
@@ -470,7 +470,7 @@ def test_main_handles_missing_total_in_threat_response(run_mod, monkeypatch):
     monkeypatch.setattr(module, "refresh_threat_intel", lambda: {"status": "tool not found"})
 
     rc = module.main()
-    report = json.loads((module.OUTPUT_DIR / "pipeline.json").read_text())
+    report = json.loads((module.OUTPUT_DIR / "pipeline.json").read_text(encoding="utf-8"))
 
     assert rc == 0
     assert report["threats"]["count"] == 0

@@ -61,7 +61,7 @@ def test_run_once_writes_publishable_jsonl_and_envelope(isolated) -> None:
     path = Path(result["output_path"])
     assert path.exists()
     assert path.with_name("theses.jsonl.envelope.json").exists()
-    row = json.loads(path.read_text().splitlines()[0])
+    row = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
     assert row["symbol"] == "BTC"
     assert row["rubric"]["publishable"] is True
     assert row["source_signal"]["tranche4_context"]["schema_version"] == 1

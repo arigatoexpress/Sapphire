@@ -865,7 +865,7 @@ def load_static_watchlist() -> dict[str, Any]:
     if not STATIC_WATCHLIST_FILE.exists():
         return {}
     try:
-        return json.loads(STATIC_WATCHLIST_FILE.read_text())
+        return json.loads(STATIC_WATCHLIST_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
 

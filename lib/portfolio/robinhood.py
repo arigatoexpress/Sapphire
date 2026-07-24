@@ -89,8 +89,8 @@ def _quote_midpoint(item: dict[str, Any]) -> float | None:
 
 def _load_credentials() -> tuple[str, bytes]:
     """Load API key + Ed25519 private key bytes from the secrets dir."""
-    api_key = (_SECRETS / "robinhood_api_key").read_text().strip()
-    private_b64 = (_SECRETS / "robinhood_ed25519_private.b64").read_text().strip()
+    api_key = (_SECRETS / "robinhood_api_key").read_text(encoding="utf-8").strip()
+    private_b64 = (_SECRETS / "robinhood_ed25519_private.b64").read_text(encoding="utf-8").strip()
     private_bytes = base64.b64decode(private_b64)
     return api_key, private_bytes
 

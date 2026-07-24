@@ -78,7 +78,7 @@ def _load_webhook_secret() -> str:
         return secret
     fallback = Path.home() / ".config" / "sapphire-secrets" / "telegram_webhook_secret"
     try:
-        return fallback.read_text().strip()
+        return fallback.read_text(encoding="utf-8").strip()
     except OSError:
         return ""
 
@@ -247,7 +247,7 @@ async def recent_signals():
     if not SIGNALS_PATH.exists():
         return {"signals": [], "count": 0}
 
-    lines = SIGNALS_PATH.read_text().strip().splitlines()[-20:]
+    lines = SIGNALS_PATH.read_text(encoding="utf-8").strip().splitlines()[-20:]
     signals = []
     for line in lines:
         with contextlib.suppress(json.JSONDecodeError):

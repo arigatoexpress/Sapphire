@@ -45,7 +45,7 @@ class StubClient:
 async def test_lend_overview_aggregates_recorded_fixture() -> None:
     if not FIXTURE.exists():
         pytest.skip(f"fixture missing: {FIXTURE}")
-    raw_hex = FIXTURE.read_text().strip()
+    raw_hex = FIXTURE.read_text(encoding="utf-8").strip()
     client = StubClient({UI_POOL: raw_hex})
     proto = MegaETHProtocols(client, registry=ProtocolRegistry.from_yaml())
     ov = await proto.lend_overview()

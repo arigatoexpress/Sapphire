@@ -236,7 +236,7 @@ def test_record_realized_pnl_accumulates_loss(policy: HyperliquidLivePolicy) -> 
     record_realized_pnl(policy, -2.5)
     record_realized_pnl(policy, 1.0)  # gain shouldn't add to loss bucket
 
-    body = json.loads(Path(policy.daily_pnl_path).read_text())
+    body = json.loads(Path(policy.daily_pnl_path).read_text(encoding="utf-8"))
     today = body[date.today().isoformat()]
 
     assert today["realized_loss_usd"] == 5.5
@@ -336,7 +336,7 @@ async def test_executor_logs_each_result_to_jsonl(
     await executor.execute_signal({"symbol": "BTC", "action": "buy", "size_usd": 5})
     await executor.execute_signal({"symbol": "BTC", "action": "yolo", "size_usd": 5})
 
-    lines = Path(policy.trade_log_path).read_text().splitlines()
+    lines = Path(policy.trade_log_path).read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     rows = [json.loads(line) for line in lines]
     assert {row["status"] for row in rows} == {"executed", "blocked"}

@@ -32,7 +32,7 @@ TIER_MAP = {"t0": "t0_nemotron", "t1": "t1_kimi", "t2": "t2_claw", "t3": "t3_cla
 def _load() -> dict:
     if USAGE_PATH.exists():
         try:
-            return json.loads(USAGE_PATH.read_text())
+            return json.loads(USAGE_PATH.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return {}
     return {}
