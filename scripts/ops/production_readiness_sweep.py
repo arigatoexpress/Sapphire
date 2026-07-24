@@ -558,6 +558,12 @@ def _probe_windows_tasks() -> list[Check]:
             capture_output=True,
             text=True,
             check=True,
+            # A readiness probe must never block. Without this, spawning
+            # PowerShell under the LOCAL SYSTEM runner service hung the whole
+            # pytest job for 23 minutes until the CI timeout killed it, leaving
+            # orphaned powershell processes behind. TimeoutExpired is an
+            # Exception, so the existing handler below degrades to parsed={}.
+            timeout=30,
         )
         import json
 
