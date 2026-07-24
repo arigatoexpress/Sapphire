@@ -96,29 +96,63 @@ selected. So `git` is found, `bash` is not, and the lookup falls through to
 `C:\Windows\System32\bash.exe` — the WSL launcher. The runner is installed as a
 service under LOCAL SYSTEM, and WSL refuses to run as LOCAL SYSTEM.
 
-Nothing in the repo can fix this well: hardcoding a Windows bash path into
-`defaults.run.shell` would break the same jobs whenever they fall back to the
-Mac, and any workaround step would itself need a working shell to run. It is a
-one-line machine fix.
+### Fix, applied in-repo (no machine access needed)
 
-**Fix — put Git's `bin` ahead of System32 for the runner service, then restart
-it.** Either:
+The seven portable jobs now carry a job-level shell default that names Git Bash
+explicitly, keyed off the same variable that selects the runner:
 
-- Add `C:\Program Files\Git\bin` to the *system* PATH (System Properties →
-  Environment Variables → System variables → Path), or
-- Set it for the runner only, via `<runner-dir>\.env` (the runner reads this at
-  service start):
+```yaml
+defaults:
+  run:
+    shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows')
+               && 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}'
+               || 'bash' }}
+```
+
+The Git install path is not a guess: the same failing logs show
+`[command]"C:\Program Files\Git\cmd\git.exe" version` succeeding, so Git for
+Windows is at `C:\Program Files\Git\` and `bin\bash.exe` is beside `cmd\`.
+The argument list matches what the runner passes for built-in `bash`, so step
+semantics (`-e`, `pipefail`) are unchanged.
+
+Keying on `SAPPHIRE_RUNNER_TESTS` rather than hardcoding means pointing that
+variable back at the macOS box transparently restores plain `bash` — the
+override is not a one-way door. The three host-bound jobs (`smoke-test`,
+`deploy`, `secrets-scan`) are untouched and keep the workflow-level `bash`.
+
+### Optional machine-side cleanup (not required)
+
+Still worth doing when someone is at the box, because it fixes `bash` for
+everything else on that machine too — but CI no longer depends on it:
+
+- Add `C:\Program Files\Git\bin` to the *system* PATH, or set it for the runner
+  only via `<runner-dir>\.env` (read at service start):
   ```
   PATH=C:\Program Files\Git\bin;C:\Program Files\Git\usr\bin;%PATH%
   ```
-  Runner dir here is `C:\Users\aribs\.github-runners\sapphire-win`.
+  Runner dir is `C:\Users\aribs\.github-runners\sapphire-win`.
 
-Then restart the runner service and re-run the jobs. Verify with a dispatch of
-`win-runner-smoke.yml` before trusting PR checks again.
+That `.env` file **already exists and is already wrong** — the failing logs show
+it injecting macOS paths onto the Windows box:
+
+```
+AGENT_TOOLSDIRECTORY: /Users/aribs/.github-runners/toolcache
+RUNNER_TOOL_CACHE:    /Users/aribs/.github-runners/toolcache
+```
+
+`/Users/aribs/...` does not exist on `DESKTOP-HFCK6U9`; the config was copied
+from the Mac runner. Nothing uses the tool cache today because every job goes
+through `uv`, so it is latent rather than breaking — but the first
+`actions/setup-python` to land will fail on it. Correct values:
+
+```
+AGENT_TOOLSDIRECTORY=C:\Users\aribs\.github-runners\toolcache
+RUNNER_TOOL_CACHE=C:\Users\aribs\.github-runners\toolcache
+```
 
 Running the service as the `aribs` user instead of LOCAL SYSTEM would also make
 the WSL bash work, but that is the worse fix — it leaves CI depending on WSL and
-on a specific user session. Prefer Git Bash on PATH.
+on a specific user session.
 
 ## What stays on the Mac, and why
 

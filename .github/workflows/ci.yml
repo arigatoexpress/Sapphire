@@ -31,6 +31,16 @@ jobs:
     name: lint (ruff)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -45,6 +55,16 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     env:
       AUTH_PASSWORD: ci-placeholder
@@ -79,6 +99,16 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     env:
       # The self-hosted runner's system Python has stray packages (e.g.
@@ -96,6 +126,16 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -109,6 +149,16 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -121,6 +171,16 @@ jobs:
     name: tool registry invariants
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -130,6 +190,16 @@ jobs:
     name: pine static analyzer
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
