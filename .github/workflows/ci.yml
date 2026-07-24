@@ -47,15 +47,39 @@ jobs:
     timeout-minutes: 10
     steps:
       # uv is not on the runner service's PATH: the Windows runner runs as
-      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
-      # invisible to it (`uv: command not found`, exit 127). Provision it in the
-      # job rather than depending on machine state — this also makes the job
-      # reproducible on any runner, hosted or self-hosted.
-      # v6, not v5: v5 targets Node 20, which the runner force-migrates to Node 24,
-      # and the action then dies with a libuv assertion
-      # (!(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94) *after* uv is
-      # already installed — so the step fails despite succeeding.
-      - uses: astral-sh/setup-uv@v6
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: put uv on PATH
+        run: |
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+          # RUNNER_TOOL_CACHE is unreliable on this runner (its .env sets a macOS
+          # path), so derive the tool cache from the workspace instead.
+          # `set -e -o pipefail` is active, so every lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          uvdir=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$uvdir" ] || { [ ! -x "$uvdir/uv.exe" ] && [ ! -x "$uvdir/uv" ]; }; then
+            echo "::error::uv not found on PATH or in the runner tool cache" >&2
+            echo "searched: $ws/../../_tool/uv/*/*" >&2
+            echo "fix: install uv system-wide on this runner, or restore" >&2
+            echo "astral-sh/setup-uv once it ships a Node 24 build" >&2
+            exit 1
+          fi
+          cygpath -w "$uvdir" >> "$GITHUB_PATH" 2>/dev/null || echo "$uvdir" >> "$GITHUB_PATH"
+          echo "added $uvdir to PATH"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: ruff check
         run: uv run --python 3.11 --no-project --with ruff==0.7.4 ruff check --output-format=github .
@@ -87,15 +111,39 @@ jobs:
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
       # uv is not on the runner service's PATH: the Windows runner runs as
-      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
-      # invisible to it (`uv: command not found`, exit 127). Provision it in the
-      # job rather than depending on machine state — this also makes the job
-      # reproducible on any runner, hosted or self-hosted.
-      # v6, not v5: v5 targets Node 20, which the runner force-migrates to Node 24,
-      # and the action then dies with a libuv assertion
-      # (!(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94) *after* uv is
-      # already installed — so the step fails despite succeeding.
-      - uses: astral-sh/setup-uv@v6
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: put uv on PATH
+        run: |
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+          # RUNNER_TOOL_CACHE is unreliable on this runner (its .env sets a macOS
+          # path), so derive the tool cache from the workspace instead.
+          # `set -e -o pipefail` is active, so every lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          uvdir=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$uvdir" ] || { [ ! -x "$uvdir/uv.exe" ] && [ ! -x "$uvdir/uv" ]; }; then
+            echo "::error::uv not found on PATH or in the runner tool cache" >&2
+            echo "searched: $ws/../../_tool/uv/*/*" >&2
+            echo "fix: install uv system-wide on this runner, or restore" >&2
+            echo "astral-sh/setup-uv once it ships a Node 24 build" >&2
+            exit 1
+          fi
+          cygpath -w "$uvdir" >> "$GITHUB_PATH" 2>/dev/null || echo "$uvdir" >> "$GITHUB_PATH"
+          echo "added $uvdir to PATH"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: pytest (unit + coverage)
         # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
@@ -147,15 +195,39 @@ jobs:
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
       # uv is not on the runner service's PATH: the Windows runner runs as
-      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
-      # invisible to it (`uv: command not found`, exit 127). Provision it in the
-      # job rather than depending on machine state — this also makes the job
-      # reproducible on any runner, hosted or self-hosted.
-      # v6, not v5: v5 targets Node 20, which the runner force-migrates to Node 24,
-      # and the action then dies with a libuv assertion
-      # (!(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94) *after* uv is
-      # already installed — so the step fails despite succeeding.
-      - uses: astral-sh/setup-uv@v6
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: put uv on PATH
+        run: |
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+          # RUNNER_TOOL_CACHE is unreliable on this runner (its .env sets a macOS
+          # path), so derive the tool cache from the workspace instead.
+          # `set -e -o pipefail` is active, so every lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          uvdir=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$uvdir" ] || { [ ! -x "$uvdir/uv.exe" ] && [ ! -x "$uvdir/uv" ]; }; then
+            echo "::error::uv not found on PATH or in the runner tool cache" >&2
+            echo "searched: $ws/../../_tool/uv/*/*" >&2
+            echo "fix: install uv system-wide on this runner, or restore" >&2
+            echo "astral-sh/setup-uv once it ships a Node 24 build" >&2
+            exit 1
+          fi
+          cygpath -w "$uvdir" >> "$GITHUB_PATH" 2>/dev/null || echo "$uvdir" >> "$GITHUB_PATH"
+          echo "added $uvdir to PATH"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: pytest (claw-sapphire)
         run: uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest plugins/claw-sapphire/tests/ -q
@@ -181,15 +253,39 @@ jobs:
     timeout-minutes: 15
     steps:
       # uv is not on the runner service's PATH: the Windows runner runs as
-      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
-      # invisible to it (`uv: command not found`, exit 127). Provision it in the
-      # job rather than depending on machine state — this also makes the job
-      # reproducible on any runner, hosted or self-hosted.
-      # v6, not v5: v5 targets Node 20, which the runner force-migrates to Node 24,
-      # and the action then dies with a libuv assertion
-      # (!(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94) *after* uv is
-      # already installed — so the step fails despite succeeding.
-      - uses: astral-sh/setup-uv@v6
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: put uv on PATH
+        run: |
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+          # RUNNER_TOOL_CACHE is unreliable on this runner (its .env sets a macOS
+          # path), so derive the tool cache from the workspace instead.
+          # `set -e -o pipefail` is active, so every lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          uvdir=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$uvdir" ] || { [ ! -x "$uvdir/uv.exe" ] && [ ! -x "$uvdir/uv" ]; }; then
+            echo "::error::uv not found on PATH or in the runner tool cache" >&2
+            echo "searched: $ws/../../_tool/uv/*/*" >&2
+            echo "fix: install uv system-wide on this runner, or restore" >&2
+            echo "astral-sh/setup-uv once it ships a Node 24 build" >&2
+            exit 1
+          fi
+          cygpath -w "$uvdir" >> "$GITHUB_PATH" 2>/dev/null || echo "$uvdir" >> "$GITHUB_PATH"
+          echo "added $uvdir to PATH"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: README test inventory
         run: |
@@ -217,15 +313,39 @@ jobs:
     timeout-minutes: 15
     steps:
       # uv is not on the runner service's PATH: the Windows runner runs as
-      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
-      # invisible to it (`uv: command not found`, exit 127). Provision it in the
-      # job rather than depending on machine state — this also makes the job
-      # reproducible on any runner, hosted or self-hosted.
-      # v6, not v5: v5 targets Node 20, which the runner force-migrates to Node 24,
-      # and the action then dies with a libuv assertion
-      # (!(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94) *after* uv is
-      # already installed — so the step fails despite succeeding.
-      - uses: astral-sh/setup-uv@v6
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: put uv on PATH
+        run: |
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+          # RUNNER_TOOL_CACHE is unreliable on this runner (its .env sets a macOS
+          # path), so derive the tool cache from the workspace instead.
+          # `set -e -o pipefail` is active, so every lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          uvdir=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$uvdir" ] || { [ ! -x "$uvdir/uv.exe" ] && [ ! -x "$uvdir/uv" ]; }; then
+            echo "::error::uv not found on PATH or in the runner tool cache" >&2
+            echo "searched: $ws/../../_tool/uv/*/*" >&2
+            echo "fix: install uv system-wide on this runner, or restore" >&2
+            echo "astral-sh/setup-uv once it ships a Node 24 build" >&2
+            exit 1
+          fi
+          cygpath -w "$uvdir" >> "$GITHUB_PATH" 2>/dev/null || echo "$uvdir" >> "$GITHUB_PATH"
+          echo "added $uvdir to PATH"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: scan public routes for admin data leaks
         run: |
@@ -252,15 +372,39 @@ jobs:
     timeout-minutes: 10
     steps:
       # uv is not on the runner service's PATH: the Windows runner runs as
-      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
-      # invisible to it (`uv: command not found`, exit 127). Provision it in the
-      # job rather than depending on machine state — this also makes the job
-      # reproducible on any runner, hosted or self-hosted.
-      # v6, not v5: v5 targets Node 20, which the runner force-migrates to Node 24,
-      # and the action then dies with a libuv assertion
-      # (!(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94) *after* uv is
-      # already installed — so the step fails despite succeeding.
-      - uses: astral-sh/setup-uv@v6
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: put uv on PATH
+        run: |
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+          # RUNNER_TOOL_CACHE is unreliable on this runner (its .env sets a macOS
+          # path), so derive the tool cache from the workspace instead.
+          # `set -e -o pipefail` is active, so every lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          uvdir=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$uvdir" ] || { [ ! -x "$uvdir/uv.exe" ] && [ ! -x "$uvdir/uv" ]; }; then
+            echo "::error::uv not found on PATH or in the runner tool cache" >&2
+            echo "searched: $ws/../../_tool/uv/*/*" >&2
+            echo "fix: install uv system-wide on this runner, or restore" >&2
+            echo "astral-sh/setup-uv once it ships a Node 24 build" >&2
+            exit 1
+          fi
+          cygpath -w "$uvdir" >> "$GITHUB_PATH" 2>/dev/null || echo "$uvdir" >> "$GITHUB_PATH"
+          echo "added $uvdir to PATH"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
 
@@ -284,15 +428,39 @@ jobs:
     timeout-minutes: 10
     steps:
       # uv is not on the runner service's PATH: the Windows runner runs as
-      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
-      # invisible to it (`uv: command not found`, exit 127). Provision it in the
-      # job rather than depending on machine state — this also makes the job
-      # reproducible on any runner, hosted or self-hosted.
-      # v6, not v5: v5 targets Node 20, which the runner force-migrates to Node 24,
-      # and the action then dies with a libuv assertion
-      # (!(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94) *after* uv is
-      # already installed — so the step fails despite succeeding.
-      - uses: astral-sh/setup-uv@v6
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: put uv on PATH
+        run: |
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+          # RUNNER_TOOL_CACHE is unreliable on this runner (its .env sets a macOS
+          # path), so derive the tool cache from the workspace instead.
+          # `set -e -o pipefail` is active, so every lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          uvdir=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$uvdir" ] || { [ ! -x "$uvdir/uv.exe" ] && [ ! -x "$uvdir/uv" ]; }; then
+            echo "::error::uv not found on PATH or in the runner tool cache" >&2
+            echo "searched: $ws/../../_tool/uv/*/*" >&2
+            echo "fix: install uv system-wide on this runner, or restore" >&2
+            echo "astral-sh/setup-uv once it ships a Node 24 build" >&2
+            exit 1
+          fi
+          cygpath -w "$uvdir" >> "$GITHUB_PATH" 2>/dev/null || echo "$uvdir" >> "$GITHUB_PATH"
+          echo "added $uvdir to PATH"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
