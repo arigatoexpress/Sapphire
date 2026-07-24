@@ -17,6 +17,20 @@ env:
   # writable local cache so no hosted minutes are needed.
   AGENT_TOOLSDIRECTORY: /Users/aribs/.github-runners/toolcache
   RUNNER_TOOL_CACHE: /Users/aribs/.github-runners/toolcache
+  # NB: the two paths above are macOS-shaped and are applied to every job,
+  # including the Windows ones — they point at /Users/aribs on a host where that
+  # does not exist. Harmless today because no job uses setup-python (everything
+  # goes through uv), but it will bite the first action that consults the tool
+  # cache. Tracked in docs/ops/ci-runner-topology.md.
+  #
+  # Windows defaults to cp1252 for text I/O, so any `path.read_text()` or
+  # `open()` without an explicit encoding fails on the box-drawing and em-dash
+  # characters throughout this repo:
+  #   UnicodeDecodeError: 'charmap' codec can't decode byte 0x8f
+  # ~386 such call sites exist; UTF-8 mode covers all of them for CI in one line
+  # and matches the default Python is moving to (PEP 686). New code should still
+  # pass encoding= explicitly — see docs/audits/portfolio-audit-2026-07-24.md.
+  PYTHONUTF8: "1"
 
 permissions:
   contents: read
@@ -25,18 +39,6 @@ permissions:
 defaults:
   run:
     shell: bash
-
-env:
-  # Windows defaults to cp1252 for text I/O, so any `path.read_text()` or
-  # `open()` without an explicit encoding blows up on the box-drawing and em-dash
-  # characters that are all over this repo:
-  #   UnicodeDecodeError: 'charmap' codec can't decode byte 0x8f
-  # There are ~386 such call sites; UTF-8 mode fixes every one of them for CI in
-  # a single line, and matches the default Python is moving to (PEP 686).
-  # New code should still pass encoding= explicitly — see
-  # docs/audits/portfolio-audit-2026-07-24.md.
-  PYTHONUTF8: "1"
-
 
 jobs:
   lint:

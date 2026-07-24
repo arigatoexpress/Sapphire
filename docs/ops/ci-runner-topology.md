@@ -132,23 +132,25 @@ everything else on that machine too — but CI no longer depends on it:
   ```
   Runner dir is `C:\Users\aribs\.github-runners\sapphire-win`.
 
-That `.env` file **already exists and is already wrong** — the failing logs show
-it injecting macOS paths onto the Windows box:
+### Correction: the macOS tool-cache paths come from `ci.yml`, not the runner
+
+An earlier revision of this document blamed the runner's `.env` for the macOS
+paths visible in every Windows job log:
 
 ```
 AGENT_TOOLSDIRECTORY: /Users/aribs/.github-runners/toolcache
 RUNNER_TOOL_CACHE:    /Users/aribs/.github-runners/toolcache
 ```
 
-`/Users/aribs/...` does not exist on `DESKTOP-HFCK6U9`; the config was copied
-from the Mac runner. Nothing uses the tool cache today because every job goes
-through `uv`, so it is latent rather than breaking — but the first
-`actions/setup-python` to land will fail on it. Correct values:
+That was wrong. They are set in **`ci.yml`'s own top-level `env:` block**, with a
+comment explaining they exist for the self-hosted *macOS* runner. Because the
+block is workflow-level it applies to every job, so Windows jobs receive a
+`/Users/aribs/...` path that cannot exist on `DESKTOP-HFCK6U9`.
 
-```
-AGENT_TOOLSDIRECTORY=C:\Users\aribs\.github-runners\toolcache
-RUNNER_TOOL_CACHE=C:\Users\aribs\.github-runners\toolcache
-```
+Harmless today: no job uses `setup-python` — everything goes through `uv`, and
+uv is handled by the `ensure uv` step. It will bite the first action that
+consults the tool cache. Fixing it properly means scoping those two variables to
+the three macOS-bound jobs instead of setting them workflow-wide.
 
 Running the service as the `aribs` user instead of LOCAL SYSTEM would also make
 the WSL bash work, but that is the worse fix — it leaves CI depending on WSL and
