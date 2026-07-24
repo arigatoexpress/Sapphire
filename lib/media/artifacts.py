@@ -30,8 +30,15 @@ def _normal_token(value: str, *, default: str) -> str:
 
 
 def _repo_relative(path: Path, root: Path) -> str:
+    """Repo-relative path, always with forward slashes.
+
+    These strings land in committed JSON artifacts, so they must not vary by the
+    host that generated them. `str()` on a Path yields backslashes on Windows,
+    which would make an artifact generated there differ from the same artifact
+    generated on macOS — and, for provenance, change the dict keys.
+    """
     try:
-        return str(path.resolve().relative_to(root.resolve()))
+        return path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return str(path)
 

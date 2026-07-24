@@ -36,8 +36,15 @@ def _now_iso() -> str:
 
 
 def _repo_relative(path: Path) -> str:
+    """Repo-relative path, always with forward slashes.
+
+    These strings land in committed JSON artifacts, so they must not vary by the
+    host that generated them. `str()` on a Path yields backslashes on Windows,
+    which would make an artifact generated there differ from the same artifact
+    generated on macOS — and, for provenance, change the dict keys.
+    """
     try:
-        return str(path.resolve().relative_to(REPO_ROOT.resolve()))
+        return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
     except ValueError:
         return f"[outside-repo]/{path.name}"
 

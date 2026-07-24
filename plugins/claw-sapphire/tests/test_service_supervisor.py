@@ -143,7 +143,13 @@ def test_restart_triggered_on_unloaded_expected_service(monkeypatch, supervisor_
     assert result["ok"] is True
     assert result["attempted"][0]["restart_action"] == "bootstrap"
     assert fake_run.calls[0][:3] == ["launchctl", "bootstrap", "gui/501"]
-    assert fake_run.calls[0][3].endswith("Library/LaunchAgents/com.sapphire.pm-bot.plist")
+    # Compare path *components*, not a substring. The module builds this with
+    # `Path.home() / "Library" / "LaunchAgents" / ...`, so the separator is "\"
+    # on Windows and a forward-slash endswith() never matches there.
+    plist_path = Path(fake_run.calls[0][3])
+    assert plist_path.name == "com.sapphire.pm-bot.plist"
+    assert plist_path.parent.name == "LaunchAgents"
+    assert plist_path.parent.parent.name == "Library"
 
 
 def test_cooldown_blocks_consecutive_restarts(monkeypatch, supervisor_env):
