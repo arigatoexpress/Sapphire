@@ -1,8 +1,12 @@
-"""Robinhood Chain (Arbitrum Orbit, chain ID 46630) integration.
+"""Robinhood Chain (Arbitrum Orbit) integration — testnet client.
 
-Manages web3 connections to testnet, publishes trading signals on-chain,
-and reads contract state. Reads deployed addresses from
-data/chain/deployments.json; falls back gracefully when web3 is unavailable.
+Chain IDs: mainnet 4663 (live since 2026-07-01, RPC
+https://rpc.mainnet.chain.robinhood.com), testnet 46630. This module
+currently targets testnet only — mainnet wiring is a follow-up.
+
+Manages web3 connections, publishes trading signals on-chain, and reads
+contract state. Reads deployed addresses from data/chain/deployments.json;
+falls back gracefully when web3 is unavailable.
 
 Usage:
     client = RobinhoodChainClient()

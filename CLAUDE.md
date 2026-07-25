@@ -6,8 +6,8 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 6,580 collected by test_inventory.py
-pytest plugins/claw-sapphire/tests/ -q     # 604 collected by test_inventory.py
+pytest tests/unit/ --tb=short -q           # 6,718 collected by test_inventory.py (2026-07-25)
+pytest plugins/claw-sapphire/tests/ -q     # 637 collected by test_inventory.py (2026-07-25)
 
 # Lint
 ruff check .                          # pyproject.toml rules (E501 ignored)
@@ -15,7 +15,7 @@ ruff check --fix .                    # auto-fix
 
 # Services (Mac — LaunchAgents in infra/launchagents/)
 uvicorn app.main:app --port 8082                             # control-plane (from services/control-plane/)
-AUTH_PASSWORD=<strong-pw> PORT=8080 python3 app.py           # dashboard (from services/dashboard/); weak/default pws are rejected at import
+AUTH_PASSWORD=<strong-pw> PORT=8085 python3 app.py           # dashboard (from services/dashboard/); weak/default pws are rejected at import. 8080 is squatted by com.sovereign.openwebui and the code default 8082 collides with control-plane, so 8085 is what actually works on this Mac.
 python3 -m uvicorn src.signal_logger:app --port 18081        # signal logger (from services/alpha/)
 X402_ENABLED=1 python3 services/inference-proxy/app.py       # inference proxy with x402 paywall
 
@@ -91,17 +91,17 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-07-03 via `scripts/ops/test_inventory.py --check-readme`):** 7,245 collected tests (6,617 core + 628 plugin) across 439 files · 52 dashboard pages · 7 quant strategies · 29 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) plus 1 disabled template. Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-07-25 via `scripts/ops/test_inventory.py`):** 7,355 collected tests (6,718 core + 637 plugin) across 449 files · 52 dashboard pages · 5 quant strategies · 33 committed LaunchAgent plists in `infra/launchagents/` (`content-publisher` excluded from `scripts/ops/restore_launchagents.sh --all` because it is outward-facing) — 33 restored on this Mac as of 2026-07-25 (32 of the committed set + `alpha-telemetry-publisher` which is Mac-only, minus the excluded `content-publisher`). Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
 | `lib/core/` | library | Risk kernel, position sizing, **event_bus**, **heartbeat** (60s state machine), **kill_switch** (global + security), **confirmation_firewall** (2-phase commit), **decision_engine** (explainable autonomous ranking), **security_monitor**. Also `src/sapphire_core/` package (cognitive agent, executor, gateway, memory, telegram_bot). |
-| `lib/analytics/` | library | 24 modules — strategies (7: RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite + base + params), CPCV, regime GMM, VPIN, backtest_engine, risk_engine, deflated_sharpe, liquidation, correlation, factors, forecast (Kronos+TA consensus), performance, performance_tracker, prediction_accuracy, brain_accuracy, strategy_performance, backtest_results, signal_enhancer, self_optimizer, run_strategies, sentiment, indicators. |
-| `lib/chain/` | library | On-chain intelligence: regime, funding, OI, TVL, stablecoin supply, whale flow. **`coinmetrics.py`** (on-chain fundamentals), **`robinhood_chain.py`** (Arbitrum Orbit chain ID 46630 web3 client), `intelligence.py`, `sources.py`, `providers/` (CoinGlass, Dune, Whale Alert, Santiment, CoinAPI, BGGeometrics). |
-| `lib/content/` | library | 14-module research-to-publish pipeline: `data_collector` → `thesis_engine` → `draft_generator` → `report_generator` → `visualizations` → `quality` (7-check rubric) → `performance_policy` (blocks premature accuracy claims) → `qa_pipeline` → `formatters` → `approval` (Telegram sign-off) → `publisher`/`auto_publish` → `scheduler` (Mon brief / Wed AI intel / Fri security / daily pulse). Publishers: `substack`, `x`, `linkedin`, `typefully`. Also `outreach.py` (lead-engine integration). |
+| `lib/analytics/` | library | 24 modules — strategies (**5**: RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite — plus the `Strategy` base and `StrategyParams`, which are not strategies; the long-standing "7" counted those two. `CVDOrderFlow`/`VolatilityBreakout` appear in some older docs but were never implemented), CPCV, regime GMM, VPIN, backtest_engine, risk_engine, deflated_sharpe, liquidation, correlation, factors, forecast (Kronos+TA consensus), performance, performance_tracker, prediction_accuracy, brain_accuracy, strategy_performance, backtest_results, signal_enhancer, self_optimizer, run_strategies, sentiment, indicators. |
+| `lib/chain/` | library | On-chain intelligence: regime, funding, OI, TVL, stablecoin supply, whale flow. **`coinmetrics.py`** (on-chain fundamentals), **`robinhood_chain.py`** (Arbitrum Orbit web3 client — currently hard-coded to **testnet chain ID 46630**; **mainnet chain ID 4663** launched 2026-07-01 at `https://rpc.mainnet.chain.robinhood.com` and is not yet wired), `intelligence.py`, `sources.py`, `providers/` (CoinGlass, Dune, Whale Alert, Santiment, CoinAPI, BGGeometrics). |
+| `lib/content/` | library | 17-module research-to-publish pipeline: `data_collector` → `thesis_engine` → `draft_generator` → `report_generator` → `visualizations` → `quality` (7-check rubric — `banned_phrases`, `data_density`, `sentence_length`, `evidence`, `citation_quality`, `argument_coherence`, `originality`; plus supporting checks for `unsupported_claims`, `logical_overreach`, and `performance_claim_sample_size` gated by `performance_policy`) → `qa_pipeline` → `formatters` → `approval`/`telegram_approval` (Telegram sign-off) → `publisher`/`auto_publish` → `scheduler` (Mon brief / Wed AI intel / Fri security / daily pulse). **Bilingual EN↔ES (PR #966, 2026-07-25):** `translator.py` + `glossary.py` (199 curated terms across trading/crypto/financial/technical/sapphire categories, neutral Latin American Spanish); pass `--language en,es` or set `TARGET_LANGUAGES` in `scheduler.py`. Publishers: `substack`, `x`, `linkedin`, `typefully` (under `publishers/`). Also `outreach.py` (lead-engine integration). |
 | `lib/foundry/` | library | **Palantir Foundry integration**: `client` (bearer + OAuth), `ingestion` (local → ontology objects), `readiness` (repo-grounded audit), `sync` (15-min delta-aware + Telegram alerts). |
 | `lib/portfolio/` | library | Multi-venue portfolio tracking. **`robinhood.py`** — Robinhood Crypto API client (Ed25519-signed REST, accounts, holdings, best_bid_ask, order history, reconstructed cost basis). **`okx.py`** — OKX V5 read-only client (HMAC-SHA256 signed, merges trading + funding sub-accounts, public SPOT tickers double as a price oracle). **`aggregate.py`** — `PortfolioAggregator` unifies both venues behind `/api/portfolio`, emitting `holdings` (per-venue rows) + `by_asset` (cross-venue exposure) + `sources` (per-venue status). Credentials in `~/.config/sapphire-secrets/`. |
-| `lib/security/` | library | **Security platform**: `dependency_scanner` (OSV.dev CVE lookup + CycloneDX 1.5 SBOM), `model_monitor` (Ollama blob SHA-256 + Jinja2 backdoor detection), `network_mapper` (Tailscale topology + trust-zone scoring + attack-surface). |
+| `lib/security/` | library | **Security platform** (6 modules — no standalone `sigstore_manager`/`sbom_generator`/`runtime_monitor`; SBOM is emitted by `dependency_scanner`, signature checks live in `model_monitor`): `dependency_scanner` (OSV.dev CVE lookup + CycloneDX 1.5 SBOM emit), `model_monitor` (Ollama blob SHA-256 + Jinja2 backdoor detection), `network_mapper` (Tailscale topology + trust-zone scoring + attack-surface), `adversarial_detectors` + `adversarial_telemetry` (LLM-input adversarial pattern detection + telemetry sink), `pii_redactor` (regex-based PII scrub for logs / outbound content). |
 | `lib/intel/` | library | `market_intelligence.py`, `lead_enricher.py`. |
 | `lib/payments/` | library | `x402_middleware.py` — HTTP 402 micropayment gate (Flask + raw-socket), EVM signature verification. |
 | `lib/agents/` | library | Paper-only autonomous harness (`base.py`, `alpha_agent.py`, `runner.py`) plus the broader OpenClaw/NemoClaw dispatch stack under `src/sapphire_agents/`. |
@@ -112,7 +112,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/analytics_dashboard/` | service | Analytics-focused dashboard variant. |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused). |
 | `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac:8082]. |
-| `services/dashboard/` | service | Flask dashboard [Mac:8080 by convention — but `app.py` defaults to `PORT=8082`, which collides with control-plane; always pass `PORT` explicitly] — 53 page routes + 129 `/api/*` routes, including the unified `/showcase`, SSE event stream, lead-intel, performance + forecast + backtest endpoints. |
+| `services/dashboard/` | service | Flask dashboard [Mac:**8085** in practice — 8080 is squatted by `com.sovereign.openwebui`, `app.py` code default `PORT=8082` collides with control-plane, so pass `PORT=8085` explicitly] — 53 page routes + 129 `/api/*` routes, including the unified `/showcase`, SSE event stream, lead-intel, performance + forecast + backtest endpoints. No `com.sapphire.dashboard` LaunchAgent — run under a manual `python3 app.py` or via `services/dashboard/run.sh`. |
 | `services/foundry_sync/` | service | Scheduled Foundry sync daemon — wraps `lib/foundry/sync.py`. |
 | `services/heartbeat/` | service | Heartbeat daemon wrapper (`run.py`, `heartbeat.py`). |
 | `services/hyperliquid/` | service | Hyperliquid L1 bot — public-feed signal subscriber + live-trading executor (`hyperliquid_bot/risk.py`, hard caps: $5/order, 3x lev, 5 positions, $25/day loss, file-killswitch). Mainnet refused until EIP-712 signing is verified on testnet (`policy.signing_verified=False`). |
@@ -124,13 +124,13 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/pm_bot/` | service | PM bot webhook and reviewed Telegram draft queue [Mac:18082]. |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
 | `plugins/claw-sapphire/` | plugin | 118 tool scripts on disk (64 at top level + 52 in `internal/` + 2 in `_deprecated/`), 10 libs, 604 collected tests. |
-| `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
+| `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor — first live mandate minted 2026-07-25: BRODIE token @ $0.38, all four safety boundaries proved). Deployed on Robinhood Chain **testnet (chain 46630)** via `scripts/deploy_robinhood_chain.py`; **mainnet (chain 4663, live since 2026-07-01)** deployment is a follow-up. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
 | `data/content/` | data | Content engine drafts + ready/ queue. |
 | `data/chain/` | data | Deployed contract addresses (`deployments.json`), chain snapshots. |
 | `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1–v3). |
-| `infra/launchagents/` | infra | 29 macOS LaunchAgent plists (folded in by the 2026-04-21 audit: chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh; TV pair `tradingview-ta-capture` (every 4h) + `tradingview-pine-batch` (daily 13:00 UTC) added 2026-04-30, both read-only; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12) plus 1 disabled template. Four Mac-side-only LaunchAgents (`com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, `com.sapphire.vpin-materializer`) archived on the Mac as of 2026-05-12 — no source plist was ever in this directory. |
+| `infra/launchagents/` | infra | 33 macOS LaunchAgent plists (audit folded in chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh; TV pair `tradingview-ta-capture` (every 4h) + `tradingview-pine-batch` (daily 13:00 UTC) added 2026-04-30, both read-only; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12). `scripts/ops/restore_launchagents.sh --all` restores the infra + intelligence + trading tiers on this Mac (32 restored today via that path); the outward `content-publisher` tier is intentionally excluded from the batch and must be enabled explicitly. Four Mac-side-only LaunchAgents (`com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, `com.sapphire.vpin-materializer`) archived on the Mac as of 2026-05-12 — no source plist was ever in this directory. |
 | `infra/agent-manifest.yaml` | infra | Lean 5-tool subset the LLM sees. |
 | `infra/tool-registry.yaml` | infra | Full plugin tool registry (CI-enforced by `scripts/validate_tool_registry.py`). |
 | `infra/tailscale-acl.json` | infra | Tailscale mesh ACL. |
@@ -139,9 +139,9 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 ## Infrastructure (verified 2026-04-18)
 
 **Mac (100.x.x.w) — commander, all services:**
-- control-plane:8082, dashboard:8080, signal-logger:18081
-- **Port caveat (verified 2026-07-25):** `com.sovereign.openwebui` LaunchAgent occupies **8080**, so the dashboard cannot bind its conventional port while open-webui is loaded. Pick a free port via `PORT=`, or unload open-webui first.
-- **LaunchAgent state (verified 2026-07-25):** zero `com.sapphire.*` agents are loaded — the plists are absent from `~/Library/LaunchAgents` and launchctl holds 45 residual `disabled` overrides. Nothing in the "Active routines" / "22 Scheduled Tasks" sections below is firing on this Mac. Restore with `scripts/ops/restore_launchagents.sh --list` (tiered; outward `content-publisher` excluded from `all`).
+- control-plane:8082, dashboard:8085 (**not** 8080 — see port caveat), signal-logger:18081
+- **Port caveat (verified 2026-07-25):** `com.sovereign.openwebui` LaunchAgent occupies **8080**, so the dashboard cannot bind its conventional port while open-webui is loaded. `PORT=8085` is the working slot on this Mac (dashboard code default `PORT=8082` collides with control-plane).
+- **LaunchAgent state (verified 2026-07-25):** 33 `com.sapphire.*` agents are installed under `~/Library/LaunchAgents/` (infra + intelligence + trading tiers restored via `scripts/ops/restore_launchagents.sh --all`; the outward `content-publisher` tier stays excluded and must be enabled explicitly).
 - inference-proxy:11435 (4-tier failover)
 - pm-bot:18082 (com.sapphire.pm-bot LaunchAgent, Telegram webhook owner)
 - content-engine (com.sapphire.content-engine LaunchAgent, weekly cadence)
@@ -352,7 +352,7 @@ All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked 
 - Control-plane fails closed (HTTP 503) when `CONTROL_PLANE_TOKEN` unset — this is intentional.
 - OpenBB SDK has broken auto-generated package files — use REST API (:6900).
 - Kimi CLI auth tokens expire ~1h — use HTTP API via inference-proxy (Moonshot or OpenRouter), not the CLI.
-- macOS `python3` may resolve to brew 3.14 (no pytest) — use `/usr/local/bin/python3`.
+- macOS python interpreter (verified 2026-07-25): `/usr/local/bin/python3` (framework 3.12) is currently hung on this Mac — hangs indefinitely on `-c` invocations. **Use `/opt/homebrew/bin/python3` (brew 3.14.5)** — it's the working interpreter and has the project's pytest/dependencies wired in. `python3` on `$PATH` resolves to the brew binary already.
 - GPU Ollama needs `OLLAMA_HOST=0.0.0.0` after Windows reboot.
 - Windows Ollama `/v1/` returns empty — proxy uses native `/api/chat`.
 - Event bus silently degrades to JSONL if Redis is down — check `tail -f data/events/bus.jsonl` if you expect Redis events.
