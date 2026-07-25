@@ -246,36 +246,93 @@ _CVE_RE = re.compile(r"Canonical ID:\s*`([^`]+)`")
 _TITLE_RE = re.compile(r"^###\s*\d+\.\s*(.+)$", re.MULTILINE)
 _CVSS_RE = re.compile(r"CVSS base score:\s*([0-9.]+)")
 _EXPLOITED_RE = re.compile(r"Exploited in the wild:\s*(yes|no)", re.IGNORECASE)
+_SUMMARY_RE = re.compile(r"^- Summary:\s*(.+?)(?=\n- |\Z)", re.MULTILINE | re.DOTALL)
+_SOURCES_RE = re.compile(r"^- Sources:\s*(.+)$", re.MULTILINE)
+_EVIDENCE_DATE_RE = re.compile(r"^- Latest evidence date:\s*(\S+)", re.MULTILINE)
+_REMEDIATION_RE = re.compile(r"CISA remediation due date:\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
 
 
-def threat_intel_summary(md_path: Path | None) -> dict[str, Any]:
-    """Parse the prioritized queue from the latest threat digest."""
+def threat_intel_summary(md_path: Path | None, limit: int = 5) -> dict[str, Any]:
+    """Parse the prioritized queue from the latest threat digest.
+
+    Extracts title, CVE ID, priority score, CVSS, exploited-in-wild flag, plus
+    summary text, vendor label, source providers, latest-evidence date, and any
+    CISA remediation deadline embedded in the summary.
+    """
     if md_path is None or not md_path.exists():
-        return {"path": None, "items": [], "count": 0}
+        return {
+            "path": None,
+            "items": [],
+            "count": 0,
+            "total_in_queue": 0,
+            "source_age_days": None,
+            "source_generated_at": None,
+        }
     txt = md_path.read_text()
-    # Split into queue items by "### N." heading, take up to 5
+    # Split into queue items by "### N." heading. Count all of them, surface `limit`.
     blocks = re.split(r"\n(?=###\s*\d+\.)", txt)
+    total = sum(1 for b in blocks if _CVE_RE.search(b))
     items = []
     for b in blocks:
         title_m = _TITLE_RE.search(b)
         cve_m = _CVE_RE.search(b)
+        if not (title_m and cve_m):
+            continue
         prio_m = _PRIO_RE.search(b)
         cvss_m = _CVSS_RE.search(b)
         exp_m = _EXPLOITED_RE.search(b)
-        if not (title_m and cve_m):
-            continue
+        sum_m = _SUMMARY_RE.search(b)
+        src_m = _SOURCES_RE.search(b)
+        ev_m = _EVIDENCE_DATE_RE.search(b)
+        raw_title = title_m.group(1).strip()
+        # Vendor is the leading segment before the first ":" (e.g. "Microsoft SharePoint").
+        vendor = raw_title.split(":", 1)[0].strip() if ":" in raw_title else raw_title
+        # CISA KEV titles come as "Vendor Product: Vendor Product ..." — collapse the dup.
+        title = raw_title
+        if ": " in title:
+            head, tail = title.split(": ", 1)
+            if tail.lower().startswith(head.lower()):
+                title = f"{head} — {tail[len(head) :].lstrip(' :')}"
+        summary_text = sum_m.group(1).strip() if sum_m else ""
+        # Squeeze runs of whitespace/newlines from the summary block.
+        summary_text = re.sub(r"\s+", " ", summary_text)
+        rem_m = _REMEDIATION_RE.search(summary_text) if summary_text else None
         items.append(
             {
-                "title": title_m.group(1).strip(),
+                "title": title,
+                "vendor": vendor,
                 "cve": cve_m.group(1).strip(),
                 "priority_score": float(prio_m.group(1)) if prio_m else 0.0,
                 "cvss": float(cvss_m.group(1)) if cvss_m else None,
                 "exploited": (exp_m.group(1).lower() == "yes") if exp_m else False,
+                "summary": summary_text,
+                "sources": [s.strip() for s in src_m.group(1).split(",")] if src_m else [],
+                "latest_evidence_date": ev_m.group(1) if ev_m else None,
+                "remediation_due": rem_m.group(1) if rem_m else None,
             }
         )
-        if len(items) >= 5:
+        if len(items) >= limit:
             break
-    return {"path": str(md_path), "items": items, "count": len(items)}
+
+    # Derive freshness of the underlying threat pack itself.
+    gen_m = re.search(r"Generated at:\s*(\S+)", txt)
+    generated_at = gen_m.group(1) if gen_m else None
+    source_age_days: float | None = None
+    if generated_at:
+        try:
+            gen_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+            source_age_days = round((datetime.now(UTC) - gen_dt).total_seconds() / 86400.0, 1)
+        except ValueError:
+            source_age_days = None
+
+    return {
+        "path": str(md_path),
+        "items": items,
+        "count": len(items),
+        "total_in_queue": total,
+        "source_age_days": source_age_days,
+        "source_generated_at": generated_at,
+    }
 
 
 # ---------- report generators ----------
@@ -392,11 +449,32 @@ def generate_security_digest() -> Report:
     if scored_cvss:
         avg_cvss = round(sum(scored_cvss) / len(scored_cvss), 2)
 
+    # Group by vendor to catch clusters (e.g. multiple Fortinet CVEs on one patch cycle).
+    vendor_counts: dict[str, int] = {}
+    for i in intel["items"]:
+        v = i.get("vendor") or "Unknown"
+        vendor_counts[v] = vendor_counts.get(v, 0) + 1
+    vendor_clusters = sorted(
+        [(v, n) for v, n in vendor_counts.items() if n >= 2],
+        key=lambda kv: (-kv[1], kv[0]),
+    )
+
+    # Overdue-remediation callout (CISA-tracked deadlines already past today).
+    today_iso = datetime.now(UTC).strftime("%Y-%m-%d")
+    overdue = [
+        i for i in intel["items"] if i.get("remediation_due") and i["remediation_due"] < today_iso
+    ]
+
     facts = {
         "top_cves": intel["items"],
         "count": intel["count"],
         "exploited_in_wild": exploited_count,
         "avg_cvss": avg_cvss,
+        "total_in_queue": intel["total_in_queue"],
+        "source_age_days": intel["source_age_days"],
+        "source_generated_at": intel["source_generated_at"],
+        "vendor_clusters": vendor_clusters,
+        "overdue_count": len(overdue),
     }
     sources = []
     if intel["path"]:
@@ -560,22 +638,94 @@ def _render_ai_intel(f: dict[str, Any]) -> str:
 
 
 def _render_security(f: dict[str, Any]) -> str:
-    lines = []
-    lines.append("## Top Priority CVEs This Cycle")
+    total = f.get("total_in_queue") or f["count"]
+    age = f.get("source_age_days")
+    age_note = ""
+    if age is not None:
+        if age < 1.5:
+            age_note = f"Threat pack is {age:.1f} day old."
+        elif age <= 3.0:
+            age_note = f"Threat pack is {age:.1f} days old."
+        else:
+            age_note = (
+                f"Threat pack is {age:.1f} days old; upstream refresh may have lagged this cycle."
+            )
+
+    lines: list[str] = []
+
+    # Executive summary — the "so what" up top so a skim reads clean.
+    lines.append("## Executive Summary")
     lines.append("")
-    lines.append(
-        f"{f['count']} prioritized items. "
-        f"{f['exploited_in_wild']} exploited in the wild. "
-        f"Average CVSS {f['avg_cvss']}."
-    )
+    exec_bits = [
+        f"{f['count']} of {total} prioritized CVEs surfaced this cycle",
+        f"All {f['exploited_in_wild']} are actively exploited (CISA KEV)"
+        if f["exploited_in_wild"] == f["count"] and f["count"]
+        else f"{f['exploited_in_wild']} actively exploited (CISA KEV)",
+        f"Average CVSS {f['avg_cvss']}",
+    ]
+    if f.get("overdue_count", 0):
+        exec_bits.append(f"{f['overdue_count']} past CISA remediation deadline")
+    lines.append(". ".join(exec_bits) + ".")
+    if age_note:
+        lines.append("")
+        lines.append(f"_{age_note}_")
+    lines.append("")
+
+    # Vendor-cluster insight only fires when there's a real pattern.
+    clusters = f.get("vendor_clusters") or []
+    if clusters:
+        cluster_text = "; ".join(f"{n}x {v}" for v, n in clusters)
+        lines.append(
+            "**Pattern to watch.** Multiple entries share a vendor this cycle "
+            f"({cluster_text}) — a single patch window likely covers each cluster."
+        )
+        lines.append("")
+
+    lines.append("## Top Priority CVEs")
     lines.append("")
     for item in f["top_cves"]:
-        kev = " · KEV" if item["exploited"] else ""
-        cvss = f" · CVSS {item['cvss']}" if item.get("cvss") is not None else ""
-        lines.append(
-            f"- **{item['cve']}** — {item['title']} "
-            f"(priority {item['priority_score']:.2f}{cvss}{kev})"
-        )
+        tags: list[str] = []
+        if item.get("cvss") is not None:
+            tags.append(f"CVSS {item['cvss']}")
+        if item.get("exploited"):
+            tags.append("CISA KEV")
+        tags.append(f"priority {item['priority_score']:.2f}")
+        tag_str = " · ".join(tags)
+
+        lines.append(f"### {item['cve']} — {item['title']}")
+        lines.append(f"_{tag_str}_")
+        if item.get("summary"):
+            lines.append("")
+            lines.append(item["summary"])
+        meta_bits: list[str] = []
+        if item.get("remediation_due"):
+            meta_bits.append(f"CISA remediation due **{item['remediation_due']}**")
+        if item.get("latest_evidence_date"):
+            meta_bits.append(f"latest evidence {item['latest_evidence_date']}")
+        if item.get("sources"):
+            meta_bits.append("via " + ", ".join(item["sources"]))
+        if meta_bits:
+            lines.append("")
+            lines.append("_" + " · ".join(meta_bits) + "._")
+        lines.append("")
+
+    # Defender guidance is fixed but concrete — no fluff.
+    lines.append("## Mitigation Priorities")
+    lines.append("")
+    lines.append(
+        "1. Confirm each KEV-listed CVE against your asset inventory before the CISA "
+        "deadline; missed deadlines are the fingerprint most commonly cited in incident "
+        "reviews."
+    )
+    lines.append(
+        "2. Where multiple CVEs share a vendor, treat them as one patch window — do not "
+        "ship staged partial fixes that leave a known-exploited variant live."
+    )
+    lines.append(
+        "3. For network-edge devices (Fortinet, SonicWall, F5, Ivanti), verify management "
+        "interfaces are not internet-exposed even after patching; edge-device compromise is "
+        "still the top public-sector initial-access vector."
+    )
     return "\n".join(lines)
 
 
