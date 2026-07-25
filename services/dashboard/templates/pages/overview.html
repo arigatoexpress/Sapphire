@@ -717,7 +717,13 @@ async function loadSummaryCards() {
         ]);
         const holdings = Array.isArray(p.holdings) ? p.holdings : [];
         const holdingsValue = holdings.reduce((sum, h) => sum + asNumber(h.market_value, 0), 0);
-        const equity = asNumber(p.cash, 0) + holdingsValue;
+        // Prefer the aggregator's total. Recomputing as cash + holdings would
+        // double-count stablecoins, which appear both as holdings rows and
+        // inside `cash`. Fall back to the old arithmetic only if total_value
+        // is absent (pre-aggregate payload shape).
+        const equity = p.total_value !== undefined && p.total_value !== null
+            ? asNumber(p.total_value, 0)
+            : asNumber(p.cash, 0) + holdingsValue;
         const pnl = asNumber(p.day_pnl, 0);
         const winRate = ratePct(perf.overall?.win_rate);
         const winText = winRate === null ? 'win n/a' : winRate.toFixed(0) + '% win';
