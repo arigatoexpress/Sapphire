@@ -68,7 +68,51 @@ def _pick_headline(stance: str, asset: str, supporting: list[str]) -> str:
 
 
 class ThesisEngine:
-    """Synthesise asset theses from Sapphire prediction + chain data."""
+    """Synthesise asset theses from Sapphire prediction + chain data.
+
+    Optionally augments the thesis with evidence from Ari's self-sovereign
+    vault at ~/Knowledge (see lib.vault_client). Vault evidence lands in
+    ``supporting`` ONLY on a ``confident`` verdict — a vault outage, a weak
+    hit, or a knowledge gap are all silently dropped, never fabricated into
+    the thesis.
+
+    Default is ``use_vault=False`` — deterministic thesis synthesis with no
+    subprocess round-trip. Callers that want vault-augmented theses (e.g. the
+    weekly-crypto-brief renderer) pass ``use_vault=True`` explicitly so unit
+    tests don't get slowed down or made non-deterministic by whether the
+    vault happens to be reachable on the test host.
+    """
+
+    def __init__(self, use_vault: bool = False, vault_timeout: float = 10.0) -> None:
+        self.use_vault = use_vault
+        self.vault_timeout = vault_timeout
+
+    def _vault_evidence(self, asset: str, stance: str) -> str | None:
+        """Return one short, citation-safe evidence line, or None."""
+        if not self.use_vault:
+            return None
+        try:
+            from lib.vault_client import query_vault
+        except Exception as e:
+            log.debug("vault_client import failed: %s", e)
+            return None
+
+        try:
+            result = query_vault(
+                f"{asset} {stance} thesis",
+                n_results=1,
+                timeout=self.vault_timeout,
+            )
+        except Exception as e:
+            log.debug("vault query crashed: %s", e)
+            return None
+
+        if not result.is_citable or not result.results:
+            return None
+
+        hit = result.results[0]
+        title = (hit.title or "").strip()[:60]
+        return f"vault: {title}" if title else None
 
     def generate(
         self,
@@ -124,6 +168,11 @@ class ThesisEngine:
             confidence = 0.5
             supporting = neutral_reasons or ["mixed bullish/bearish evidence"]
             against = bull_reasons + bear_reasons
+
+        # Vault augmentation — after stance is decided so we ask the right question.
+        vault_line = self._vault_evidence(asset, stance)
+        if vault_line:
+            supporting = [*supporting, vault_line]
 
         headline = _pick_headline(stance, asset, supporting)
         return Thesis(

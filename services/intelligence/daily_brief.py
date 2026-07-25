@@ -146,6 +146,56 @@ def _regime_narrative(state: str, score: float, confidence: float, snap: dict) -
     return "\n".join(f"  {s}" for s in sentences) if sentences else "  No signal data."
 
 
+def _section_vault_context(regime_state: str) -> dict:
+    """Query the self-sovereign vault for evidence relevant to today's regime.
+
+    Contract with lib.vault_client:
+      * `confident` verdict → render hits
+      * `weak` verdict      → render but flag
+      * `none` / `unavailable` → skip the section entirely (never fabricate)
+
+    The vault runs as a subprocess against ~/Knowledge; a dead vault, sleeping
+    laptop, or broken venv collapses to `unavailable` and this section drops
+    out of the brief silently.
+    """
+    try:
+        from lib.vault_client import query_vault
+    except Exception as e:
+        return {"status": "unavailable", "error": f"vault_client import failed: {e}"}
+
+    query = (
+        f"{regime_state} playbook"
+        if regime_state and regime_state != "UNKNOWN"
+        else "market outlook"
+    )
+
+    try:
+        result = query_vault(query, n_results=3, timeout=15.0)
+    except Exception as e:
+        log.warning("vault query crashed: %s", e)
+        return {"status": "unavailable", "error": str(e)}
+
+    if result.verdict in ("unavailable", "none"):
+        return {"status": result.verdict, "query": query, "error": result.error}
+
+    lines: list[str] = []
+    if result.verdict == "weak":
+        lines.append(
+            f"  _Weak vault evidence (top {result.top1:.3f}) — for orientation only._"
+        )
+    for hit in result.results[:3]:
+        title = hit.title.strip() or "Untitled"
+        snippet = " ".join(hit.chunk.split())[:180]
+        lines.append(f"  • *{title}* — {snippet}")
+
+    return {
+        "status": "ok",
+        "verdict": result.verdict,
+        "query": query,
+        "text": "\n".join(lines) if lines else None,
+    }
+
+
 def _section_regime(chain_snapshot: dict | None = None) -> dict:
     """Market regime section from on-chain intelligence."""
     try:
@@ -921,6 +971,7 @@ def build_brief() -> str:
     fleet = _section_fleet_status()
     kron = _section_kronos()
     threats = _section_threats()
+    vault_ctx = _section_vault_context(regime.get("state", "UNKNOWN"))
     health = _section_health()
     leads = _section_leads()
 
@@ -979,6 +1030,10 @@ def build_brief() -> str:
         "",
         "*Threat intel*",
         _t(threats, "threats"),
+    ]
+    if vault_ctx.get("status") == "ok" and vault_ctx.get("text"):
+        parts.extend(["", "*Vault context*", vault_ctx["text"]])
+    parts.extend([
         "",
         "*Home leads (Houston)*",
         _t(leads, "leads"),
@@ -988,7 +1043,7 @@ def build_brief() -> str:
         "",
         "*Daily Recommendation*",
         rec,
-    ]
+    ])
     return "\n".join(parts)
 
 

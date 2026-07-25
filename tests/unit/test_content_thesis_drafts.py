@@ -89,6 +89,88 @@ def test_generate_all_uses_first_prediction_per_asset() -> None:
     assert "TA model: bullish" in theses[0].supporting
 
 
+def test_thesis_engine_folds_confident_vault_evidence(monkeypatch) -> None:
+    """With use_vault=True and a confident vault hit, the thesis grows one line."""
+    from lib import vault_client
+    from lib.content import thesis_engine as te
+
+    hit = vault_client.VaultHit(
+        title="BTC bullish playbook",
+        path="/vault/BTC-bullish.md",
+        note_id="btc-bull-1",
+        group="crypto",
+        score=0.71,
+        chunk="Historically strong post-halving RSI + rising funding.",
+        chunk_index=0,
+        total_chunks=1,
+    )
+    result = vault_client.VaultResult(
+        query="BTC bull thesis",
+        verdict="confident",
+        top1=0.71,
+        results=[hit],
+    )
+
+    monkeypatch.setattr(te, "__name__", te.__name__)  # keep import path stable
+    monkeypatch.setattr(vault_client, "query_vault", lambda *a, **kw: result)
+
+    thesis = ThesisEngine(use_vault=True).generate(
+        "BTC",
+        prediction={"symbol": "BTC", "direction": "strong_bullish"},
+        regime="RISK_ON",
+    )
+
+    assert thesis.stance == "bull"
+    assert "vault: BTC bullish playbook" in thesis.supporting
+
+
+def test_thesis_engine_ignores_weak_and_unavailable_vault(monkeypatch) -> None:
+    """weak / none / unavailable verdicts must NEVER become citations."""
+    from lib import vault_client
+    from lib.content.thesis_engine import ThesisEngine
+
+    for verdict in ("weak", "none", "unavailable"):
+        result = vault_client.VaultResult(
+            query="q",
+            verdict=verdict,
+            top1=0.1,
+            results=[],
+            error="fake" if verdict == "unavailable" else None,
+        )
+        monkeypatch.setattr(vault_client, "query_vault", lambda *a, r=result, **kw: r)
+
+        thesis = ThesisEngine(use_vault=True).generate(
+            "BTC",
+            prediction={"symbol": "BTC", "direction": "strong_bullish"},
+            regime="RISK_ON",
+        )
+        assert not any(s.startswith("vault:") for s in thesis.supporting), verdict
+
+
+def test_thesis_engine_survives_vault_client_raising(monkeypatch) -> None:
+    """A raising query_vault (any exception) must not crash thesis generation.
+
+    This exercises the outer try/except in ``_vault_evidence`` — the guardrail
+    that keeps a vault subprocess crash, timeout, or corrupted response from
+    taking down deterministic thesis synthesis.
+    """
+    from lib import vault_client
+    from lib.content.thesis_engine import ThesisEngine
+
+    def _boom(*a, **kw):
+        raise RuntimeError("vault process died mid-query")
+
+    monkeypatch.setattr(vault_client, "query_vault", _boom)
+
+    thesis = ThesisEngine(use_vault=True).generate(
+        "BTC",
+        prediction={"symbol": "BTC", "direction": "strong_bullish"},
+        regime="RISK_ON",
+    )
+    assert thesis.stance == "bull"
+    assert not any(s.startswith("vault:") for s in thesis.supporting)
+
+
 def test_draft_generate_persists_markdown(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(draft_generator, "_DRAFTS_DIR", tmp_path)
     monkeypatch.setattr(draft_generator, "_GENERATORS", {"market_pulse": _report})

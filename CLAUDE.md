@@ -322,6 +322,8 @@ All 8 are read-only or PR/issue-only (no auto-merge, no live trading, no secrets
 ## 22 Scheduled Tasks (Claude Code)
 
 All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked `[CLOUD]` have a cloud-routine equivalent firing on Anthropic infra; both run during the soak window.
+
+**Reality check (2026-07-25):** only **3 of the 22** tasks below are actually installed on this Mac (`fleet-security-triage`, `quarterly-charter-memory-refresh`, `tho-cutover-health-check` — verify with `mcp__scheduled-tasks__list_scheduled_tasks`). Everything else — including `market-pulse` (writes `data/signals/YYYY-MM-DD.jsonl`) and `trading-research` (writes `data/paper_portfolio.json` via `paper_trader.py`) — is documented but not deployed, which is why the staleness monitor keeps flagging `signal-stream` and `paper-portfolio`. Restoring trading-related tasks needs an explicit paper-vs-live decision; don't fabricate them from CLAUDE.md alone.
 - sapphire-morning-briefing (8 AM) — 6-section digest → Telegram
 - trading-research (5:42 AM) — TA predictions + scoring
 - market-pulse (8/12/4 M-F) — signal scan + paper trade stops

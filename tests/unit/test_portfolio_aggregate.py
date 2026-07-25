@@ -194,14 +194,26 @@ def test_all_venues_down_reports_unavailable():
     assert snap["holdings"] == []
 
 
-def test_is_configured_raising_is_treated_as_unconfigured():
+def test_is_configured_raising_degrades_without_crashing():
+    """A raising probe must not crash the aggregator and must not read as live.
+
+    Previously this asserted `status == "not_configured"`. That label was wrong:
+    a locked keychain is an operational fault an operator needs to see, and
+    filing it under "credentials not configured" makes it look expected. The
+    invariant worth protecting is that the aggregator degrades instead of
+    crashing and surfaces the real reason — see
+    `test_venue_probe_failure_is_reported_as_error_not_misconfiguration`.
+    """
+
     class Exploding(FakeReader):
         def is_configured(self):
             raise RuntimeError("keychain locked")
 
     agg = PortfolioAggregator({"okx": Exploding()})
     src = agg.get_snapshot()["sources"][0]
-    assert src["status"] == "not_configured"
+    assert src["status"] == "error"
+    assert src["configured"] is False
+    assert "keychain locked" in src["error"]
 
 
 def test_source_rows_report_position_counts():
@@ -444,3 +456,29 @@ def test_snapshot_does_not_mutate_reader_rows():
     reader = FakeReader([original])
     PortfolioAggregator({"robinhood": reader}).get_snapshot()
     assert "venue" not in original
+
+
+def test_venue_probe_failure_is_reported_as_error_not_misconfiguration():
+    """A venue outage must not masquerade as "you never set up this venue".
+
+    `is_configured()` returning False means "no credentials". `is_configured()`
+    raising means "could not determine". Reporting the second as the first
+    invents a plausible cause and makes a live outage look expected.
+    """
+
+    class Unreachable:
+        def is_configured(self):
+            raise RuntimeError("OKX unreachable")
+
+    class Configured:
+        def is_configured(self):
+            return False
+
+    aggregator = PortfolioAggregator(readers={"okx": Unreachable(), "kraken": Configured()})
+    sources = {s["venue"]: s for s in aggregator.get_snapshot()["sources"]}
+
+    assert sources["okx"]["status"] == "error"
+    assert "unreachable" in sources["okx"]["error"].lower()
+
+    assert sources["kraken"]["status"] == "not_configured"
+    assert sources["kraken"]["error"] == "credentials not configured"

@@ -369,3 +369,101 @@ def test_regime_narrative_full_snapshot_renders_three_sentences():
     sentences = [line for line in result.split("\n") if line.strip()]
 
     assert len(sentences) == 3
+
+
+# ── _section_vault_context ────────────────────────────────────────────
+
+
+def test_vault_section_ok_on_confident(monkeypatch):
+    """A confident vault verdict produces a rendered section."""
+    from lib import vault_client
+
+    hit = vault_client.VaultHit(
+        title="RISK_ON playbook",
+        path="/vault/risk-on.md",
+        note_id="ro-1",
+        group="playbooks",
+        score=0.72,
+        chunk="Momentum long, funding-neutral, buy dips into rising VWAP.",
+        chunk_index=0,
+        total_chunks=1,
+    )
+    result = vault_client.VaultResult(
+        query="RISK_ON playbook",
+        verdict="confident",
+        top1=0.72,
+        results=[hit],
+    )
+    monkeypatch.setattr(vault_client, "query_vault", lambda *a, **kw: result)
+
+    section = daily_brief._section_vault_context("RISK_ON")
+
+    assert section["status"] == "ok"
+    assert "RISK_ON playbook" in section["text"]
+    assert "Momentum long" in section["text"]
+
+
+def test_vault_section_skips_when_unavailable(monkeypatch):
+    """An unavailable verdict must be silently absent from the brief."""
+    from lib import vault_client
+
+    result = vault_client.VaultResult(
+        query="q",
+        verdict="unavailable",
+        top1=0.0,
+        results=[],
+        error="vault root missing",
+    )
+    monkeypatch.setattr(vault_client, "query_vault", lambda *a, **kw: result)
+
+    section = daily_brief._section_vault_context("RISK_OFF")
+
+    assert section["status"] == "unavailable"
+    assert "text" not in section  # nothing to render
+
+
+def test_vault_section_skips_on_none_verdict(monkeypatch):
+    """A `none` verdict — vault knows nothing confident — must not fabricate."""
+    from lib import vault_client
+
+    result = vault_client.VaultResult(
+        query="q",
+        verdict="none",
+        top1=0.4,
+        results=[],
+    )
+    monkeypatch.setattr(vault_client, "query_vault", lambda *a, **kw: result)
+
+    section = daily_brief._section_vault_context("NEUTRAL")
+
+    assert section["status"] == "none"
+    assert "text" not in section
+
+
+def test_vault_section_flags_weak_evidence(monkeypatch):
+    """Weak evidence renders but is marked as such — orientation only."""
+    from lib import vault_client
+
+    hit = vault_client.VaultHit(
+        title="Adjacent note",
+        path="/vault/adj.md",
+        note_id="adj-1",
+        group="misc",
+        score=0.60,
+        chunk="Topically related but not a direct playbook match.",
+        chunk_index=0,
+        total_chunks=1,
+    )
+    result = vault_client.VaultResult(
+        query="q",
+        verdict="weak",
+        top1=0.60,
+        results=[hit],
+    )
+    monkeypatch.setattr(vault_client, "query_vault", lambda *a, **kw: result)
+
+    section = daily_brief._section_vault_context("RISK_ON")
+
+    assert section["status"] == "ok"
+    assert section["verdict"] == "weak"
+    assert "Weak vault evidence" in section["text"]
