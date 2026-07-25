@@ -28,6 +28,17 @@ SUITES = (
     ("unit", ("tests/unit",)),
     ("plugin", ("plugins/claw-sapphire/tests",)),
 )
+# Collection must not autoload pytest11 entry points. The self-hosted runner's
+# Homebrew python has a stale global web3==6.20.4 whose metadata registers
+# `web3.tools.pytest_ethereum.plugins`; the uv overlay puts web3 7.x (which
+# deleted web3/tools/) ahead of it on sys.path, so autoload resolves the 6.x
+# entry point against the 7.x package and dies with ModuleNotFoundError.
+# ci.yml already does this for the `test` and `plugin tests` jobs — doing it
+# here keeps the invariant with the subprocess that actually needs it, so it
+# holds for local runs and `make registry` too. Plugins the suites genuinely
+# need are then loaded back explicitly (pyproject sets asyncio_mode = "auto").
+COLLECTION_ENV = {"PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
+COLLECTION_PLUGIN_ARGS = ("-p", "no:cacheprovider", "-p", "pytest_asyncio.plugin")
 FILE_COUNT_RE = re.compile(r"^(?P<path>.+\.py):\s+(?P<count>\d+)\s*$")
 SUMMARY_RE = re.compile(r"(?P<count>\d+)\s+tests?\s+collected")
 # The 2026-05-30 README overhaul (d762e899) replaced the counts table with a
@@ -39,10 +50,38 @@ README_BADGE_RE = re.compile(
 )
 
 
+def _has_pytest(python: str) -> bool:
+    try:
+        return (
+            subprocess.run(
+                [python, "-c", "import pytest"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            ).returncode
+            == 0
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def _resolve_collection_python() -> str:
+    # Explicit override wins — the operator knows which env they want.
     if env := os.environ.get("PYTHON3"):
         return env
-    if Path("/usr/local/bin/python3").exists():
+    # Prefer the interpreter that's running this script: under `uv run` (CI)
+    # or a project venv, sys.executable is the one with pytest + all test
+    # deps installed. `/usr/local/bin/python3` is the macOS system python,
+    # which usually lacks the deps and drives pytest --collect-only past the
+    # 90s timeout via slow ImportError cascades.
+    if _has_pytest(sys.executable):
+        return sys.executable
+    # Fallbacks for the rare case sys.executable can't import pytest (e.g.
+    # invoking the script directly under a shebang'd brew python@3.14 with
+    # a broken stdlib ABI — see the "python3 may resolve to brew 3.14"
+    # gotcha in CLAUDE.md).
+    if Path("/usr/local/bin/python3").exists() and _has_pytest("/usr/local/bin/python3"):
         return "/usr/local/bin/python3"
     return shutil.which("python3") or sys.executable
 
@@ -123,8 +162,17 @@ def collect_inventory() -> Inventory:
 def collect_suite(name: str, paths: tuple[str, ...]) -> SuiteInventory:
     start = time.perf_counter()
     result = subprocess.run(
-        [COLLECTION_PYTHON, "-m", "pytest", *paths, "--collect-only", "-qq"],
+        [
+            COLLECTION_PYTHON,
+            "-m",
+            "pytest",
+            *paths,
+            "--collect-only",
+            "-qq",
+            *COLLECTION_PLUGIN_ARGS,
+        ],
         cwd=ROOT,
+        env={**os.environ, **COLLECTION_ENV},
         text=True,
         capture_output=True,
         check=False,

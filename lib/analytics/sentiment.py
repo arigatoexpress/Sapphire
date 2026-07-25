@@ -5,12 +5,18 @@ index. Each input is mapped to a 0-100 sub-score (100 = extreme greed,
 0 = extreme fear) then weighted into a composite.
 
 Inputs (all from existing modules, no external sentiment API):
-  1. Funding rates       (25%) — extreme positive = greed
-  2. Stablecoin flow     (15%) — minting = money waiting to deploy = greed
-  3. BTC dominance trend (15%) — falling dom = alt-season greed
-  4. Open-interest delta (15%) — rapid OI growth = leverage greed
-  5. Correlation regime  (10%) — high decorrelation = uncertainty = fear
-  6. Market regime       (20%) — RISK_ON = greed
+  1. Fear & Greed index  (25%) — the authoritative published reading
+  2. Funding rates       (20%) — extreme positive = greed
+  3. Market regime       (20%) — RISK_ON = greed
+  4. BTC dominance level (10%) — falling dom = alt-season greed
+  5. Open-interest delta (10%) — rapid OI growth = leverage greed
+  6. Correlation regime  (10%) — high decorrelation = uncertainty = fear
+  7. Stablecoin flow     ( 5%) — minting = money waiting to deploy = greed
+
+All sub-scores read the FLAT `ChainIntelligence.snapshot()` shape. A sub-score
+returns None when its input is genuinely unavailable, and the composite
+renormalizes over whatever is live — absent data must never contribute a
+neutral 50, which would silently drag the composite toward "no opinion".
 """
 
 from __future__ import annotations
@@ -37,41 +43,69 @@ class SentimentScore:
 
 
 # ---------------------------------------------------------------------------
-# Sub-score helpers (each returns (score_0_100, explanation))
+# Sub-score helpers
+#
+# Each takes the flat chain snapshot and returns (score_0_100 | None,
+# explanation). None means "input unavailable" — the caller drops it from the
+# weighting rather than scoring it a neutral 50.
 # ---------------------------------------------------------------------------
 
 
-def _score_funding(funding_snap: dict) -> tuple[float, str]:
+def _clamp(score: float) -> float:
+    return max(0.0, min(100.0, score))
+
+
+def _score_fear_greed(snap: dict) -> tuple[float | None, str]:
+    """Published Fear & Greed index — already a 0-100 sentiment reading."""
+    fg = snap.get("fear_greed")
+    if fg is None:
+        return None, "fear & greed index unavailable"
+    fg = float(fg)
+    label = snap.get("fear_greed_label") or ""
+    suffix = f" ({label})" if label else ""
+    return _clamp(fg), f"F&G index {fg:.0f}{suffix}"
+
+
+def _score_funding(snap: dict) -> tuple[float | None, str]:
     """Funding rate → greed/fear. Extreme positive funding = greed (paying to stay long).
 
-    `avg_funding_pct` is already in percent (intelligence.py multiplies the
-    raw 8h rate by 100). Extreme funding = ±0.05% per 8h, so map ±0.05
-    percent to ±50 around 50. The prior implementation divided by 0.0005
-    (raw-rate threshold) while reading percent — 100× too sensitive,
-    clamping any positive funding to 100 (extreme greed).
+    `btc_funding_rate_pct` / `eth_funding_rate_pct` are already in percent.
+    Extreme funding = ±0.05% per 8h, so map ±0.05 percent to ±50 around 50.
+    A prior implementation divided by 0.0005 (raw-rate threshold) while
+    reading percent — 100× too sensitive, clamping any positive funding to
+    100 (extreme greed).
     """
-    avg_pct = float(funding_snap.get("avg_funding_pct", 0.0) or 0.0)
-    score = 50.0 + (avg_pct / 0.05) * 50.0
-    score = max(0.0, min(100.0, score))
-    skew = funding_snap.get("majors_skew", "neutral")
-    return score, f"avg 8h funding {avg_pct:+.3f}% · skew {skew}"
+    rates = [
+        snap.get("btc_funding_rate_pct"),
+        snap.get("eth_funding_rate_pct"),
+    ]
+    live = [float(r) for r in rates if r is not None]
+    if not live:
+        return None, "funding unavailable"
+    avg_pct = sum(live) / len(live)
+    skew = "longs crowded" if avg_pct > 0.04 else "shorts crowded" if avg_pct < -0.04 else "neutral"
+    return _clamp(50.0 + (avg_pct / 0.05) * 50.0), f"avg 8h funding {avg_pct:+.3f}% · skew {skew}"
 
 
-def _score_stablecoins(stable: dict) -> tuple[float, str]:
-    """Stablecoin supply growth → money flowing in = greed."""
+def _score_stablecoins(snap: dict) -> tuple[float | None, str]:
+    """Stablecoin supply growth → money flowing in = greed.
+
+    The chain snapshot carries no stablecoin supply series; that lives in
+    `lib.intel.market_intelligence`. Until it is wired through, report
+    unavailable rather than contributing a fake neutral.
+    """
+    stable = snap.get("stablecoins") or {}
     d24 = stable.get("delta_24h_usd")
-    total = float(stable.get("total_usd") or 1.0)
+    total = float(stable.get("total_usd") or 0.0)
     if d24 is None or total <= 0:
-        return 50.0, "no delta data yet"
+        return None, "stablecoin supply unavailable"
     pct = (d24 / total) * 100.0
     # ±0.5% 24h is a lot for stablecoins. Map ±0.5% to ±50.
-    score = 50.0 + (pct / 0.5) * 50.0
-    score = max(0.0, min(100.0, score))
     arrow = "inflow" if d24 > 0 else "outflow"
-    return score, f"stable supply {pct:+.2f}% ({arrow})"
+    return _clamp(50.0 + (pct / 0.5) * 50.0), f"stable supply {pct:+.2f}% ({arrow})"
 
 
-def _score_dominance(overview: dict) -> tuple[float, str]:
+def _score_dominance(snap: dict) -> tuple[float | None, str]:
     """Falling BTC dominance = alt-season (greed). Rising = flight to safety (fear).
 
     Without a time series we can't compute a delta here — use dominance level
@@ -79,7 +113,10 @@ def _score_dominance(overview: dict) -> tuple[float, str]:
     greedy. Mid-range is neutral. This is intentionally low-magnitude because
     dominance is noisy on short horizons.
     """
-    dom = float(overview.get("btc_dominance") or 50.0)
+    raw_dom = snap.get("btc_dominance")
+    if raw_dom is None:
+        return None, "BTC dominance unavailable"
+    dom = float(raw_dom)
     if dom >= 60:
         score = 35.0
         note = f"BTC.D {dom:.1f}% (high — defensive)"
@@ -98,15 +135,17 @@ def _score_dominance(overview: dict) -> tuple[float, str]:
     return score, note
 
 
-def _score_oi(oi: dict) -> tuple[float, str]:
-    """Rapid OI growth = leverage greed. Rapid decline = deleveraging/fear."""
-    d24 = oi.get("delta_24h_pct")
+def _score_oi(snap: dict) -> tuple[float | None, str]:
+    """Rapid OI growth = leverage greed. Rapid decline = deleveraging/fear.
+
+    The chain snapshot carries no open-interest series today; CoinGlass OI
+    lives in `lib.chain.providers`. Report unavailable until wired through.
+    """
+    d24 = (snap.get("open_interest") or {}).get("delta_24h_pct")
     if d24 is None:
-        return 50.0, "OI delta unavailable"
+        return None, "OI delta unavailable"
     # ±10% 24h is extreme leverage event. Map ±10% → ±50.
-    score = 50.0 + (d24 / 10.0) * 50.0
-    score = max(0.0, min(100.0, score))
-    return score, f"OI 24h {d24:+.2f}%"
+    return _clamp(50.0 + (float(d24) / 10.0) * 50.0), f"OI 24h {float(d24):+.2f}%"
 
 
 def _score_correlation(corr_events: list) -> tuple[float, str]:
@@ -121,15 +160,25 @@ def _score_correlation(corr_events: list) -> tuple[float, str]:
     return score, f"{severe}S/{moderate}M/{mild}m decorrelations"
 
 
-def _score_regime(regime: dict) -> tuple[float, str]:
-    """Regime score (-1..+1) mapped to 0..100."""
-    rscore = float(regime.get("score", 0.0) or 0.0)
-    conf = float(regime.get("confidence", 0.0) or 0.0)
-    state = regime.get("state", "UNKNOWN")
+def _score_regime(snap: dict) -> tuple[float | None, str]:
+    """Regime score (-1..+1) mapped to 0..100.
+
+    Reads the `classification` block emitted by `lib.chain.classify`. `regime`
+    arrives as a `Regime` enum in-process and as a plain string after a JSON
+    round-trip, so accept both. Confidence is derived from the share of inputs
+    that resolved (`inputs_ok / inputs_total`).
+    """
+    clf = snap.get("classification") or {}
+    if not clf:
+        return None, "regime classification unavailable"
+    raw_state = clf.get("regime")
+    state = raw_state.value if hasattr(raw_state, "value") else str(raw_state or "UNKNOWN")
+    rscore = float(clf.get("score", 0.0) or 0.0)
+    inputs_total = float(clf.get("inputs_total", 0) or 0)
+    conf = (float(clf.get("inputs_ok", 0) or 0) / inputs_total) if inputs_total > 0 else 0.0
     # Base neutral 50. Shift by rscore × 40 × confidence (damp by uncertainty).
     # So a +0.5 regime with 0.8 confidence shifts to 50 + 16 = 66.
-    score = 50.0 + rscore * 40.0 * max(0.3, conf)
-    score = max(0.0, min(100.0, score))
+    score = _clamp(50.0 + rscore * 40.0 * max(0.3, conf))
     return score, f"{state} (score {rscore:+.2f}, conf {conf:.0%})"
 
 
@@ -139,12 +188,13 @@ def _score_regime(regime: dict) -> tuple[float, str]:
 
 
 WEIGHTS = {
-    "funding": 0.25,
-    "stablecoins": 0.15,
-    "dominance": 0.15,
-    "oi": 0.15,
-    "correlation": 0.10,
+    "fear_greed": 0.25,
+    "funding": 0.20,
     "regime": 0.20,
+    "dominance": 0.10,
+    "oi": 0.10,
+    "correlation": 0.10,
+    "stablecoins": 0.05,
 }
 
 
@@ -189,38 +239,46 @@ def compute_sentiment(
             log.warning("correlation unavailable: %s", e)
             correlation_events = []
 
-    overview = chain_snapshot.get("overview") or {}
-    funding = chain_snapshot.get("funding") or {}
-    oi = chain_snapshot.get("open_interest") or {}
-    stable = chain_snapshot.get("stablecoins") or {}
-    regime = chain_snapshot.get("regime") or {}
+    # Every sub-score reads the flat snapshot directly and self-reports
+    # availability; correlation is the one input passed in separately.
+    scored = {
+        "fear_greed": _score_fear_greed(chain_snapshot),
+        "funding": _score_funding(chain_snapshot),
+        "regime": _score_regime(chain_snapshot),
+        "dominance": _score_dominance(chain_snapshot),
+        "oi": _score_oi(chain_snapshot),
+        "correlation": _score_correlation(correlation_events),
+        "stablecoins": _score_stablecoins(chain_snapshot),
+    }
 
-    funding_s, funding_e = _score_funding(funding)
-    stable_s, stable_e = _score_stablecoins(stable)
-    dom_s, dom_e = _score_dominance(overview)
-    oi_s, oi_e = _score_oi(oi)
-    corr_s, corr_e = _score_correlation(correlation_events)
-    reg_s, reg_e = _score_regime(regime)
-
+    # Explanations cover every input (including the unavailable ones, so the
+    # gap is visible); components carry only what actually scored.
+    explanations = {name: expl for name, (_, expl) in scored.items()}
     components = {
-        "funding": round(funding_s, 1),
-        "stablecoins": round(stable_s, 1),
-        "dominance": round(dom_s, 1),
-        "oi": round(oi_s, 1),
-        "correlation": round(corr_s, 1),
-        "regime": round(reg_s, 1),
-    }
-    explanations = {
-        "funding": funding_e,
-        "stablecoins": stable_e,
-        "dominance": dom_e,
-        "oi": oi_e,
-        "correlation": corr_e,
-        "regime": reg_e,
+        name: round(score, 1) for name, (score, _) in scored.items() if score is not None
     }
 
-    composite = sum(components[k] * WEIGHTS[k] for k in components)
-    score = int(round(max(0.0, min(100.0, composite))))
+    # Renormalize over live inputs. Without this, an unavailable input scored
+    # as a neutral 50 would pull the composite toward "no opinion" — the exact
+    # failure that pinned this metric at ~50 regardless of the market.
+    live_weight = sum(WEIGHTS[k] for k in components)
+    if live_weight <= 0:
+        log.warning("sentiment: no live inputs — returning neutral")
+        composite = 50.0
+    else:
+        composite = sum(components[k] * WEIGHTS[k] for k in components) / live_weight
+
+    missing = [k for k in WEIGHTS if k not in components]
+    if missing:
+        log.info(
+            "sentiment: %d/%d inputs live (%.0f%% weight); missing: %s",
+            len(components),
+            len(WEIGHTS),
+            live_weight * 100,
+            ", ".join(sorted(missing)),
+        )
+
+    score = int(round(_clamp(composite)))
     return SentimentScore(
         score=score,
         label=_label_for(score),
