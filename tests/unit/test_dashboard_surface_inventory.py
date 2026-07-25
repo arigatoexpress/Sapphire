@@ -19,7 +19,7 @@ def test_dashboard_surface_inventory_snapshot_is_current() -> None:
 
     assert committed == inventory
     assert inventory["summary"]["route_count"] >= 175
-    assert inventory["summary"]["page_template_count"] == 46
+    assert inventory["summary"]["page_template_count"] == 47
 
 
 def test_every_route_has_migration_owner_lifecycle_and_safety_mode() -> None:

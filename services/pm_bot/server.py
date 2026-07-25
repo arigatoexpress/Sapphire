@@ -27,6 +27,7 @@ if str(TOOL_DIR) not in sys.path:
 
 import sapphire_pm_bot
 
+from lib.telegram import menu_providers, menus, settings_store
 from lib.telegram.agent_router import SUPPORTED_UPDATE_TYPES, RouterDecision, route_update
 from lib.telegram.draft_queue import append_draft, build_draft, transition_draft
 
@@ -275,6 +276,7 @@ class TelegramAPI:
         reply_parameters: dict[str, Any] | None = None,
         message_thread_id: int | None = None,
         direct_messages_topic_id: int | None = None,
+        reply_markup: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "chat_id": chat_id,
@@ -283,6 +285,8 @@ class TelegramAPI:
         }
         if parse_mode:
             payload["parse_mode"] = parse_mode
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
         clean_business_connection_id = str(business_connection_id or "").strip()
         if clean_business_connection_id:
             payload["business_connection_id"] = clean_business_connection_id
@@ -295,6 +299,42 @@ class TelegramAPI:
         if direct_messages_topic_id is not None:
             payload["direct_messages_topic_id"] = direct_messages_topic_id
         return self._post("sendMessage", payload)
+
+    def answer_callback_query(
+        self,
+        *,
+        callback_query_id: str,
+        text: str = "",
+        show_alert: bool = False,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"callback_query_id": callback_query_id}
+        if text:
+            # Telegram caps callback toasts at 200 characters.
+            payload["text"] = text[:200]
+        if show_alert:
+            payload["show_alert"] = True
+        return self._post("answerCallbackQuery", payload)
+
+    def edit_message_text(
+        self,
+        *,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        parse_mode: str | None = None,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text,
+            "disable_web_page_preview": True,
+        }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        return self._post("editMessageText", payload)
 
     def get_updates(self, *, offset: int, timeout: int = 30) -> list[dict[str, Any]]:
         # The HTTP read timeout must exceed the long-poll hold, or every empty
@@ -871,6 +911,123 @@ def _chat_id(update: dict[str, Any]) -> int | None:
     return None
 
 
+def _menu_context() -> menus.MenuContext:
+    """Build the menu runtime context from current settings + providers."""
+    current = settings_store.load()
+    return menus.MenuContext(
+        webapp_url=os.getenv("SAPPHIRE_TELEGRAM_WEBAPP_URL", "").strip() or None,
+        heartbeat_enabled=current.heartbeat_enabled,
+        heartbeat_hours=current.heartbeat_hours,
+        providers=menu_providers.build_providers(),
+        on_setting_change=_apply_setting_change,
+    )
+
+
+def _apply_setting_change(scope: str, action: str) -> None:
+    """Persist a settings-menu toggle. Only the heartbeat scope is writable."""
+    if scope != "heartbeat":
+        logger.warning("Ignoring unknown settings scope: %s", scope)
+        return
+    settings_store.apply_change(action)
+
+
+def _callback_query_payload(update: dict[str, Any]) -> dict[str, Any]:
+    payload = update.get("callback_query")
+    return payload if isinstance(payload, dict) else {}
+
+
+def _handle_menu_callback(decision: RouterDecision, update: dict[str, Any]) -> bool:
+    """Answer a menu callback by editing the message in place.
+
+    Menu callbacks have no external side effect beyond repainting the
+    screen the user is already looking at, plus (for the settings menu)
+    writing a local preferences file.
+    """
+    context = decision.context
+    callback = _callback_query_payload(update)
+    callback_id = str(callback.get("id") or "").strip()
+
+    try:
+        render = menus.dispatch_menu_callback(context.callback_data, _menu_context())
+    except ValueError:
+        logger.warning("Menu router received a non-menu callback; ignoring")
+        return False
+
+    if callback_id:
+        try:
+            TELEGRAM_API.answer_callback_query(
+                callback_query_id=callback_id,
+                text=render.callback_answer,
+            )
+        except Exception as exc:  # pragma: no cover - network behavior
+            logger.warning("answerCallbackQuery failed: %s", _redact_sensitive_text(exc))
+
+    if context.chat_id is None or context.message_id is None:
+        logger.warning("Menu callback without chat/message id; nothing to edit")
+        return False
+
+    try:
+        TELEGRAM_API.edit_message_text(
+            chat_id=context.chat_id,
+            message_id=context.message_id,
+            text=render.text,
+            parse_mode=render.parse_mode,
+            reply_markup=render.reply_markup,
+        )
+    except Exception as exc:  # pragma: no cover - network behavior
+        # A "message is not modified" error is benign (user re-tapped the
+        # same button); anything else is worth surfacing.
+        logger.warning("editMessageText failed: %s", _redact_sensitive_text(exc))
+        return False
+    return True
+
+
+def _handle_content_approval_callback(decision: RouterDecision, update: dict[str, Any]) -> bool:
+    """Run the content-approval flow for apv:/rej:/vw: callbacks.
+
+    This closes a long-standing gap: ``lib/content/telegram_approval`` has
+    always built these buttons, but nothing routed the taps back to it, so
+    the buttons spun forever and drafts were never approved from Telegram.
+    """
+    context = decision.context
+    callback = _callback_query_payload(update)
+    callback_id = str(callback.get("id") or "").strip()
+
+    try:
+        from lib.content import telegram_approval
+    except Exception as exc:
+        logger.error("content approval module unavailable: %s", _redact_sensitive_text(exc))
+        return False
+
+    actor = context.actor.username or (
+        f"telegram:{context.actor.user_id}" if context.actor.user_id else "telegram"
+    )
+    try:
+        result = telegram_approval.handle_callback(
+            context.callback_data,
+            callback_id=callback_id or None,
+            chat_id=context.chat_id,
+            message_id=context.message_id,
+            actor=actor,
+        )
+    except Exception as exc:  # pragma: no cover - filesystem/network behavior
+        logger.exception("content approval callback failed: %s", exc)
+        return False
+
+    logger.info(
+        "Content approval callback handled: %s",
+        _redact_sensitive_text(
+            {
+                "action": result.get("action"),
+                "slug": result.get("slug"),
+                "status": result.get("status"),
+                "ok": result.get("ok"),
+            }
+        ),
+    )
+    return bool(result.get("ok"))
+
+
 def process_update(update: dict[str, Any]) -> bool:
     if _mark_update_seen(update):
         logger.info("Ignoring duplicate Telegram update_id=%s", update.get("update_id"))
@@ -909,6 +1066,10 @@ def process_update(update: dict[str, Any]) -> bool:
             ),
         )
         return False
+    if decision.route == "menu":
+        return _handle_menu_callback(decision, update)
+    if decision.route == "content_approval":
+        return _handle_content_approval_callback(decision, update)
     if decision.route != "command":
         return _process_router_decision_no_send(decision)
 
@@ -928,10 +1089,12 @@ def process_update(update: dict[str, Any]) -> bool:
     if not text:
         return False
 
+    reply_markup = response.get("reply_markup")
     TELEGRAM_API.send_message(
         chat_id=chat_id,
         text=text,
         parse_mode=response.get("parse_mode"),
+        reply_markup=reply_markup if isinstance(reply_markup, dict) else None,
         disable_notification=bool(response.get("disable_notification", False)),
         reply_parameters=(
             {"message_id": response.get("reply_to_message_id", _message_id(update))}
