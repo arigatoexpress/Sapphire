@@ -111,8 +111,8 @@ curl -s http://127.0.0.1:18081/health
 # Dashboard
 curl -s http://127.0.0.1:8080/healthz
 
-# Brain synthesis
-curl -s https://sapphirealpha.xyz/api/brain/synthesis | python3 -m json.tool
+# Public Mission Control (live telemetry)
+curl -s https://sapphirealpha.xyz/api/v1/live | python3 -m json.tool
 
 # Full system check
 make doctor
@@ -161,7 +161,7 @@ echo '{"action": "list_pine"}' | python3 plugins/claw-sapphire/tools/tradingview
 | Surface | URL | Auth |
 |---|---|---|
 | Public face | https://sapphirealpha.xyz | — |
-| Brain synthesis | https://sapphirealpha.xyz/api/brain/synthesis | — |
+| Live telemetry | https://sapphirealpha.xyz/api/v1/live | — |
 | Dashboard | http://localhost:8080/showcase | `sapphire` / `.env` password |
 | Control plane | http://localhost:8082 | `SapphireControl` header |
 | OpenBB (32 providers) | http://localhost:6900 | — |
