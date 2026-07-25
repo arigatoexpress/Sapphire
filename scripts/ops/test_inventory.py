@@ -28,6 +28,17 @@ SUITES = (
     ("unit", ("tests/unit",)),
     ("plugin", ("plugins/claw-sapphire/tests",)),
 )
+# Collection must not autoload pytest11 entry points. The self-hosted runner's
+# Homebrew python has a stale global web3==6.20.4 whose metadata registers
+# `web3.tools.pytest_ethereum.plugins`; the uv overlay puts web3 7.x (which
+# deleted web3/tools/) ahead of it on sys.path, so autoload resolves the 6.x
+# entry point against the 7.x package and dies with ModuleNotFoundError.
+# ci.yml already does this for the `test` and `plugin tests` jobs — doing it
+# here keeps the invariant with the subprocess that actually needs it, so it
+# holds for local runs and `make registry` too. Plugins the suites genuinely
+# need are then loaded back explicitly (pyproject sets asyncio_mode = "auto").
+COLLECTION_ENV = {"PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
+COLLECTION_PLUGIN_ARGS = ("-p", "no:cacheprovider", "-p", "pytest_asyncio.plugin")
 FILE_COUNT_RE = re.compile(r"^(?P<path>.+\.py):\s+(?P<count>\d+)\s*$")
 SUMMARY_RE = re.compile(r"(?P<count>\d+)\s+tests?\s+collected")
 # The 2026-05-30 README overhaul (d762e899) replaced the counts table with a
@@ -151,8 +162,17 @@ def collect_inventory() -> Inventory:
 def collect_suite(name: str, paths: tuple[str, ...]) -> SuiteInventory:
     start = time.perf_counter()
     result = subprocess.run(
-        [COLLECTION_PYTHON, "-m", "pytest", *paths, "--collect-only", "-qq"],
+        [
+            COLLECTION_PYTHON,
+            "-m",
+            "pytest",
+            *paths,
+            "--collect-only",
+            "-qq",
+            *COLLECTION_PLUGIN_ARGS,
+        ],
         cwd=ROOT,
+        env={**os.environ, **COLLECTION_ENV},
         text=True,
         capture_output=True,
         check=False,
