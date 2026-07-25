@@ -44,15 +44,23 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-async def _scan_aave_arb_async(top_n: int) -> list[Any]:
-    """Internal async helper so :func:`scan_aave_arb` can be sync."""
-    from lib.chains.cross_chain.aave_apy_arb import AaveApyArbScanner
+async def _scan_aave_arb_async(top_n: int, scanner: Any | None = None) -> list[Any]:
+    """Internal async helper so :func:`scan_aave_arb` can be sync.
 
-    scanner = AaveApyArbScanner()
+    ``scanner`` is injectable so callers (and tests) can supply per-chain
+    protocol facades. A bare ``CrossChainAaveScanner()`` registers **no**
+    facades and therefore silently yields zero signals — see
+    :func:`scan_aave_arb`, which rejects that case rather than reporting an
+    empty scan as a successful one.
+    """
+    if scanner is None:
+        from lib.chains.cross_chain.aave_apy_arb import CrossChainAaveScanner
+
+        scanner = CrossChainAaveScanner()
     return await scanner.scan_top_assets(n=top_n)
 
 
-def scan_aave_arb(top_n: int = 5) -> dict[str, Any]:
+def scan_aave_arb(top_n: int = 5, scanner: Any | None = None) -> dict[str, Any]:
     """Synchronous JSON-serializable cross-chain Aave APY arbitrage summary.
 
     Returns a dict with this shape::
@@ -73,6 +81,11 @@ def scan_aave_arb(top_n: int = 5) -> dict[str, Any]:
     On *any* uncaught failure returns a structured error dict so the
     dashboard / plugin tool surface a graceful empty state rather than
     a 500.
+
+    When no ``scanner`` is supplied, the default has zero per-chain facades
+    wired and cannot produce signals. That is reported as an explicit
+    ``error`` — an unwired scanner must not be presented as "scanned
+    successfully, no opportunities found".
     """
     from lib.chains.cross_chain.aave_apy_arb import (
         DEFAULT_TOP_ASSETS,
@@ -80,10 +93,7 @@ def scan_aave_arb(top_n: int = 5) -> dict[str, Any]:
         MIN_SIGNAL_SPREAD_BPS,
     )
 
-    try:
-        signals = asyncio.run(_scan_aave_arb_async(top_n=top_n))
-    except Exception as exc:
-        logger.exception("scan_aave_arb failed")
+    def _empty(error: str) -> dict[str, Any]:
         return {
             "top_n": top_n,
             "signals": [],
@@ -94,8 +104,21 @@ def scan_aave_arb(top_n: int = 5) -> dict[str, Any]:
                 "extreme_spread_bps": str(EXTREME_SPREAD_BPS),
             },
             "candidate_assets": list(DEFAULT_TOP_ASSETS),
-            "error": f"{type(exc).__name__}: {exc}",
+            "error": error,
         }
+
+    if scanner is None:
+        return _empty(
+            "not wired: no per-chain Aave facades configured. Pass scanner= "
+            "with MegaETHProtocols / ArbitrumProtocols / OptimismProtocols "
+            "built on live RPC clients."
+        )
+
+    try:
+        signals = asyncio.run(_scan_aave_arb_async(top_n=top_n, scanner=scanner))
+    except Exception as exc:
+        logger.exception("scan_aave_arb failed")
+        return _empty(f"{type(exc).__name__}: {exc}")
 
     summaries = []
     for s in signals:

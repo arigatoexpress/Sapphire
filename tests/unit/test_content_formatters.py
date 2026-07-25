@@ -345,7 +345,41 @@ class TestFormatXThread:
         )
         result = format_x_thread(r)
         assert len(result[0]) <= X_TWEET_LIMIT
-        assert result[0].endswith("…")
+        # Body is truncated, but the disclaimer survives and lands last.
+        assert "…" in result[0]
+        assert result[0].endswith(SHORT_DISCLAIMER)
+
+    def test_market_pulse_no_period_body_stays_within_limit(self):
+        """A body with no sentence boundary hits _shorten_to's ellipsis path,
+        which is bounded to budget + 1 — _append_tail must absorb that."""
+        r = Report(
+            kind="market_pulse",
+            title="Pulse",
+            generated_at="2026-04-18T09:00:00",
+            facts={},
+            body="x" * 500,
+            sources=[],
+            tags=[],
+        )
+        result = format_x_thread(r)
+        assert len(result[0]) <= X_TWEET_LIMIT
+        assert result[0].endswith(SHORT_DISCLAIMER)
+
+    def test_market_pulse_includes_disclaimer(self):
+        """market_pulse returns early from format_x_thread, so it must carry
+        its own disclaimer — and X is the only platform it publishes to."""
+        r = Report(
+            kind="market_pulse",
+            title="Pulse",
+            generated_at="2026-04-18T09:00:00",
+            facts={},
+            body="BTC up 3%. ETH steady. SOL breaking out.",
+            sources=[],
+            tags=[],
+        )
+        result = format_x_thread(r)
+        assert SHORT_DISCLAIMER in result[0]
+        assert len(result[0]) <= X_TWEET_LIMIT
 
     def test_unknown_kind_uses_title_and_body(self):
         result = format_x_thread(_unknown_report())

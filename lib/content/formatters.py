@@ -48,7 +48,10 @@ def _append_tail(text: str, tail: str, limit: int) -> str:
     budget = max(0, limit - len(joiner) - len(tail))
     if budget == 0:
         return tail[:limit]
-    return _shorten_to(text, budget) + joiner + tail
+    # Reaching here means *text* must be shortened, and _shorten_to appends its
+    # ellipsis after cutting (so it is bounded to budget + 1, not budget) —
+    # aim one char lower to keep the joined result within *limit*.
+    return _shorten_to(text, budget - 1) + joiner + tail
 
 
 def _linkedin_crypto(r: Report) -> str:
@@ -254,11 +257,9 @@ def format_x_thread(r: Report) -> list[str]:
     elif r.kind == "security_digest":
         parts = _x_security_parts(r)
     elif r.kind == "market_pulse":
-        # Market pulse is a single tweet.
-        single = r.body.strip()
-        if len(single) > X_TWEET_LIMIT:
-            single = single[: X_TWEET_LIMIT - 1] + "…"
-        return [single]
+        # Market pulse is a single tweet, so it returns early and never reaches
+        # the shared disclaimer append below — it has to carry its own.
+        return [_append_tail(r.body.strip(), SHORT_DISCLAIMER, X_TWEET_LIMIT)]
     else:
         parts = [r.title, r.body]
     parts.append(SHORT_DISCLAIMER)

@@ -15,7 +15,7 @@ ruff check --fix .                    # auto-fix
 
 # Services (Mac — LaunchAgents in infra/launchagents/)
 uvicorn app.main:app --port 8082                             # control-plane (from services/control-plane/)
-AUTH_PASSWORD=sapphire python3 app.py                        # dashboard (from services/dashboard/)
+AUTH_PASSWORD=<strong-pw> PORT=8080 python3 app.py           # dashboard (from services/dashboard/); weak/default pws are rejected at import
 python3 -m uvicorn src.signal_logger:app --port 18081        # signal logger (from services/alpha/)
 X402_ENABLED=1 python3 services/inference-proxy/app.py       # inference proxy with x402 paywall
 
@@ -45,8 +45,11 @@ echo '{"all": true}' | python3 plugins/claw-sapphire/tools/verify.py
 echo '{"action": "list_pine"}' | python3 plugins/claw-sapphire/tools/tradingview.py  # read-only TV orchestrator surface
 
 # Content engine
-python3 -m lib.content generate                               # render weekly report from events+signals
-python3 -m lib.content publish                                # promote draft → ready/
+python3 -m lib.content                                        # run today's scheduled slots
+python3 -m lib.content --kind weekly_crypto_brief             # render one report kind → drafts/ + ready/
+python3 -m lib.content --all                                  # render every report kind
+python3 -m lib.content --list-drafts                          # list recent draft manifests
+python3 -m lib.content --publish                              # run live publishers (dry-run unless SAPPHIRE_PUBLISH_LIVE=1)
 
 # Makefile shortcuts (see `make help`)
 make test          # core unit tests
@@ -109,7 +112,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/analytics_dashboard/` | service | Analytics-focused dashboard variant. |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused). |
 | `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac:8082]. |
-| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 52 pages including the unified `/showcase`, SSE event stream, lead-intel, performance + forecast + backtest endpoints. |
+| `services/dashboard/` | service | Flask dashboard [Mac:8080 by convention — but `app.py` defaults to `PORT=8082`, which collides with control-plane; always pass `PORT` explicitly] — 53 page routes + 129 `/api/*` routes, including the unified `/showcase`, SSE event stream, lead-intel, performance + forecast + backtest endpoints. |
 | `services/foundry_sync/` | service | Scheduled Foundry sync daemon — wraps `lib/foundry/sync.py`. |
 | `services/heartbeat/` | service | Heartbeat daemon wrapper (`run.py`, `heartbeat.py`). |
 | `services/hyperliquid/` | service | Hyperliquid L1 bot — public-feed signal subscriber + live-trading executor (`hyperliquid_bot/risk.py`, hard caps: $5/order, 3x lev, 5 positions, $25/day loss, file-killswitch). Mainnet refused until EIP-712 signing is verified on testnet (`policy.signing_verified=False`). |
@@ -137,6 +140,8 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 **Mac (100.x.x.w) — commander, all services:**
 - control-plane:8082, dashboard:8080, signal-logger:18081
+- **Port caveat (verified 2026-07-25):** `com.sovereign.openwebui` LaunchAgent occupies **8080**, so the dashboard cannot bind its conventional port while open-webui is loaded. Pick a free port via `PORT=`, or unload open-webui first.
+- **LaunchAgent state (verified 2026-07-25):** zero `com.sapphire.*` agents are loaded — the plists are absent from `~/Library/LaunchAgents` and launchctl holds 45 residual `disabled` overrides. Nothing in the "Active routines" / "22 Scheduled Tasks" sections below is firing on this Mac. Restore with `scripts/ops/restore_launchagents.sh --list` (tiered; outward `content-publisher` excluded from `all`).
 - inference-proxy:11435 (4-tier failover)
 - pm-bot:18082 (com.sapphire.pm-bot LaunchAgent, Telegram webhook owner)
 - content-engine (com.sapphire.content-engine LaunchAgent, weekly cadence)
