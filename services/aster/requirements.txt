@@ -1,8 +1,8 @@
 # Aster Bot Dependencies
 httpx>=0.23.0
-aiohttp>=3.8.0
+aiohttp>=3.14.1  # security: floors below leave 22 known CVEs (GHSA-2fqr-mr3j-6wp8 + siblings)
 python-dotenv>=1.0.0
-cryptography>=41.0.0
+cryptography>=48.0.1  # security: earlier floors ship vulnerable OpenSSL (GHSA-537c-gmf6-5ccf)
 redis>=5.0.0
 websockets>=11.0.3
 pydantic>=2.0.0
