@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 """Read-only production smoke for sapphirealpha.xyz.
 
-This guard is intentionally narrow: prove the apex is serving the Sapphire
-analytics/control-plane backend, not a static SPA that falls back to index.html
+This guard is intentionally narrow: prove the apex is serving the
+sapphire-alpha-dashboard backend (arigatoexpress/sapphire-alpha-dashboard on
+Cloud Run in sapphire-479610), not a static SPA that falls back to index.html
 for every /api/* route.
+
+Why the HTML sniff matters: the backend registers a `/{catchall:path}` route
+that returns index.html with HTTP 200 for anything unmatched. A renamed or
+dropped API route therefore does NOT 404 - it quietly serves HTML at 200.
+Status-code checks alone cannot see that; the content-type sniff can.
+
+Note: /healthz is unusable as a probe. Google Front End reserves that path on
+Cloud Run and intercepts it before the container sees it, so it always 404s in
+production. /api/health exists specifically to work around this.
 """
 
 from __future__ import annotations
@@ -41,14 +51,17 @@ class ProbeResult:
     content_type: str | None = None
 
 
+EXPECTED_SERVICE = "sapphire-alpha-dashboard"
+
 PROBES: tuple[ProbeSpec, ...] = (
-    ProbeSpec("home_html", "/", "html", ("Sapphire OS",)),
-    ProbeSpec("health_json", "/health", "json", ("ok", "project", "dataset")),
-    ProbeSpec("projects_json", "/api/projects", "json", ("projects",)),
-    ProbeSpec("brain_json", "/api/brain/synthesis", "json"),
-    ProbeSpec("markets_json", "/api/markets/snapshot", "json"),
-    ProbeSpec("silos_json", "/api/silos/health", "json"),
-    ProbeSpec("about_subpage_html", "/p/about", "html", ("Sapphire",)),
+    ProbeSpec("home_html", "/", "html", ("SAPPHIRE ALPHA",)),
+    ProbeSpec("health_json", "/api/health", "json", ("status", "service", "version")),
+    ProbeSpec("status_json", "/api/v1/status", "json", ("service", "version", "gate")),
+    ProbeSpec("live_json", "/api/v1/live", "json", ("version", "summary")),
+    ProbeSpec("transparency_json", "/api/v1/transparency", "json", ("records", "counts")),
+    ProbeSpec("widgets_json", "/api/v1/widgets", "json", ("gate",)),
+    ProbeSpec("fleet_json", "/api/fleet", "json", ("public_view",)),
+    ProbeSpec("miniapp_html", "/miniapp", "html", ("Sapphire Command",)),
 )
 
 
@@ -79,18 +92,23 @@ def _looks_like_static_html(body: bytes) -> bool:
 
 
 def _health_owner_mismatch(payload: Any) -> str | None:
+    """Catch the apex being re-pointed at some other Cloud Run service.
+
+    A wrong-but-healthy backend answers 200 with valid JSON, so shape checks
+    alone pass. Pinning the service name is what makes a silent re-point loud.
+    """
     if not isinstance(payload, dict):
         return "health JSON is not an object"
     service = payload.get("service")
-    if isinstance(service, str) and service and service != "sapphire-analytics-dashboard":
+    if isinstance(service, str) and service and service != EXPECTED_SERVICE:
         return (
-            f"route owner mismatch: /health reports service={service!r}; expected "
-            "Sapphire analytics health JSON with project and dataset keys"
+            f"route owner mismatch: /api/health reports service={service!r}; "
+            f"expected {EXPECTED_SERVICE!r}"
         )
-    missing_owner_keys = [key for key in ("project", "dataset") if key not in payload]
+    missing_owner_keys = [key for key in ("status", "version") if key not in payload]
     if missing_owner_keys:
         return (
-            "route owner mismatch: /health missing Sapphire analytics keys: "
+            f"route owner mismatch: /api/health missing {EXPECTED_SERVICE} keys: "
             f"{', '.join(missing_owner_keys)}"
         )
     return None

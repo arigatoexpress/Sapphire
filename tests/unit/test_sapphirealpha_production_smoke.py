@@ -44,17 +44,42 @@ class _FakeResponse:
         return self._body
 
 
+def _healthy_json_for(url: str) -> bytes | None:
+    """Return a well-shaped body for each live JSON probe, or None if not a JSON route."""
+    bodies: dict[str, dict[str, Any]] = {
+        "/api/health": {
+            "status": "ok",
+            "service": "sapphire-alpha-dashboard",
+            "version": "0.2.0",
+        },
+        "/api/v1/status": {"service": "sapphire-alpha-dashboard", "version": "0.2.0", "gate": {}},
+        "/api/v1/live": {"version": 1, "summary": {"state": "ok"}},
+        "/api/v1/transparency": {"records": [], "counts": {}},
+        "/api/v1/widgets": {"gate": {}},
+        "/api/fleet": {"public_view": True},
+    }
+    for path, payload in bodies.items():
+        if url.endswith(path):
+            return json.dumps(payload).encode()
+    return None
+
+
 def test_smoke_fails_when_api_route_returns_static_html(monkeypatch):
+    """The catchall route serves index.html at HTTP 200 for unmatched paths.
+
+    That is the exact regression this smoke exists to catch: a dropped API
+    route looks 'healthy' to any status-code-only monitor.
+    """
     module = _load_module()
 
     def fake_urlopen(request, timeout, **_kwargs):
         url = request.full_url
-        if "/api/" in url or url.endswith("/health"):
+        if "/api/" in url:
             return _FakeResponse(
                 b"<!doctype html><html><body><div id='root'></div></body></html>",
                 content_type="text/html",
             )
-        return _FakeResponse(b"<html>Sapphire OS</html>", content_type="text/html")
+        return _FakeResponse(b"<html>SAPPHIRE ALPHA</html>", content_type="text/html")
 
     monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
 
@@ -71,15 +96,22 @@ def test_smoke_fails_with_crisp_route_owner_mismatch(monkeypatch):
 
     def fake_urlopen(request, timeout, **_kwargs):
         url = request.full_url
-        if url.endswith("/health"):
+        if url.endswith("/api/health"):
+            # Healthy JSON, correct shape - but the wrong Cloud Run service.
             return _FakeResponse(
-                json.dumps({"ok": True, "service": "agent-opportunity-exchange"}).encode()
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "service": "agent-opportunity-exchange",
+                        "version": "1.0.0",
+                    }
+                ).encode()
             )
-        if url.endswith("/api/projects"):
-            return _FakeResponse(json.dumps({"projects": []}).encode())
-        if "/api/" in url:
-            return _FakeResponse(b'{"ok": true}')
-        return _FakeResponse(b"<html>Sapphire OS</html>", content_type="text/html")
+        if (body := _healthy_json_for(url)) is not None:
+            return _FakeResponse(body)
+        return _FakeResponse(
+            b"<html>SAPPHIRE ALPHA Sapphire Command</html>", content_type="text/html"
+        )
 
     monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
 
@@ -92,26 +124,16 @@ def test_smoke_fails_with_crisp_route_owner_mismatch(monkeypatch):
     assert "agent-opportunity-exchange" in health_probe["evidence"]
 
 
-def test_smoke_passes_for_control_plane_backend_shapes(monkeypatch):
+def test_smoke_passes_for_alpha_dashboard_backend_shapes(monkeypatch):
     module = _load_module()
 
     def fake_urlopen(request, timeout, **_kwargs):
         url = request.full_url
-        if url.endswith("/api/projects"):
-            return _FakeResponse(json.dumps({"projects": []}).encode())
-        if url.endswith("/health"):
-            return _FakeResponse(
-                json.dumps(
-                    {
-                        "ok": True,
-                        "project": "sapphire-479610",
-                        "dataset": "analytics",
-                    }
-                ).encode()
-            )
-        if "/api/" in url or url.endswith("/health"):
-            return _FakeResponse(b'{"ok": true}')
-        return _FakeResponse(b"<html>Sapphire OS</html>", content_type="text/html")
+        if (body := _healthy_json_for(url)) is not None:
+            return _FakeResponse(body)
+        return _FakeResponse(
+            b"<html>SAPPHIRE ALPHA Sapphire Command</html>", content_type="text/html"
+        )
 
     monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
 
@@ -120,3 +142,9 @@ def test_smoke_passes_for_control_plane_backend_shapes(monkeypatch):
     assert report["ok"] is True
     assert report["failed"] == 0
     assert report["passed"] == len(module.PROBES)
+
+
+def test_smoke_probes_avoid_healthz_which_gfe_intercepts(monkeypatch):
+    """/healthz always 404s on Cloud Run - GFE reserves it. Never probe it."""
+    module = _load_module()
+    assert all(probe.path != "/healthz" for probe in module.PROBES)
