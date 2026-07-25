@@ -384,6 +384,7 @@ def probe_satellite_merge_posture(
     api_errors: list[str] = []
     auto_merge_false: list[str] = []
     critical: list[str] = []
+    unevaluated: list[str] = []
 
     for repo in repos:
         repo_id = str(repo.get("id") or repo.get("name") or "unknown")
@@ -410,16 +411,25 @@ def probe_satellite_merge_posture(
             critical.append(f"{repo_id}:allow_squash_merge=false")
         if not delete_branch:
             critical.append(f"{repo_id}:delete_branch_on_merge=false")
-        if runner_gate != "pass":
+        if runner_gate == "missing_local":
+            # Absence of a local clone is not evidence of a broken runner gate —
+            # it is absence of evidence. Most of the old arigatoexpress fleet is
+            # archived and deliberately not cloned on this Mac, so treating
+            # "can't look" as "found a violation" pinned this check to FAIL
+            # forever and buried the one real violation it did find.
+            unevaluated.append(repo_id)
+        elif runner_gate != "pass":
             critical.append(f"{repo_id}:runner_gate={runner_gate}")
 
     status = "PASS"
     if critical:
         status = "FAIL"
-    elif api_errors or auto_merge_false:
+    elif api_errors or auto_merge_false or unevaluated:
         status = "WARN"
 
     evidence_parts = [f"checked_repos={len(repos)}"]
+    if unevaluated:
+        evidence_parts.append(f"runner_gate_unevaluated={','.join(unevaluated)}")
     if auto_merge_false:
         evidence_parts.append(f"auto_merge_false={','.join(auto_merge_false)}")
     if api_errors:
@@ -519,7 +529,41 @@ def repo_runner_gate_state(repo: dict[str, Any]) -> str:
     return "pass" if jobs else "no_jobs"
 
 
+def runs_on_labels(job: dict[str, Any]) -> list[str]:
+    """Normalise every `runs-on` spelling to a flat list of label strings.
+
+    GitHub accepts a bare string (`ubuntu-latest`), a label list
+    (`[self-hosted, Windows, X64]`), and a group/labels mapping.
+    """
+    runs_on = job.get("runs-on")
+    if isinstance(runs_on, str):
+        return [runs_on]
+    if isinstance(runs_on, list):
+        return [str(label) for label in runs_on]
+    if isinstance(runs_on, dict):
+        labels = runs_on.get("labels")
+        if isinstance(labels, str):
+            return [labels]
+        if isinstance(labels, list):
+            return [str(label) for label in labels]
+    return []
+
+
 def workflow_no_spend_gate_violations(repo_id: str, workflow: Path) -> tuple[list[str], int]:
+    """Flag jobs that could bill GitHub-hosted Actions minutes.
+
+    Two spellings satisfy the no-spend invariant:
+
+    1. The `vars.SAPPHIRE_RUNNER` gate — `runs-on` resolves from the var and the
+       job is `if`-guarded on it being set, so the job cannot fall back to a
+       hosted runner when the self-hosted runner is unregistered.
+    2. An explicit `self-hosted` label in `runs-on`. This targets Ari's own
+       hardware and bills nothing, so it needs no gate.
+
+    Only recognising (1) made `win-runner-smoke.yml` a permanent FAIL even
+    though it pins `runs-on: [self-hosted, Windows, X64, sapphire-win]` — free
+    by construction. The invariant is "don't spend", not "use one idiom".
+    """
     try:
         data = yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}
     except Exception as exc:
@@ -531,9 +575,12 @@ def workflow_no_spend_gate_violations(repo_id: str, workflow: Path) -> tuple[lis
     for job_name, job in jobs.items():
         if not isinstance(job, dict):
             continue
+        labels = runs_on_labels(job)
+        if any(label.strip().lower() == "self-hosted" for label in labels):
+            continue
         if_text = str(job.get("if") or "")
-        runs_on = str(job.get("runs-on") or "")
-        if "vars.SAPPHIRE_RUNNER" not in if_text or "vars.SAPPHIRE_RUNNER" not in runs_on:
+        runs_on_text = " ".join(labels)
+        if "vars.SAPPHIRE_RUNNER" not in if_text or "vars.SAPPHIRE_RUNNER" not in runs_on_text:
             violations.append(f"{repo_id}:{workflow.name}:{job_name}")
     return violations, len(jobs)
 
@@ -588,15 +635,20 @@ def probe_launchagents() -> list[Check]:
     if sys.platform == "win32":
         return _probe_windows_tasks()
 
+    # Source of truth: plists under infra/launchagents/. Retired 2026-07-25:
+    #   com.sapphire.dashboard      — CLAUDE.md: "No LaunchAgent — run manually"
+    #   com.sapphire.inference-proxy — no plist; run manually if needed
+    #   com.sapphire.cloudflare-tunnel — renamed to webhook-tunnel (kept below)
+    # Kept intentionally even though no plist in infra/launchagents/:
+    #   com.sapphire.pm-bot — plist lives at services/pm_bot/launchagent/;
+    #     last active 2026-05-13 per log — real regression, do NOT hide.
     expected = {
-        "com.sapphire.dashboard": "always_on",
         "com.sapphire.control-plane": "always_on",
         "com.sapphire.signal-logger": "always_on",
-        "com.sapphire.inference-proxy": "always_on",
         "com.sapphire.pm-bot": "always_on",
         "com.sapphire.heartbeat": "always_on",
         "com.sapphire.openbb-api": "always_on",
-        "com.sapphire.cloudflare-tunnel": "always_on",
+        "com.sapphire.webhook-tunnel": "always_on",
         "actions.runner.arigatoexpress-Sapphire.ari-macbook-sapphire": "always_on",
         "com.sapphire.gcp-sync": "scheduled",
         "com.sapphire.content-engine": "scheduled",
@@ -641,11 +693,31 @@ def parse_launchctl_list(output: str) -> dict[str, tuple[str, str]]:
     return parsed
 
 
+def dashboard_port() -> str:
+    """Port the Sapphire dashboard actually binds on this host.
+
+    Not 8080: `com.sovereign.openwebui` squats that port. Not the app.py default
+    8082 either: control-plane owns it. 8085 is the working slot.
+    """
+    return os.environ.get("SAPPHIRE_DASHBOARD_PORT", "8085")
+
+
 def probe_local_endpoints(env: dict[str, str]) -> list[Check]:
+    dash = dashboard_port()
     checks = [
         inference_proxy_health_check(),
-        http_check("local", "inference_proxy_metrics", "http://127.0.0.1:11435/metrics"),
-        http_check("local", "dashboard_health", "http://127.0.0.1:8080/health"),
+        http_check(
+            "local",
+            "inference_proxy_metrics",
+            "http://127.0.0.1:11435/metrics",
+            warn_on_error=True,
+        ),
+        http_check(
+            "local",
+            "dashboard_health",
+            f"http://127.0.0.1:{dash}/health",
+            expect_json={"status": "healthy"},
+        ),
         http_check("local", "control_plane_health", "http://127.0.0.1:8082/health"),
         http_check("local", "signal_logger_health", "http://127.0.0.1:18081/health"),
         tcp_check("local", "openbb_api_tcp", "127.0.0.1", 6900),
@@ -664,7 +736,7 @@ def probe_local_endpoints(env: dict[str, str]) -> list[Check]:
             http_check(
                 "local",
                 "dashboard_authenticated_root",
-                "http://127.0.0.1:8080/",
+                f"http://127.0.0.1:{dash}/",
                 auth=("sapphire", password),
             )
         )
@@ -681,6 +753,9 @@ def probe_local_endpoints(env: dict[str, str]) -> list[Check]:
 
 
 def inference_proxy_health_check() -> Check:
+    # Inference proxy is optional infra on this Mac (no LaunchAgent by design;
+    # run manually via services/inference-proxy/app.py when needed). A missing
+    # proxy is a WARN, not a FAIL — same treatment as tradingview_cdp_version.
     started = time.perf_counter()
     url = "http://127.0.0.1:11435/health"
     try:
@@ -691,7 +766,7 @@ def inference_proxy_health_check() -> Check:
         return Check(
             "local",
             "inference_proxy_health",
-            "FAIL",
+            "WARN",
             f"http={exc.code}",
             int((time.perf_counter() - started) * 1000),
         )
@@ -699,7 +774,7 @@ def inference_proxy_health_check() -> Check:
         return Check(
             "local",
             "inference_proxy_health",
-            "FAIL",
+            "WARN",
             exc.__class__.__name__,
             int((time.perf_counter() - started) * 1000),
         )
@@ -1704,7 +1779,18 @@ def http_check(
     *,
     auth: tuple[str, str] | None = None,
     warn_on_error: bool = False,
+    expect_json: dict[str, Any] | None = None,
 ) -> Check:
+    """Probe an HTTP endpoint.
+
+    `expect_json` turns the probe into an *identity assertion*: the response body
+    must parse as a JSON object containing every listed key with the listed
+    value, otherwise the check FAILs with `identity_mismatch`. Without it, a
+    health check only proves "something answered on this port" — which is how
+    `dashboard_health` spent months passing against Open WebUI squatting :8080
+    and returning its own `{"status": true}`. Matching is a subset match so a
+    service adding new fields does not break the probe.
+    """
     started = time.perf_counter()
     request = urllib.request.Request(url)
     if auth:
@@ -1727,6 +1813,7 @@ def http_check(
         )
     status = "PASS" if 200 <= status_code < 300 else ("WARN" if warn_on_error else "FAIL")
     hint = ""
+    parsed: Any = None
     with contextlib_suppress():
         parsed = json.loads(body)
         if isinstance(parsed, dict):
@@ -1734,6 +1821,21 @@ def http_check(
                 hint = f"; status={parsed.get('status')}"
             elif parsed.get("healthy") is not None:
                 hint = f"; healthy={parsed.get('healthy')}"
+
+    if expect_json and status == "PASS":
+        if not isinstance(parsed, dict):
+            status = "FAIL"
+            hint += "; identity_mismatch=body_not_json_object"
+        else:
+            mismatched = [
+                f"{key}={parsed.get(key)!r}!={value!r}"
+                for key, value in expect_json.items()
+                if parsed.get(key) != value
+            ]
+            if mismatched:
+                status = "FAIL"
+                hint += f"; identity_mismatch={','.join(mismatched)}"
+
     return Check(
         category,
         name,

@@ -141,6 +141,28 @@ if [[ -d infra/launchagents ]]; then
   pass "${n} enabled plist(s) on disk"
 fi
 
+section "Data freshness"
+
+if have python3 && [[ -f infra/staleness-thresholds.yaml ]]; then
+  # scripts/ops/staleness_monitor.py owns the config; exit=2 means at least one
+  # STALE, exit=0 all-clear. We echo one line per stale/missing target only.
+  stale_out=$(python3 scripts/ops/staleness_monitor.py --stale-only 2>&1 || true)
+  # Header row is always emitted; if only the header came back, everything is FRESH.
+  if [[ "$(echo "${stale_out}" | wc -l | tr -d ' ')" -le 1 ]]; then
+    pass "all watched data files within threshold"
+  else
+    echo "${stale_out}" | tail -n +2 | while IFS= read -r line; do
+      # STALE = fail-worthy; MISSING = optional target absent, informational.
+      case "${line}" in
+        *STALE*)   fail "staleness: ${line}" ;;
+        *MISSING*) info  "missing (optional): ${line}" ;;
+      esac
+    done
+  fi
+else
+  info "staleness monitor unavailable (no python3 or config)"
+fi
+
 section "Git"
 
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")

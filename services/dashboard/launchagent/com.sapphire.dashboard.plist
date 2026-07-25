@@ -21,12 +21,21 @@
     <key>KeepAlive</key>
     <true/>
 
+    <!-- app.py aborts at import when AUTH_PASSWORD is unset or weak. Without a
+         throttle, KeepAlive respawns that crash on launchd's 1s floor and
+         buries the real error under a log flood. 30s keeps the restart useful
+         while making a crash-loop legible. -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <!-- 8080 is squatted by com.sovereign.openwebui and app.py's own
+             default 8082 collides with control-plane. 8085 is the free slot. -->
         <key>PORT</key>
-        <string>8082</string>
+        <string>8085</string>
     </dict>
 
     <key>StandardOutPath</key>

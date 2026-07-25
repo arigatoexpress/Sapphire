@@ -33,7 +33,30 @@ SRC="$REPO/infra/launchagents"
 DEST="$HOME/Library/LaunchAgents"
 DOMAIN="gui/$(id -u)"
 
-INFRA=(control-plane openbb-api heartbeat logrotate telemetry-collector)
+# Plists live in TWO places. infra/launchagents/ holds the shared fleet;
+# service-owned agents ship next to their code under services/*/launchagent/.
+# This script used to glob only the former, so `--all` silently skipped
+# com.sapphire.{dashboard,inference-proxy,pm-bot} — they showed up in the
+# readiness sweep as "not loaded" and were mistaken for stale checks.
+# resolve_plist() looks in both.
+resolve_plist() {
+  local label="$1"
+  if [ -f "$SRC/$label.plist" ]; then
+    printf '%s\n' "$SRC/$label.plist"
+    return 0
+  fi
+  local candidate
+  for candidate in "$REPO"/services/*/launchagent/"$label.plist"; do
+    if [ -f "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+INFRA=(control-plane openbb-api heartbeat logrotate telemetry-collector
+       dashboard inference-proxy)
 INTEL=(chain-refresh correlation-refresh threat-refresh market-intel
        continuous-intelligence-daily morning-brief gemini-ooda-daily
        fleet-status readiness-cache security-pipeline tdr-pro-sync
@@ -43,6 +66,12 @@ TRADING=(signal-logger alpha-agent auto-executor trading-shadow-controller
          webhook-receiver-mac webhook-tunnel tv-webhook-url-sync
          tradingview-cdp tradingview-ta-capture tradingview-pine-batch)
 PUBLISH=(content-publisher)
+# com.sapphire.pm-bot owns Telegram ingress. Excluded from 'all' on purpose:
+# its committed plist sets MODE=polling + SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1,
+# which contradicts the documented policy (webhook mode, shared-token polling
+# disabled — CLAUDE.md "Telegram PM Bot"). Reconcile that before loading it,
+# or you risk a poller conflict with the Windows bot.
+TELEGRAM=(pm-bot)
 
 DRY_RUN=0
 SELECTED=()
@@ -51,17 +80,19 @@ for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --list)
-      printf 'infra:   %s\n\n' "${INFRA[*]}"
-      printf 'intel:   %s\n\n' "${INTEL[*]}"
-      printf 'trading: %s\n\n' "${TRADING[*]}"
-      printf 'publish: %s  (OUTWARD — posts publicly)\n' "${PUBLISH[*]}"
+      printf 'infra:    %s\n\n' "${INFRA[*]}"
+      printf 'intel:    %s\n\n' "${INTEL[*]}"
+      printf 'trading:  %s\n\n' "${TRADING[*]}"
+      printf 'telegram: %s  (Telegram ingress — explicit only)\n\n' "${TELEGRAM[*]}"
+      printf 'publish:  %s  (OUTWARD — posts publicly)\n' "${PUBLISH[*]}"
       exit 0 ;;
-    infra)   SELECTED+=("${INFRA[@]}") ;;
-    intel)   SELECTED+=("${INTEL[@]}") ;;
-    trading) SELECTED+=("${TRADING[@]}") ;;
-    publish) SELECTED+=("${PUBLISH[@]}") ;;
-    all)     SELECTED+=("${INFRA[@]}" "${INTEL[@]}" "${TRADING[@]}") ;;
-    *) echo "unknown tier: $arg (want: infra|intel|trading|publish|all)" >&2; exit 2 ;;
+    infra)    SELECTED+=("${INFRA[@]}") ;;
+    intel)    SELECTED+=("${INTEL[@]}") ;;
+    trading)  SELECTED+=("${TRADING[@]}") ;;
+    telegram) SELECTED+=("${TELEGRAM[@]}") ;;
+    publish)  SELECTED+=("${PUBLISH[@]}") ;;
+    all)      SELECTED+=("${INFRA[@]}" "${INTEL[@]}" "${TRADING[@]}") ;;
+    *) echo "unknown tier: $arg (want: infra|intel|trading|telegram|publish|all)" >&2; exit 2 ;;
   esac
 done
 
@@ -75,10 +106,9 @@ loaded=0; skipped=0
 
 for name in "${SELECTED[@]}"; do
   label="com.sapphire.$name"
-  plist="$SRC/$label.plist"
 
-  if [ ! -f "$plist" ]; then
-    echo "  SKIP  $label — no plist in infra/launchagents/"
+  if ! plist="$(resolve_plist "$label")"; then
+    echo "  SKIP  $label — no plist in infra/launchagents/ or services/*/launchagent/"
     skipped=$((skipped + 1))
     continue
   fi

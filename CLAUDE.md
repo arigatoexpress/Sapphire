@@ -6,7 +6,7 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 6,718 collected by test_inventory.py (2026-07-25)
+pytest tests/unit/ --tb=short -q           # 6,828 collected by test_inventory.py (2026-07-25, CI env)
 pytest plugins/claw-sapphire/tests/ -q     # 637 collected by test_inventory.py (2026-07-25)
 
 # Lint
@@ -91,7 +91,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-07-25 via `scripts/ops/test_inventory.py`):** 7,355 collected tests (6,718 core + 637 plugin) across 449 files · 52 dashboard pages · 5 quant strategies · 33 committed LaunchAgent plists in `infra/launchagents/` (`content-publisher` excluded from `scripts/ops/restore_launchagents.sh --all` because it is outward-facing) — 33 restored on this Mac as of 2026-07-25 (32 of the committed set + `alpha-telemetry-publisher` which is Mac-only, minus the excluded `content-publisher`). Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-07-25 via `scripts/ops/test_inventory.py`, CI env):** 7,465 collected tests (6,828 core + 637 plugin) across 452 files · 52 dashboard pages · 5 quant strategies · 33 committed LaunchAgent plists in `infra/launchagents/` (`content-publisher` excluded from `scripts/ops/restore_launchagents.sh --all` because it is outward-facing) — 33 restored on this Mac as of 2026-07-25 (32 of the committed set + `alpha-telemetry-publisher` which is Mac-only, minus the excluded `content-publisher`). Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
