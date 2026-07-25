@@ -104,6 +104,68 @@ class _FakeHTTPResponse:
         return self._body
 
 
+def test_http_check_fails_when_a_different_service_answers(monkeypatch) -> None:
+    """The Open WebUI false-PASS regression guard.
+
+    `com.sovereign.openwebui` squats :8080 and its /health returns
+    `{"status": true}`. The sweep probed that port for `dashboard_health`, saw a
+    200 with a truthy `status`, and reported the Sapphire dashboard healthy for
+    months while it was not even running. An identity assertion is the fix: a
+    health check must prove *which* service answered.
+    """
+
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        return _FakeHTTPResponse(200, {"status": True})
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.http_check(
+        "local",
+        "dashboard_health",
+        "http://127.0.0.1:8085/health",
+        expect_json={"status": "healthy"},
+    )
+
+    assert check.status == "FAIL"
+    assert "identity_mismatch" in check.evidence
+
+
+def test_http_check_passes_on_matching_identity_with_extra_fields(monkeypatch) -> None:
+    """Subset matching: a service adding fields must not break monitoring."""
+
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        return _FakeHTTPResponse(200, {"status": "healthy", "timestamp": "2026-07-25T15:15:47"})
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.http_check(
+        "local",
+        "dashboard_health",
+        "http://127.0.0.1:8085/health",
+        expect_json={"status": "healthy"},
+    )
+
+    assert check.status == "PASS"
+    assert "identity_mismatch" not in check.evidence
+
+
+def test_dashboard_probe_targets_the_port_the_dashboard_actually_binds(monkeypatch) -> None:
+    """8080 is Open WebUI and 8082 is control-plane — neither is the dashboard."""
+    urls: list[str] = []
+
+    def fake_urlopen(request: object, timeout: int) -> _FakeHTTPResponse:
+        urls.append(request.full_url if hasattr(request, "full_url") else str(request))
+        return _FakeHTTPResponse(200, {"status": "healthy"})
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.delenv("SAPPHIRE_DASHBOARD_PORT", raising=False)
+
+    sweep.probe_local_endpoints({})
+
+    assert any("127.0.0.1:8085/health" in url for url in urls)
+    assert not any("127.0.0.1:8080" in url for url in urls)
+
+
 def test_inference_health_warns_on_degraded_tiers(monkeypatch) -> None:
     def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
         assert timeout == 5
@@ -184,7 +246,7 @@ def test_scheduled_launchagent_nonzero_last_status_warns(monkeypatch) -> None:
         "com.sapphire.pm-bot",
         "com.sapphire.heartbeat",
         "com.sapphire.openbb-api",
-        "com.sapphire.cloudflare-tunnel",
+        "com.sapphire.webhook-tunnel",
         "actions.runner.arigatoexpress-Sapphire.ari-macbook-sapphire",
     ]
     scheduled = [
@@ -657,6 +719,54 @@ repos:
     assert "violations=satellite:ci.yml:test" in check.evidence
 
 
+def test_satellite_ci_no_spend_gates_accepts_explicit_self_hosted_labels(
+    tmp_path: Path,
+) -> None:
+    """A self-hosted runner bills nothing, so it needs no SAPPHIRE_RUNNER gate.
+
+    Regression guard for the real `win-runner-smoke.yml` FAIL: the job pins
+    `runs-on: [self-hosted, Windows, X64, sapphire-win]` — free by construction —
+    but the check only recognised the `vars.SAPPHIRE_RUNNER` idiom.
+    """
+    repo = tmp_path / "satellite"
+    workflows = repo / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "smoke.yml").write_text(
+        """
+jobs:
+  smoke:
+    runs-on: [self-hosted, Windows, X64, sapphire-win]
+    steps:
+      - run: echo free
+""",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "org-repos.yaml"
+    manifest.write_text(
+        f"""
+repos:
+  - id: satellite
+    local_path: {repo}
+    ci_strategy: local_evidence_skip_ci_bootstrap
+""",
+        encoding="utf-8",
+    )
+
+    check = sweep.probe_satellite_ci_no_spend_gates(manifest)
+
+    assert check.status == "PASS"
+    assert "violations" not in check.evidence
+
+
+def test_runs_on_labels_normalises_every_spelling() -> None:
+    assert sweep.runs_on_labels({"runs-on": "ubuntu-latest"}) == ["ubuntu-latest"]
+    assert sweep.runs_on_labels({"runs-on": ["self-hosted", "X64"]}) == ["self-hosted", "X64"]
+    assert sweep.runs_on_labels({"runs-on": {"group": "g", "labels": ["self-hosted"]}}) == [
+        "self-hosted"
+    ]
+    assert sweep.runs_on_labels({}) == []
+
+
 def test_satellite_merge_posture_reports_auto_merge_without_failing_hard_gates(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -715,6 +825,57 @@ repos:
     assert check.status == "WARN"
     assert "auto_merge_false=satellite" in check.evidence
     assert "satellite(auto=false,squash=true,delete=true,runner_gate=pass)" in check.evidence
+
+
+def test_satellite_merge_posture_does_not_fail_on_uncloned_repos(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Absence of a local clone is absence of evidence, not a violation.
+
+    Most of the old arigatoexpress fleet is archived and deliberately not cloned
+    on this Mac. Counting `runner_gate=missing_local` as critical pinned this
+    check to FAIL permanently and buried the one genuine violation.
+    """
+    manifest = tmp_path / "org-repos.yaml"
+    manifest.write_text(
+        """
+repos:
+  - id: archived-satellite
+    local_path: /definitely/not/cloned
+    github: arigatoexpress/archived-satellite
+    ci_strategy: local_evidence_skip_ci_bootstrap
+""",
+        encoding="utf-8",
+    )
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        cwd: Path | None = None,
+        timeout: int = 20,
+        env: dict[str, str] | None = None,
+    ) -> sweep.RunResult:
+        del cmd, cwd, timeout, env
+        return sweep.RunResult(
+            0,
+            json.dumps(
+                {
+                    "allow_auto_merge": True,
+                    "allow_squash_merge": True,
+                    "delete_branch_on_merge": True,
+                }
+            ),
+            "",
+            7,
+        )
+
+    monkeypatch.setattr(sweep, "run", fake_run)
+
+    check = sweep.probe_satellite_merge_posture(no_external=False, manifest_path=manifest)
+
+    assert check.status == "WARN"
+    assert "runner_gate_unevaluated=archived-satellite" in check.evidence
+    assert "violations" not in check.evidence
 
 
 def test_satellite_merge_posture_fails_for_missing_delete_branch_or_runner_gate(
