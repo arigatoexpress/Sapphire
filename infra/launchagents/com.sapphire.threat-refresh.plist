@@ -21,6 +21,8 @@
     <dict>
         <key>PATH</key>
         <string>/usr/local/bin:/usr/bin:/bin</string>
+        <key>SAPPHIRE_THREATS_BOT_BIN</key>
+        <string>native</string>
     </dict>
 </dict>
 </plist>
