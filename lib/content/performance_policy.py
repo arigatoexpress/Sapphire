@@ -43,3 +43,23 @@ def small_sample_accuracy_notice(
             f"below Sapphire's {threshold}-call threshold for public accuracy claims."
         )
     return f"{subject} is still below Sapphire's {threshold}-call threshold for public accuracy claims."
+
+
+def small_sample_accuracy_notice_es(
+    data: Mapping[str, Any] | None,
+    *,
+    subject: str,
+    threshold: int = MIN_PUBLIC_ACCURACY_SAMPLE,
+) -> str:
+    """Spanish sibling of small_sample_accuracy_notice used by ES formatters."""
+    total = prediction_sample_size(data)
+    if total > 0:
+        return (
+            f"{subject} sigue en fase de construcción de historial con {total} "
+            f"predicciones evaluadas, por debajo del umbral de {threshold} señales "
+            "que Sapphire exige antes de reportar precisión al público."
+        )
+    return (
+        f"{subject} sigue por debajo del umbral de {threshold} señales que Sapphire "
+        "exige antes de reportar precisión al público."
+    )

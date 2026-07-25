@@ -32,6 +32,18 @@ TARGET_PLATFORMS: dict[str, list[str]] = {
     "market_pulse": ["x"],
 }
 
+# Languages each report kind is rendered into. English is always default;
+# Spanish is added for reader-facing crypto content that serves the Houston
+# US-Hispanic audience (44.2% per the Sapphire charter). Internal-ish reports
+# (AI intel, security digest) stay English-only until a Spanish reader-need
+# is proven.
+TARGET_LANGUAGES: dict[str, list[str]] = {
+    "weekly_crypto_brief": ["en", "es"],
+    "ai_intel": ["en"],
+    "security_digest": ["en"],
+    "market_pulse": ["en", "es"],
+}
+
 
 @dataclass
 class Slot:
