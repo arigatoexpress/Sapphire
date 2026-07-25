@@ -116,9 +116,11 @@ ships without explicit Telegram approval.**
   with mode `700`; one file per credential. See `infra/setup-sops.sh`.
 - **Network:** Tailscale-only plane, six ACL trust zones, Cloudflare Tunnel
   for externals, zero public SSH.
-- **Supply chain:** CycloneDX 1.6 SBOM daily, OSV.dev CVE lookup, `gitleaks`
-  at pre-commit **and** in CI, `.git-secrets-patterns` regex, sigstore
-  artifact signing.
+- **Supply chain:** CycloneDX 1.5 SBOM daily (`lib/security/dependency_scanner.py`),
+  OSV.dev CVE lookup, `gitleaks` at pre-commit **and** in CI,
+  `.git-secrets-patterns` regex. Sigstore/cosign artifact signing is **not
+  implemented** — it is the top open item in
+  `docs/onboarding/ai-redteam-audit-baseline.md` § 2 (no manifest signature chain).
 - **Model integrity:** Ollama blobs fingerprinted with SHA-256; Jinja2
   template scanner checks for 7 known backdoor patterns (see
   `lib/security/model_monitor.py`). Local models for anything sensitive; cloud
