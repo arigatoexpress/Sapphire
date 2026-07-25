@@ -273,7 +273,7 @@ curl -X POST https://api.resend.com/emails \
 | **Status** | ⏳ needs dashboard check |
 | **Account** | dash.cloudflare.com (Ari's personal login) |
 | **Expected tunnels** | `sapphire-dashboard`, `sapphire-intel`, `sapphire-proxy` |
-| **Reference** | `docs/CLOUDFLARE_DNS_SETUP.md` |
+| **Reference** | `docs/DNS_SETUP.md` (sapphirealpha.xyz is on Google Cloud DNS, not Cloudflare) |
 
 ### Verification steps (Ari or a Chrome session)
 1. dash.cloudflare.com → **Zero Trust → Access → Tunnels**.

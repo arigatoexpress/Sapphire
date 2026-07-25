@@ -384,6 +384,6 @@ All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked 
 - `docs/ops/threat-intel-sweep-runbook.md` — threat-intel cloud routine; auto-supersede rule added in PR #615
 - `docs/QUICK_START_GUIDE.md` — first-run setup
 - `docs/LOGGING.md` — event + audit log schema
-- `docs/CLOUDFLARE_DNS_SETUP.md` — tunnel config
+- `docs/DNS_SETUP.md` — sapphirealpha.xyz DNS (Google Cloud DNS; authoritative zone is in `sapphire-479610`, the `tho-ai-agent` zone is an orphan)
 - `docs/setup/WINDOWS_*.md` — Windows node bringup
 - `docs/setup/PI_ETHERNET_BRIDGE_SETUP.md` — Pi networking
