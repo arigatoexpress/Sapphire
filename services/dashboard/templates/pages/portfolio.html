@@ -242,6 +242,7 @@
     <div class="refresh-bar">
         <div class="refresh-dot"></div>
         <span id="last-refresh">LIVE — updating every 60s</span>
+        <span id="venue-bar" class="panel-meta" style="margin-left:14px;"></span>
     </div>
 
     <!-- Hero summary -->
@@ -278,7 +279,7 @@
             <thead>
                 <tr>
                     <th>Symbol</th>
-                    <th>Name</th>
+                    <th>Venue</th>
                     <th>Qty</th>
                     <th>Avg Cost</th>
                     <th>Current</th>
@@ -411,25 +412,70 @@ function renderHero(data) {
     document.getElementById('hero-buying-power').textContent = fmtUSD(data.buying_power) + ' buying power';
 }
 
+/* Format a holding quantity: crypto spans 8 decimals (BTC) to whole units
+   (PENGU), so scale precision to magnitude instead of padding everything. */
+function fmtQty(q) {
+    if (q === null || q === undefined || isNaN(q)) return '—';
+    if (q >= 1000) return Number(q).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (q >= 1) return Number(q).toFixed(4).replace(/\.?0+$/, '');
+    return Number(q).toPrecision(4);
+}
+
+function fmtWeight(w) {
+    return (w === null || w === undefined || isNaN(w)) ? '—' : w.toFixed(1) + '%';
+}
+
 function renderHoldings(holdings) {
     var tbody = document.getElementById('holdings-body');
     tbody.innerHTML = '';
+    var unpriced = 0;
     holdings.forEach(function(h) {
         var dayClass = signedClass(h.day_chg_pct);
         var retClass = signedClass(h.total_return);
+        // A venue can list a holding it refuses to quote (Robinhood does this
+        // for several tokens). Mark those rows rather than rendering a false $0.
+        var isUnpriced = (h.market_value === null || h.market_value === undefined);
+        if (isUnpriced) unpriced++;
         var tr = document.createElement('tr');
+        if (isUnpriced) tr.style.opacity = '0.55';
+        // Show where a backfilled price came from so a cross-venue valuation
+        // is never mistaken for the venue's own quote.
+        var venue = (h.venue || 'robinhood').toUpperCase();
+        var venueCell = h.price_source === 'okx_public'
+            ? venue + ' <span title="priced via OKX public ticker">*</span>'
+            : venue;
         tr.innerHTML =
             '<td>' + h.symbol + '</td>' +
-            '<td>' + h.name + '</td>' +
-            '<td>' + h.qty + '</td>' +
+            '<td>' + venueCell + '</td>' +
+            '<td>' + fmtQty(h.qty) + '</td>' +
             '<td>' + fmtUSD(h.avg_cost) + '</td>' +
-            '<td>' + fmtUSD(h.price) + '</td>' +
+            '<td>' + (isUnpriced ? 'no quote' : fmtUSD(h.price)) + '</td>' +
             '<td class="' + dayClass + '">' + fmtPct(h.day_chg_pct) + '</td>' +
             '<td class="' + retClass + '">' + fmtUSD(h.total_return) + '</td>' +
-            '<td>' + h.weight.toFixed(1) + '%</td>';
+            '<td>' + fmtWeight(h.weight) + '</td>';
         tbody.appendChild(tr);
     });
-    document.getElementById('holdings-meta').textContent = holdings.length + ' positions';
+    var meta = holdings.length + ' positions';
+    if (unpriced) meta += ' · ' + unpriced + ' unpriced';
+    document.getElementById('holdings-meta').textContent = meta;
+}
+
+/* Per-venue attribution line — makes it obvious when a venue is down or
+   unconfigured instead of silently showing a smaller portfolio. */
+function renderSources(sources) {
+    var bar = document.getElementById('venue-bar');
+    if (!bar) return;
+    if (!sources || !sources.length) { bar.textContent = ''; return; }
+    bar.innerHTML = sources.map(function(s) {
+        var cls = s.status === 'live' ? 'pos' : 'neg';
+        var label = s.venue.toUpperCase();
+        if (s.status === 'live') {
+            return '<span class="' + cls + '">' + label + ' ' + fmtUSD(s.total_value) +
+                   ' (' + s.position_count + ')</span>';
+        }
+        return '<span class="' + cls + '">' + label + ' — ' +
+               (s.status === 'not_configured' ? 'not configured' : 'error') + '</span>';
+    }).join(' &nbsp;|&nbsp; ');
 }
 
 function renderSectors(sectors) {
@@ -569,8 +615,10 @@ function refreshPortfolio() {
 function renderAll(data) {
     renderHero(data);
     renderHoldings(data.holdings);
+    renderSources(data.sources);
     renderSectors(data.sectors);
     renderAssetRing(data.asset_classes);
+    animateHero(data);
 
     // Update timestamp
     var now = new Date();
@@ -578,18 +626,27 @@ function renderAll(data) {
     document.getElementById('last-refresh').textContent = 'LIVE — last refresh ' + ts;
 }
 
-/* ── Animate hero values on first load ── */
-function animateOnLoad() {
-    var data = getMockData();
-    animateValue('hero-total', data.total_value, '$', '', 900);
-    animateValue('hero-day-pnl', data.day_pnl, '+$', '', 700);
-    animateValue('hero-total-return', data.total_return, '+$', '', 800);
-    animateValue('hero-cash', data.cash, '$', '', 600);
+/* ── Animate hero values once real data lands ──
+   Previously this animated toward getMockData() the moment the page opened,
+   so a fabricated ~$219k portfolio value ticked up on screen and raced the
+   live render for ~900ms. Animate the actual numbers instead, and only on
+   the first successful load. */
+var heroAnimated = false;
+function animateHero(data) {
+    if (heroAnimated) return;
+    heroAnimated = true;
+    animateValue('hero-total', data.total_value || 0, '$', '', 900);
+    if (data.day_pnl !== null && data.day_pnl !== undefined) {
+        animateValue('hero-day-pnl', data.day_pnl, data.day_pnl >= 0 ? '+$' : '$', '', 700);
+    }
+    if (data.total_return !== null && data.total_return !== undefined) {
+        animateValue('hero-total-return', data.total_return, data.total_return >= 0 ? '+$' : '$', '', 800);
+    }
+    animateValue('hero-cash', data.cash || 0, '$', '', 600);
 }
 
 /* ── Init ── */
 refreshPortfolio();
-animateOnLoad();
 setInterval(refreshPortfolio, 60000);
 </script>
 {% endblock %}

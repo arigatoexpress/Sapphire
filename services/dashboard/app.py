@@ -6785,13 +6785,17 @@ def api_investments_sources():
 @app.route("/api/portfolio")
 @requires_auth
 def api_portfolio():
-    """Live Robinhood portfolio snapshot."""
+    """Unified multi-venue portfolio snapshot (Robinhood + OKX).
+
+    Top-level keys are unchanged from the previous Robinhood-only shape;
+    ``sources``, ``by_asset`` and per-holding ``venue`` are additive. Venues
+    degrade independently — an unconfigured OKX does not blank the page.
+    """
 
     def fetch():
-        from lib.portfolio.robinhood import RobinhoodReader
+        from lib.portfolio.aggregate import PortfolioAggregator
 
-        reader = RobinhoodReader()
-        return reader.get_snapshot()
+        return PortfolioAggregator().get_snapshot()
 
     try:
         return jsonify(
@@ -6809,6 +6813,9 @@ def api_portfolio():
                 "source": "unavailable",
                 "error": str(e),
                 "holdings": [],
+                "by_asset": [],
+                "sources": [],
+                "venue_count": 0,
                 "total_value": 0,
                 "day_pnl": 0,
                 "day_pnl_pct": 0,
