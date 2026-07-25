@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Watches artifact freshness + LaunchAgent exit codes and queues a Telegram
+  DRAFT (never a send) when something has gone quiet.
+
+  Runs every 6h. The tightest threshold in infra/staleness-thresholds.yaml is
+  1h (chain-snapshot), so worst-case detection lag is ~7h — well inside the
+  "weeks" window that let the threat-refresh outage hide. Alert dedup lives in
+  the script (24h cooldown per unchanged problem set), not here, so a shorter
+  interval would add cost without adding signal.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.staleness-monitor</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>/Users/aribs/Code/Sapphire/scripts/ops/staleness_monitor.py</string>
+        <string>--stale-only</string>
+        <string>--check-agents</string>
+        <string>--alert</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+    <key>StartInterval</key>
+    <integer>21600</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/autonomy-status/logs/staleness-monitor.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/autonomy-status/logs/staleness-monitor.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

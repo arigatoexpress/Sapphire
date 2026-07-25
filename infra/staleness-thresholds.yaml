@@ -1,0 +1,50 @@
+# Sapphire staleness thresholds — consumed by scripts/ops/staleness_monitor.py.
+# Each target reports FRESH if its file's mtime is within `max_age_h` of now.
+# Set `optional: true` for paths that may legitimately not exist yet.
+#
+# Add new targets as new critical data flows come online. Keep this list small
+# and focused on files whose staleness would indicate a broken pipeline.
+
+targets:
+  - label: chain-snapshot
+    path: data/chain/chain_*.json
+    max_age_h: 1
+  - label: system-events
+    path: data/system_events.jsonl
+    max_age_h: 6
+  - label: signal-stream
+    path: data/signals/*.jsonl
+    max_age_h: 24
+  - label: paper-portfolio
+    path: data/paper_portfolio.json
+    max_age_h: 72
+  - label: paper-trading-log
+    path: data/paper_trading.jsonl
+    max_age_h: 24
+  - label: intelligence-latest
+    path: data/intelligence/latest
+    max_age_h: 24
+    optional: true
+  - label: content-ready-queue
+    path: data/content/ready/*.md
+    max_age_h: 168
+    optional: true
+  # The regression case. threat-refresh ran loaded-but-exiting-1 for weeks and
+  # wrote nothing (PR #965). The old target here pointed at a marker file that
+  # has never existed AND was optional, so the one bug this monitor was built
+  # to catch would have stayed invisible. Watch the artifact the job actually
+  # writes, and let it alert. Runs every 4h → 12h tolerates two missed cycles.
+  - label: threat-intel
+    path: data/intelligence/*/threats.json
+    max_age_h: 12
+  # Readiness sweep self-monitoring: if the sweep itself stops running, every
+  # other health signal silently freezes at its last-known value.
+  - label: readiness-sweep
+    path: ~/autonomy-status/logs/readiness-sweep-latest.json
+    max_age_h: 2
+  - label: foundry-sync-history
+    path: data/foundry_sync_history.jsonl
+    max_age_h: 24
+  - label: backtest-artifacts
+    path: data/backtests/strategies/strategy_sweep_*.json
+    max_age_h: 168

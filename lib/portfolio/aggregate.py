@@ -107,23 +107,31 @@ class PortfolioAggregator:
         sources: list[dict[str, Any]] = []
 
         for venue, reader in self._readers.items():
+            # `is_configured()` returning False is a statement of fact ("no
+            # credentials"). `is_configured()` RAISING is an absence of
+            # information ("could not determine"). Collapsing the second into
+            # the first reported a live venue outage as "credentials not
+            # configured" — a fabricated cause that reads as expected-and-fine,
+            # so nobody would ever investigate the outage.
+            probe_error: str | None = None
             try:
                 configured = bool(reader.is_configured())
             except Exception as exc:
                 log.warning("%s is_configured failed: %s", venue, exc)
                 configured = False
+                probe_error = str(exc)
 
             if not configured:
                 sources.append(
                     {
                         "venue": venue,
-                        "status": "not_configured",
+                        "status": "error" if probe_error else "not_configured",
                         "configured": False,
                         "total_value": 0.0,
                         "cash": 0.0,
                         "holdings_value": 0.0,
                         "position_count": 0,
-                        "error": "credentials not configured",
+                        "error": probe_error or "credentials not configured",
                     }
                 )
                 continue
