@@ -100,9 +100,11 @@ def main() -> int:
 
     latest = data_dir / "latest"
     try:
-        if latest.is_symlink() or latest.exists():
+        if latest.is_symlink():
             latest.unlink()
-        latest.symlink_to(today)
+            latest.symlink_to(today)
+        elif not latest.exists():
+            latest.symlink_to(today)
     except Exception as e:
         print(f"Symlink update failed: {e}", file=sys.stderr)
 
