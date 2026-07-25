@@ -39,10 +39,38 @@ README_BADGE_RE = re.compile(
 )
 
 
+def _has_pytest(python: str) -> bool:
+    try:
+        return (
+            subprocess.run(
+                [python, "-c", "import pytest"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            ).returncode
+            == 0
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def _resolve_collection_python() -> str:
+    # Explicit override wins — the operator knows which env they want.
     if env := os.environ.get("PYTHON3"):
         return env
-    if Path("/usr/local/bin/python3").exists():
+    # Prefer the interpreter that's running this script: under `uv run` (CI)
+    # or a project venv, sys.executable is the one with pytest + all test
+    # deps installed. `/usr/local/bin/python3` is the macOS system python,
+    # which usually lacks the deps and drives pytest --collect-only past the
+    # 90s timeout via slow ImportError cascades.
+    if _has_pytest(sys.executable):
+        return sys.executable
+    # Fallbacks for the rare case sys.executable can't import pytest (e.g.
+    # invoking the script directly under a shebang'd brew python@3.14 with
+    # a broken stdlib ABI — see the "python3 may resolve to brew 3.14"
+    # gotcha in CLAUDE.md).
+    if Path("/usr/local/bin/python3").exists() and _has_pytest("/usr/local/bin/python3"):
         return "/usr/local/bin/python3"
     return shutil.which("python3") or sys.executable
 
