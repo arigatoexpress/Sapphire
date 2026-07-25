@@ -5,6 +5,12 @@ Usage:
     python3 -m lib.content --kind weekly_crypto_brief
     python3 -m lib.content --all           # generate every report kind
     python3 -m lib.content --list-drafts
+
+Language selection:
+    python3 -m lib.content --kind weekly_crypto_brief --language es
+    python3 -m lib.content --kind weekly_crypto_brief --language en,es
+Without --language, the scheduler's TARGET_LANGUAGES for that report kind
+is used (crypto brief and market pulse default to en+es).
 """
 
 from __future__ import annotations
@@ -30,12 +36,12 @@ GENERATORS = {
 }
 
 
-def run_kind(kind: str) -> dict:
+def run_kind(kind: str, languages: list[str] | None = None) -> dict:
     gen = GENERATORS.get(kind)
     if gen is None:
         raise SystemExit(f"unknown report kind: {kind}")
     report = gen()
-    return publisher.publish(report)
+    return publisher.publish(report, languages=languages)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -57,7 +63,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--chat-id", help="Chat ID of the original approval message (for edit)")
     ap.add_argument("--message-id", type=int, help="Message ID of the original approval (for edit)")
     ap.add_argument("--actor", default="telegram", help="Approver identity (for approval record)")
+    ap.add_argument(
+        "--language",
+        help="Comma-separated language codes to render (e.g. 'en', 'es', 'en,es'). "
+        "Overrides scheduler.TARGET_LANGUAGES for this run.",
+    )
     args = ap.parse_args(argv)
+
+    languages: list[str] | None = None
+    if args.language:
+        languages = [x.strip() for x in args.language.split(",") if x.strip()]
 
     if args.callback:
         from lib.content import telegram_approval
@@ -84,19 +99,19 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.kind:
-        out = run_kind(args.kind)
+        out = run_kind(args.kind, languages=languages)
         print(json.dumps(out, indent=2, default=str))
         return 0
 
     if args.all:
-        results = {k: run_kind(k) for k in GENERATORS}
+        results = {k: run_kind(k, languages=languages) for k in GENERATORS}
         print(json.dumps(results, indent=2, default=str))
         return 0
 
     # Default: run today's scheduled slots
     results = []
     for slot in scheduler.today_plan():
-        results.append(run_kind(slot.report_kind))
+        results.append(run_kind(slot.report_kind, languages=languages))
     print(json.dumps(results, indent=2, default=str))
     return 0
 

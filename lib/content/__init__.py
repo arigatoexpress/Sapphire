@@ -2,7 +2,8 @@
 
 Generates data-driven reports from Sapphire's real intelligence data
 (predictions, portfolio, threat intel, signals) and formats them for
-LinkedIn, Substack, and X. Every claim is tied to a Sapphire data source.
+LinkedIn, Substack, and X, in English and Spanish. Every claim is tied
+to a Sapphire data source.
 
 Public surface:
     report_generator.WeeklyCryptoBrief
@@ -13,15 +14,28 @@ Public surface:
     scheduler.today_plan / plan_for
     outreach.build_bd_message
     publisher.publish
+    glossary.GLOSSARY / lookup / Term
+    translator.Translator / translate_text / detect_artifacts
 """
 
-from . import formatters, outreach, publisher, quality, report_generator, scheduler
+from . import (
+    formatters,
+    glossary,
+    outreach,
+    publisher,
+    quality,
+    report_generator,
+    scheduler,
+    translator,
+)
 
 __all__ = [
     "formatters",
+    "glossary",
     "outreach",
     "publisher",
     "quality",
     "report_generator",
     "scheduler",
+    "translator",
 ]
