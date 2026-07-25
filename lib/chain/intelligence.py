@@ -48,6 +48,10 @@ NOTIFY_TOOL = ROOT / "plugins" / "claw-sapphire" / "tools" / "notify.py"
 HTTP_TIMEOUT = 10.0
 REQUEST_HEADERS = {"User-Agent": "SapphireOS/1.0 (chain-intelligence)"}
 
+# HTTP statuses that will never succeed on a retry: 451 is Binance's
+# geo-block, 401/403 are auth walls, 404 is a wrong endpoint.
+PERMANENT_HTTP_STATUSES = frozenset({401, 403, 404, 451})
+
 
 # ---------------------------------------------------------------------------
 # Types
@@ -111,6 +115,16 @@ def _http_json(url: str, timeout: float = HTTP_TIMEOUT) -> dict | list | None:
             with urllib.request.urlopen(req, context=_SSL_CTX, timeout=timeout) as r:
                 raw = r.read(4 * 1024 * 1024)
             return json.loads(raw)
+        except urllib.error.HTTPError as exc:
+            # HTTPError subclasses URLError, so it must be caught first.
+            # Geo-blocks and auth/not-found errors never recover on retry —
+            # burning the 1s+2s backoff on them just slows every snapshot.
+            if exc.code in PERMANENT_HTTP_STATUSES:
+                log.debug("chain: fetch %s unavailable (HTTP %d, not retried)", url, exc.code)
+                return None
+            last_exc = exc
+            if attempt < 2:
+                time.sleep(2**attempt)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
             last_exc = exc
             if attempt < 2:
@@ -162,6 +176,48 @@ def _fetch_binance_funding(symbol: str) -> float | None:
         return float(raw) * 100.0
     except (TypeError, ValueError):
         return None
+
+
+def _fetch_okx_funding(symbol: str) -> float | None:
+    """OKX public funding rate (8h). Returns percent.
+
+    Takes the Binance-style pair (`BTCUSDT`) and maps it to the OKX perpetual
+    instId (`BTC-USDT-SWAP`) so callers use one symbol vocabulary. OKX returns
+    HTTP 200 with a non-zero application-level `code` on error, so success is
+    checked on the body rather than the status.
+    """
+    base = symbol[:-4] if symbol.endswith("USDT") else symbol
+    data = _http_json(
+        f"https://www.okx.com/api/v5/public/funding-rate?instId={base}-USDT-SWAP",
+        timeout=6.0,
+    )
+    if not isinstance(data, dict) or str(data.get("code")) != "0":
+        return None
+    rows = data.get("data") or []
+    if not rows or not isinstance(rows[0], dict):
+        return None
+    raw = rows[0].get("fundingRate")
+    if raw is None:
+        return None
+    try:
+        return float(raw) * 100.0
+    except (TypeError, ValueError):
+        return None
+
+
+def _fetch_funding(symbol: str) -> float | None:
+    """8h funding rate in percent — Binance primary, OKX fallback.
+
+    Binance `fapi` answers HTTP 451 from US IPs, so on a US-hosted node the
+    primary is permanently dead and OKX carries the reading. Kept as a
+    fallback chain rather than a hardcoded venue swap so a non-restricted
+    host still prefers Binance.
+    """
+    rate = _fetch_binance_funding(symbol)
+    # Explicit None check: 0.0 is a legitimate funding rate, not a miss.
+    if rate is not None:
+        return rate
+    return _fetch_okx_funding(symbol)
 
 
 def _fetch_yf_close(ticker: str) -> tuple[float | None, float | None]:
@@ -476,8 +532,8 @@ class ChainIntelligence:
         if btc_dominance is not None and isinstance(last.get("btc_dominance"), (int, float)):
             btc_dominance_24h_change = btc_dominance - float(last["btc_dominance"])
 
-        btc_funding = _fetch_binance_funding("BTCUSDT")
-        eth_funding = _fetch_binance_funding("ETHUSDT")
+        btc_funding = _fetch_funding("BTCUSDT")
+        eth_funding = _fetch_funding("ETHUSDT")
 
         dxy, dxy_chg = _fetch_yf_close("DX-Y.NYB")
         vix, _vix_chg = _fetch_yf_close("^VIX")

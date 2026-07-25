@@ -64,7 +64,7 @@ Six concerns share one event bus (Redis Streams + JSONL fallback):
 
 ## Key features
 
-- 7 quant strategies + 5 Pine strategies with CPCV backtesting
+- 5 quant strategies + 5 Pine strategies with CPCV backtesting
 - Fail-closed trading: $5/order cap, $25/day loss limit, global kill switch
 - 4-tier inference mesh (GPU → Pi ×2 → Mac CPU → Kimi Cloud)
 - Live public Mission Control at `sapphirealpha.xyz` (`/api/v1/status`, `/api/v1/live`, `/api/v1/transparency`, `/api/v1/widgets`, `/api/fleet`)

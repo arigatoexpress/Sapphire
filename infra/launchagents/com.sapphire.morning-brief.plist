@@ -11,11 +11,14 @@
         <string>/Users/aribs/Code/Sapphire/services/intelligence/daily_brief.py</string>
     </array>
 
-    <!-- Fire at 06:00 local (MDT = UTC-6) = 07:00 CDT = 12:00 UTC -->
+    <!-- Target delivery is 06:00 CT. StartCalendarInterval is evaluated in the
+         Mac's local zone (America/Denver), which trails Central by exactly one
+         hour year-round — both zones enter and leave DST on the same dates — so
+         05:00 local is 06:00 CT in both MDT and MST. Do not "correct" this to 6. -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
-        <integer>6</integer>
+        <integer>5</integer>
         <key>Minute</key>
         <integer>0</integer>
     </dict>
