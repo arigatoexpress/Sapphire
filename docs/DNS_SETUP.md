@@ -1,149 +1,113 @@
-# Cloudflare DNS Setup for sapphirealpha.xyz
+# DNS for sapphirealpha.xyz
 
-## Current Domain Mappings
+**The domain is on Google Cloud DNS, not Cloudflare.** This file was previously
+`CLOUDFLARE_DNS_SETUP.md` and documented a Cloudflare setup that was never the
+live configuration. Verified against production 2026-07-25.
 
-| Domain | Service | Status |
-|--------|---------|--------|
-| `sapphirealpha.xyz` | sapphire-command-deck | ⏳ Pending DNS |
-| `dashboard.sapphirealpha.xyz` | sapphire-dashboard | ✅ Active |
-| `gateway.sapphirealpha.xyz` | sapphire-gateway | ✅ Active |
-| `pm.sapphirealpha.xyz` | agentic-pm-hub | ⚠️ Stale mapping; service not present in `sapphire-479610` |
+## Authoritative zone — and the orphan
 
-`pm.sapphirealpha.xyz` should not be advertised as a live public Sapphire
-surface until the domain mapping is remapped or removed through a dedicated
-rollback-reviewed infrastructure change. The protected historical
-`agentic-pm-hub` service belongs to the separate AgenticArigato/THO-adjacent
-lane and must not be changed from this Sapphire DNS checklist.
+Two Cloud DNS managed zones both claim `sapphirealpha.xyz`. Only one is real.
 
----
+| Project | Zone NS | Status |
+|---|---|---|
+| `sapphire-479610` | `ns-cloud-e1..e4.googledomains.com` | **Authoritative — edit here** |
+| `tho-ai-agent` | `ns-cloud-c1..c4.googledomains.com` | **Orphaned — edits have no effect** |
 
-## Cloudflare DNS Configuration
-
-If you're using Cloudflare (recommended for SSL + caching), add these records:
-
-### 1. Root Domain (sapphirealpha.xyz) → Command Deck
-
-```
-Type: A
-Name: @
-IPv4 address: 216.239.32.21
-Proxy status: DNS only (gray cloud) ⚠️ IMPORTANT
-TTL: Auto
-```
-
-```
-Type: A
-Name: @
-IPv4 address: 216.239.34.21
-Proxy status: DNS only (gray cloud)
-TTL: Auto
-```
-
-```
-Type: A
-Name: @
-IPv4 address: 216.239.36.21
-Proxy status: DNS only (gray cloud)
-TTL: Auto
-```
-
-```
-Type: A
-Name: @
-IPv4 address: 216.239.38.21
-Proxy status: DNS only (gray cloud)
-TTL: Auto
-```
-
-### 2. Dashboard Subdomain
-
-```
-Type: CNAME
-Name: dashboard
-Target: ghs.googlehosted.com
-Proxy status: DNS only (gray cloud)
-TTL: Auto
-```
-
----
-
-## ⚠️ CRITICAL: Disable Cloudflare Proxy
-
-For Cloud Run custom domains, you MUST disable the Cloudflare proxy (orange cloud) initially:
-
-1. Click the orange cloud icon next to each record
-2. It should turn gray ("DNS only")
-3. Wait for SSL certificate provisioning (5-30 minutes)
-4. After certificate is active, you can re-enable the proxy if desired
-
----
-
-## Verification Steps
-
-After adding DNS records:
+The registrar delegates to the `e*` nameservers. Confirm before touching DNS:
 
 ```bash
-# Check DNS propagation
-dig sapphirealpha.xyz A
-dig sapphirealpha.xyz AAAA
-
-# Check certificate status
-gcloud beta run domain-mappings describe \
-    --domain sapphirealpha.xyz \
-    --region us-central1 \
-    --project sapphire-479610
+dig +short sapphirealpha.xyz NS      # must return ns-cloud-e1..e4
 ```
 
----
+Proof the `tho-ai-agent` zone is dead: `terminal.sapphirealpha.xyz` exists only
+in that zone and does not resolve at all.
 
-## Troubleshooting
+> **Trap:** writing records into the `tho-ai-agent` zone reports success and
+> changes nothing. It also touches the fenced THO production project for no
+> benefit. Always pass `--project=sapphire-479610` for this domain.
 
-### Certificate Not Provisioning
+## Live records
 
-1. Ensure DNS records are correct
-2. Ensure proxy is disabled (gray cloud)
-3. Wait up to 60 minutes
-4. Check Cloud Run domain mapping status
+Apex and `www` are the only names backed by a working Cloud Run domain mapping.
 
-### SSL Errors After Proxy Enable
+| Name | Type | Target | Backend | Status |
+|---|---|---|---|---|
+| `sapphirealpha.xyz` | A / AAAA | `216.239.3{2,4,6,8}.21` | `sapphire-alpha-dashboard` (`sapphire-479610`) | **live** |
+| `www` | CNAME | `ghs.googlehosted.com.` | `sapphire-alpha-dashboard` | **live** |
+| `tho` | CNAME | `ghs.googlehosted.com.` | `project-go-forward` (`tho-ai-agent`) | live — **retired, see below** |
+| `gpu` | A | `34.29.235.86` | — | responds 401 |
 
-If you re-enable Cloudflare proxy (orange cloud) after certificate provisioning:
+### Dangling records
 
-1. SSL mode should be "Full (strict)" in Cloudflare
-2. Or keep it "DNS only" and let Google manage SSL
+These resolve in DNS but have **no domain mapping**, so TLS fails and nothing
+serves. They are safe to delete and must not be advertised:
 
----
+`dashboard` · `gateway` · `pm` · `hack` · `regional` · `wildfire` ·
+`delivery-markets` · `trading`
 
-## Expected Timeline
+The earlier version of this file listed `dashboard` and `gateway` as
+"✅ Active". Both are dead.
 
-| Step | Time |
-|------|------|
-| DNS propagation | 1-5 minutes |
-| Certificate provisioning | 5-30 minutes |
-| Total time to live | ~30 minutes |
+### `tho.sapphirealpha.xyz` is retired
 
----
+THO's frontend was hosted here only during the testing phase, before
+`texashomeoutlet.com` was available. That migration is complete — THO now serves
+from `texashomeoutlet.com` and `www.texashomeoutlet.com`, both mapped to
+`project-go-forward` in `tho-ai-agent`. The `tho.sapphirealpha.xyz` mapping is
+leftover and is queued for removal in
+`docs/ops/tho-project-sapphire-cleanup-runbook.md`.
 
-## URLs After Setup
+## Adding a record
 
-| URL | What |
-|-----|------|
-| https://sapphirealpha.xyz | Command Deck v2.0 (NEW) |
-| https://dashboard.sapphirealpha.xyz | Old Dashboard |
-| https://gateway.sapphirealpha.xyz | API Gateway |
-| https://pm.sapphirealpha.xyz | Stale domain mapping; do not advertise as live |
-
----
-
-## Quick Commands
+Always target the authoritative project:
 
 ```bash
-# Check domain status
-gcloud beta run domain-mappings list --project sapphire-479610
-
-# View certificate details
-gcloud beta run domain-mappings describe \
-    --domain sapphirealpha.xyz \
-    --region us-central1 \
-    --project sapphire-479610
+gcloud dns record-sets create <name>.sapphirealpha.xyz. \
+    --project=sapphire-479610 \
+    --zone=sapphirealpha-xyz \
+    --type=CNAME --ttl=300 \
+    --rrdatas=ghs.googlehosted.com.
 ```
+
+A CNAME alone is not enough — Cloud Run will not serve the name until a domain
+mapping exists:
+
+```bash
+gcloud beta run domain-mappings create \
+    --project=sapphire-479610 --region=us-central1 \
+    --service=<service> --domain=<name>.sapphirealpha.xyz
+```
+
+Skipping the second step is exactly how the eight dangling records above were
+created.
+
+## Verifying
+
+```bash
+dig +short sapphirealpha.xyz A
+gcloud beta run domain-mappings list --project=sapphire-479610 --region=us-central1
+python3 scripts/ops/sapphirealpha_production_smoke.py    # 8 read-only probes
+```
+
+Certificate provisioning after a new mapping takes ~5-30 minutes; DNS
+propagation at TTL 300 is ~1-5 minutes.
+
+### IPv6 note
+
+The apex publishes AAAA records. On networks that cannot route IPv6, browsers
+preferring IPv6 may report the site unreachable while IPv4 is healthy. Force
+IPv4 to confirm:
+
+```bash
+curl -4 https://sapphirealpha.xyz/api/v1/live
+```
+
+### Do not probe `/healthz`
+
+Google Front End reserves that path on Cloud Run and intercepts it before the
+container, so it returns 404 even though the route is registered. Use
+`/api/health`, which exists specifically to work around this.
+
+The backend also registers `/{catchall:path}` returning `index.html` at **HTTP
+200**, so a dropped API route serves HTML at 200 rather than 404. Status-code
+monitoring alone is blind to this — the smoke script sniffs `content-type`.
