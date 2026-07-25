@@ -172,6 +172,95 @@ def test_fetch_binance_funding_handles_non_dict(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# _fetch_okx_funding / _fetch_funding — OKX fallback when Binance is geo-blocked
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_okx_funding_converts_to_percent_and_maps_symbol(monkeypatch):
+    seen: list[str] = []
+
+    def _fake(url, timeout=6.0):
+        seen.append(url)
+        return {"code": "0", "data": [{"fundingRate": "0.0001"}]}
+
+    monkeypatch.setattr(chain_mod, "_http_json", _fake)
+    assert chain_mod._fetch_okx_funding("BTCUSDT") == pytest.approx(0.01)
+    assert "instId=BTC-USDT-SWAP" in seen[0]
+
+
+def test_fetch_okx_funding_rejects_nonzero_application_code(monkeypatch):
+    # OKX signals errors with HTTP 200 + non-zero body code.
+    monkeypatch.setattr(
+        chain_mod,
+        "_http_json",
+        lambda url, timeout=6.0: {"code": "51001", "data": [], "msg": "instrument not found"},
+    )
+    assert chain_mod._fetch_okx_funding("BTCUSDT") is None
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [None, {"code": "0", "data": []}, {"code": "0", "data": [{"other": "x"}]}],
+)
+def test_fetch_okx_funding_handles_empty_or_malformed(monkeypatch, payload):
+    monkeypatch.setattr(chain_mod, "_http_json", lambda url, timeout=6.0: payload)
+    assert chain_mod._fetch_okx_funding("BTCUSDT") is None
+
+
+def test_fetch_funding_prefers_binance_when_available(monkeypatch):
+    monkeypatch.setattr(chain_mod, "_fetch_binance_funding", lambda s: 0.03)
+    monkeypatch.setattr(chain_mod, "_fetch_okx_funding", lambda s: 0.99)
+    assert chain_mod._fetch_funding("BTCUSDT") == pytest.approx(0.03)
+
+
+def test_fetch_funding_falls_back_to_okx_when_binance_dead(monkeypatch):
+    monkeypatch.setattr(chain_mod, "_fetch_binance_funding", lambda s: None)
+    monkeypatch.setattr(chain_mod, "_fetch_okx_funding", lambda s: -0.02)
+    assert chain_mod._fetch_funding("BTCUSDT") == pytest.approx(-0.02)
+
+
+def test_fetch_funding_treats_zero_binance_rate_as_a_real_reading(monkeypatch):
+    # 0.0 is a legitimate funding rate — a truthiness check would wrongly
+    # fall through to OKX here.
+    monkeypatch.setattr(chain_mod, "_fetch_binance_funding", lambda s: 0.0)
+    monkeypatch.setattr(chain_mod, "_fetch_okx_funding", lambda s: 5.0)
+    assert chain_mod._fetch_funding("BTCUSDT") == pytest.approx(0.0)
+
+
+def test_fetch_funding_returns_none_when_both_venues_dead(monkeypatch):
+    monkeypatch.setattr(chain_mod, "_fetch_binance_funding", lambda s: None)
+    monkeypatch.setattr(chain_mod, "_fetch_okx_funding", lambda s: None)
+    assert chain_mod._fetch_funding("BTCUSDT") is None
+
+
+def test_http_json_does_not_retry_permanent_status():
+    # Binance answers 451 from US IPs; retrying burns 3s of backoff per call.
+    err = urllib.error.HTTPError("https://x.test", 451, "blocked", {}, None)
+
+    with (
+        patch.object(chain_mod.urllib.request, "urlopen", side_effect=err) as urlopen,
+        patch.object(chain_mod.time, "sleep") as sleep,
+    ):
+        assert chain_mod._http_json("https://x.test") is None
+
+    assert urlopen.call_count == 1
+    assert sleep.call_count == 0
+
+
+def test_http_json_still_retries_transient_http_error():
+    err = urllib.error.HTTPError("https://x.test", 503, "unavailable", {}, None)
+
+    with (
+        patch.object(chain_mod.urllib.request, "urlopen", side_effect=err) as urlopen,
+        patch.object(chain_mod.time, "sleep") as sleep,
+    ):
+        assert chain_mod._http_json("https://x.test") is None
+
+    assert urlopen.call_count == 3
+    assert sleep.call_count == 2
+
+
+# ---------------------------------------------------------------------------
 # _fetch_yf_close — yfinance is mocked, never imported live
 # ---------------------------------------------------------------------------
 

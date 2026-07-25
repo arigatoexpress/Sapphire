@@ -78,6 +78,59 @@ class EnhancedSignal:
 
 
 # ---------------------------------------------------------------------------
+# Funding helpers
+# ---------------------------------------------------------------------------
+
+# 8h funding thresholds, in PERCENT — mirrors lib/chain/intelligence.py
+# `_score_funding`, which treats >0.02% as elevated and maps ±0.05% to ±1.
+FUNDING_CROWDED_PCT = 0.05
+FUNDING_ELEVATED_PCT = 0.02
+
+# Quote suffixes stripped so "BTC-USD" / "BTCUSDT" both resolve to "BTC".
+_QUOTE_SUFFIXES = ("-USD", "-USDT", "-PERP", "USDT", "USD")
+
+
+def _base_symbol(symbol: str) -> str:
+    """Reduce a venue symbol to its base asset ("BTC-USD" -> "BTC")."""
+    sym = str(symbol).upper().strip()
+    for suffix in _QUOTE_SUFFIXES:
+        if sym.endswith(suffix) and len(sym) > len(suffix):
+            return sym[: -len(suffix)].rstrip("-")
+    return sym
+
+
+def _funding_flag(pct: float) -> str | None:
+    """Classify an 8h funding rate (percent) into a crowding flag."""
+    side = "long" if pct > 0 else "short"
+    if abs(pct) >= FUNDING_CROWDED_PCT:
+        return f"crowded_{side}"
+    if abs(pct) >= FUNDING_ELEVATED_PCT:
+        return f"elevated_{side}"
+    return None
+
+
+def _build_funding_map(snap: dict) -> dict[str, tuple[float, str | None]]:
+    """Build {base_symbol: (rate_fraction, flag)} from the flat chain snapshot.
+
+    The snapshot carries `btc_funding_rate_pct` / `eth_funding_rate_pct` in
+    PERCENT, but `enhance()` renders the stored rate as `rate * 100`, so it
+    must be handed a fraction. Divide here rather than at the call site —
+    getting this backwards inflates a 0.003% funding rate into 0.3%.
+    """
+    out: dict[str, tuple[float, str | None]] = {}
+    for sym, key in (("BTC", "btc_funding_rate_pct"), ("ETH", "eth_funding_rate_pct")):
+        raw = snap.get(key)
+        if raw is None:
+            continue
+        try:
+            pct = float(raw)
+        except (TypeError, ValueError):
+            continue
+        out[sym] = (pct / 100.0, _funding_flag(pct))
+    return out
+
+
+# ---------------------------------------------------------------------------
 # SignalEnhancer
 # ---------------------------------------------------------------------------
 
@@ -126,21 +179,27 @@ class SignalEnhancer:
 
                 ci = ChainIntelligence()
                 chain_snap = ci.snapshot()
-                regime = chain_snap.get("regime", {})
-                state["regime"] = regime.get("state", "UNKNOWN")
-                state["regime_score"] = float(regime.get("score", 0.0))
-                state["regime_confidence"] = float(regime.get("confidence", 0.0))
-                # Funding: build {symbol: (rate_8h, flag)} map from FundingSnapshot.perps
-                funding = {}
-                funding_snap = chain_snap.get("funding") or {}
-                for f in funding_snap.get("perps", []) or []:
-                    sym = str(f.get("coin", "")).upper()
-                    if sym:
-                        funding[sym] = (
-                            float(f.get("funding_rate_8h", 0.0)),
-                            f.get("extreme_flag") or None,
-                        )
-                state["funding"] = funding
+
+                # `snapshot()` emits a FLAT dict. This block previously read a
+                # nested shape (`snap["regime"]["state"]`, `snap["funding"]
+                # ["perps"]`) that snapshot() has never produced, so regime came
+                # back "UNKNOWN" and funding empty on every call — silently
+                # disabling REGIME_PENALTY/REGIME_BOOST and crowded-entry
+                # detection. Same defect class fixed in lib/analytics/sentiment.py.
+                clf = chain_snap.get("classification") or {}
+                raw_state = clf.get("regime")
+                # Regime arrives as an enum in-process, a plain string after a
+                # JSON round-trip.
+                state["regime"] = (
+                    raw_state.value if hasattr(raw_state, "value") else str(raw_state or "UNKNOWN")
+                )
+                state["regime_score"] = float(clf.get("score", 0.0) or 0.0)
+                inputs_total = float(clf.get("inputs_total", 0) or 0)
+                state["regime_confidence"] = (
+                    float(clf.get("inputs_ok", 0) or 0) / inputs_total if inputs_total > 0 else 0.0
+                )
+
+                state["funding"] = _build_funding_map(chain_snap)
                 state["_chain_snapshot"] = chain_snap
             except Exception as e:
                 log.debug("chain intelligence unavailable: %s", e)
@@ -321,7 +380,8 @@ class SignalEnhancer:
         # --- Funding extremes ------------------------------------------------
         funding_rate: float | None = None
         funding_flag: str | None = None
-        fdata = state["funding"].get(symbol)
+        # Funding is keyed by base asset; signals arrive as "BTC", "BTC-USD", …
+        fdata = state["funding"].get(_base_symbol(symbol))
         if fdata is not None:
             funding_rate, funding_flag = fdata
             if funding_flag == "crowded_long" and direction == "long":

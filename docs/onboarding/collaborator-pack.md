@@ -53,9 +53,12 @@ Telegram alerts, and Palantir Foundry ontology sync consume from the same bus.
 ## 3. The four pillars
 
 ### 3.1 Quant trading
-Seven strategies (`lib/analytics/strategies.py`): `RegimeAwareRSI`,
+Five strategies (`lib/analytics/strategies.py`): `RegimeAwareRSI`,
 `FundingRateContrarian`, `CorrelationBreakout`, `MultiTFMomentum`,
-`SapphireComposite`, `CVDOrderFlow`, `VolatilityBreakout`. Stats rigor: GMM
+`SapphireComposite` — all `Strategy` subclasses driven through `on_bar()`.
+(`CVDOrderFlow` and `VolatilityBreakout` were listed here but have never been
+implemented; the count of five is what `Strategy.__subclasses__()` returns.)
+Stats rigor: GMM
 3-state regime detection, VPIN flow toxicity filter, CPCV with 15 purged
 splits, deflated Sharpe, liquidation cascade detector, quarter-Kelly with vol
 ceiling. Pipeline:

@@ -1,4 +1,4 @@
-"""Morning Telegram brief — 7 AM CT via LaunchAgent.
+"""Morning Telegram brief — 6 AM CT via LaunchAgent (05:00 America/Denver).
 
 Synthesizes eight intelligence streams into one Markdown-formatted
 Telegram message:
@@ -1029,11 +1029,33 @@ def main() -> int:
     out = persist_brief(text)
     log.info("daily brief persisted → %s (%d chars)", out, len(text))
     result = send_brief(text)
-    if result.get("ok"):
-        log.info("telegram send succeeded")
-        return 0
-    log.warning("telegram send failed: %s", result)
-    return 1
+    if not result.get("ok"):
+        log.warning("telegram delivery failed: %s", result)
+        return 1
+
+    # `ok: True` alone does not mean the brief reached Telegram — notify falls
+    # back to the pm-bot review queue (or a no-op) when live send is off, and
+    # both return ok. Log what actually happened so the LaunchAgent log can't
+    # read "succeeded" on a brief nobody received.
+    mode = result.get("delivery_mode", "live")
+    if mode == "live":
+        log.info("telegram send succeeded (live)")
+    elif mode == "draft":
+        log.info(
+            "brief queued as pm-bot draft %s (not delivered — "
+            "SAPPHIRE_NOTIFY_TELEGRAM_LIVE is off); approve at %s",
+            result.get("draft_id"),
+            result.get("draft_queue_path"),
+        )
+    elif mode == "dry_run":
+        log.info("telegram dry-run: %s chars, nothing sent", result.get("text_len"))
+    else:
+        log.warning(
+            "brief was NOT delivered — notify delivery_mode=%r (live send and "
+            "draft queue both disabled)",
+            mode,
+        )
+    return 0
 
 
 if __name__ == "__main__":
