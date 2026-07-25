@@ -1,5 +1,5 @@
 # MegaETH Ingest Service Dependencies
-aiohttp>=3.9.0
+aiohttp>=3.14.1  # security: floors below leave 22 known CVEs (GHSA-2fqr-mr3j-6wp8 + siblings)
 PyYAML>=6.0.0
 websockets>=16.0,<17
 python-dotenv>=1.0.0

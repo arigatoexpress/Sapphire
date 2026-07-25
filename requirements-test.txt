@@ -72,3 +72,17 @@ certifi==2026.5.20
 # webauthn admin scaffold (services/analytics_dashboard/auth)
 webauthn==2.7.1
 itsdangerous==2.2.0
+
+# --- security-hardened transitive floors (2026-07-25 CVE triage) -------------
+# These are transitively pulled by other pins but the versions the resolver
+# picked shipped known CVEs. Floors here force any fresh install to land on
+# patched versions. Update when the fixed_version rolls forward.
+click>=8.3.3          # PYSEC-2026-2132 — click.edit command injection
+idna>=3.15            # GHSA-65pc-fj4g-8rjx — IDNA quadratic-complexity DoS
+msgpack>=1.2.1        # GHSA-6v7p-g79w-8964 — Unpacker OOB read after error
+pillow>=12.3.0        # 12+ CVEs incl. GHSA-4x4j-2g7c-83w6 (OS command injection on WindowsViewer)
+pyasn1>=0.6.4         # GHSA-8ppf-4f7h-5ppj / hm4w-wwcw-mr6r — decoder DoS
+pypdf>=6.14.2         # 15+ CVEs — infinite loops / RAM exhaustion in PDF parsing
+setuptools>=78.1.1    # GHSA-5rjg-fvgr-3xxf — PackageIndex.download path traversal
+soupsieve>=2.8.4      # GHSA-2wc2-fm75-p42x / 836r-79rf-4m37 — selector ReDoS
+urllib3>=2.7.0        # GHSA-mf9v-mfxr-j63j / qccp-gfcp-xxvc — decomp bomb + cross-origin header leak
