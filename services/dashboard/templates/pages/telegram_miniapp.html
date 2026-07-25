@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sapphire</title>
+  <!--
+    No SRI hash here by necessity: Telegram serves this SDK unversioned and
+    updates it in place, so a pinned integrity hash would break the Mini App
+    on their next release. Telegram requires loading it from this exact
+    origin. The page is read-only and renders no third-party input.
+  -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0f1115);
+      --fg: var(--tg-theme-text-color, #e8eaed);
+      --muted: var(--tg-theme-hint-color, #8b93a1);
+      --card: var(--tg-theme-secondary-bg-color, #181b22);
+      --accent: var(--tg-theme-link-color, #4a9eff);
+      --up: #2ecc71;
+      --down: #e74c3c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
+    .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .card h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 10px;
+      font-weight: 600;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row .k { color: var(--muted); }
+    .row .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+    .err {
+      background: rgba(231, 76, 60, 0.12);
+      border: 1px solid rgba(231, 76, 60, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--fg);
+    }
+    .err code {
+      display: block;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      word-break: break-word;
+    }
+    .empty { color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+{% if auth_error %}
+  <div class="err">
+    <strong>Not authenticated</strong>
+    <code>{{ auth_error }}</code>
+  </div>
+{% else %}
+  <h1>Sapphire OS</h1>
+  <div class="sub">
+    Signed in as {{ telegram_user.first_name }}{% if telegram_user.username %} (@{{ telegram_user.username }}){% endif %}
+  </div>
+
+  {% if unified_dashboard %}
+    {% if unified_dashboard.portfolio %}
+    <div class="card">
+      <h2>Portfolio</h2>
+      {% for row in unified_dashboard.portfolio.holdings[:8] %}
+      <div class="row">
+        <span class="k">{{ row.symbol }}</span>
+        <span class="v">
+          {% if row.market_value is not none %}${{ '%.2f'|format(row.market_value) }}{% else %}—{% endif %}
+        </span>
+      </div>
+      {% else %}
+      <div class="empty">No holdings available.</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <h2>System</h2>
+      {% for key, value in (unified_dashboard.items() if unified_dashboard else []) %}
+        {% if value is string or value is number %}
+        <div class="row">
+          <span class="k">{{ key.replace('_', ' ') }}</span>
+          <span class="v">{{ value }}</span>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card"><div class="empty">Dashboard payload unavailable.</div></div>
+  {% endif %}
+{% endif %}
+
+<script>
+  // Adopt Telegram's theme + expand to full height.
+  if (window.Telegram && window.Telegram.WebApp) {
+    const wa = window.Telegram.WebApp;
+    wa.ready();
+    wa.expand();
+  }
+</script>
+</body>
+</html>

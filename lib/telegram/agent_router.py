@@ -91,6 +91,14 @@ SOURCE_CALLBACK_RE = re.compile(
     r"^source:(?P<action>mute|boost|details):(?P<source_id>[A-Za-z0-9_.:-]{1,96})$",
     re.IGNORECASE,
 )
+# Inline-menu callbacks (see ``lib.telegram.menus``). Menu callbacks paint a
+# new screen or persist a UI preference — no external side effects, no draft
+# queue writes. The pm-bot answers these directly.
+MENU_CALLBACK_RE = re.compile(r"^m:[A-Za-z0-9_.:-]{0,60}$")
+# Content-approval callbacks (see ``lib.content.telegram_approval``).
+CONTENT_APPROVAL_CALLBACK_RE = re.compile(
+    r"^(?P<action>apv|rej|vw):(?P<slug>[A-Za-z0-9_.:-]{1,96})$"
+)
 
 
 @dataclass(frozen=True)
@@ -403,6 +411,24 @@ def route_update(
             action="blocked_external_action",
             reason="Callback data attempts an external or high-risk action.",
             context=context,
+        )
+    if MENU_CALLBACK_RE.match(context.callback_data):
+        return RouterDecision(
+            route="menu",
+            action="render_menu",
+            reason="Inline-menu callback; render a new screen with no external side effect.",
+            context=context,
+            requires_confirmation=False,
+        )
+    approval = CONTENT_APPROVAL_CALLBACK_RE.match(context.callback_data)
+    if approval:
+        return RouterDecision(
+            route="content_approval",
+            action=approval.group("action").lower(),
+            reason="Content-approval callback; run the local approval flow.",
+            context=context,
+            draft_id=approval.group("slug"),
+            requires_confirmation=False,
         )
     draft = DRAFT_CALLBACK_RE.match(context.callback_data)
     if draft:

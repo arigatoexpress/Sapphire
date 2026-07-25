@@ -159,7 +159,7 @@ def test_status_command_happy_path(monkeypatch):
         lambda *args, **kwargs: SimpleNamespace(status_code=200, reason="OK"),
     )
 
-    response = pm_bot.handle_telegram_command(_make_update("/status"))
+    response = pm_bot.handle_telegram_command(_make_update("/status full"))
 
     assert response["parse_mode"] == "MarkdownV2"
     assert "Mesh devices: 1/2 online" in response["text"]
@@ -337,7 +337,7 @@ def test_command_suffix_with_bot_username_is_normalized(monkeypatch):
     response = pm_bot.handle_telegram_command(_make_update("/status@SapphirePMBot"))
 
     assert response["parse_mode"] == "MarkdownV2"
-    assert "Sapphire PM bot status" in response["text"]
+    assert "System Status" in response["text"]
 
 
 def test_guest_mention_status_is_normalized(monkeypatch):
@@ -358,7 +358,7 @@ def test_guest_mention_status_is_normalized(monkeypatch):
     response = pm_bot.handle_telegram_command(_make_update("@SapphirePMBot status"))
 
     assert response["parse_mode"] == "MarkdownV2"
-    assert "Sapphire PM bot status" in response["text"]
+    assert "System Status" in response["text"]
 
 
 def test_guest_mention_status_normalizes_without_configured_username(monkeypatch):
@@ -379,7 +379,7 @@ def test_guest_mention_status_normalizes_without_configured_username(monkeypatch
     response = pm_bot.handle_telegram_command(_make_update("@NemotronRariBot status"))
 
     assert response["parse_mode"] == "MarkdownV2"
-    assert "Sapphire PM bot status" in response["text"]
+    assert "System Status" in response["text"]
 
 
 def test_reply_followup_to_bot_normalizes_bare_command(monkeypatch):
@@ -405,7 +405,7 @@ def test_reply_followup_to_bot_normalizes_bare_command(monkeypatch):
     response = pm_bot.handle_telegram_command(update)
 
     assert response["parse_mode"] == "MarkdownV2"
-    assert "Sapphire PM bot status" in response["text"]
+    assert "System Status" in response["text"]
 
 
 def test_svc_status_uses_service_supervisor_dry_run(monkeypatch):
@@ -780,7 +780,7 @@ def test_existing_help_command_still_lists_all_commands(monkeypatch):
 
 
 def test_existing_status_command_unchanged(monkeypatch):
-    """Backward-compat: status command still produces the same shape."""
+    """Backward-compat: the detailed report is still reachable via /status full."""
     monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
     monkeypatch.setattr(
         pm_bot.sapphire_status_tool,
@@ -793,6 +793,6 @@ def test_existing_status_command_unchanged(monkeypatch):
         "get",
         lambda *a, **k: SimpleNamespace(status_code=200, reason="OK"),
     )
-    response = pm_bot.handle_telegram_command(_make_update("/status"))
+    response = pm_bot.handle_telegram_command(_make_update("/status full"))
     assert response["parse_mode"] == "MarkdownV2"
     assert "Mesh devices" in response["text"]

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.telegram-heartbeat</string>
+
+    <!--
+      Fires hourly; lib.telegram.heartbeat decides whether this tick is due
+      based on the interval in ~/.config/sapphire/telegram_settings.json.
+      That keeps the 4h / 12h / daily choice user-editable from the
+      Telegram Settings menu without reinstalling a plist.
+
+      Uses the Homebrew interpreter: /usr/local/bin/python3 (framework 3.12)
+      hangs indefinitely on this Mac (see CLAUDE.md gotchas).
+    -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>-m</string>
+        <string>lib.telegram.heartbeat</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>3600</integer>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/telegram-heartbeat.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/telegram-heartbeat.err</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>ThrottleInterval</key>
+    <integer>600</integer>
+</dict>
+</plist>

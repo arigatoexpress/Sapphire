@@ -36,6 +36,7 @@ import re
 import sys
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -89,29 +90,47 @@ THO_BASE_URL = os.getenv(
     "THO_API_BASE_URL",
     "https://project-go-forward-trgi34bxuq-uc.a.run.app",
 )
+# ``{bot}`` is interpolated with the configured bot username at render time
+# so the mention example always matches the bot the operator is talking to.
 STATUS_HELP_TEXT = (
+    "Sapphire OS — Telegram console\n"
+    "Tap /menu for the full interactive console.\n"
+    "\n"
     "Available commands:\n"
-    "You can also tag the bot in a group, for example @SapphirePMBot status\n"
-    "• /help\n"
-    "• /status\n"
-    "• /health\n"
-    "• /services\n"
-    "• /sources\n"
-    "• /dev pulse\n"
-    "• /svc status\n"
-    "• /pm list [--project <id>]\n"
-    "• /pm new <title>\n"
-    "• /rag <query>\n"
-    "• /claw <prompt>\n"
+    "\n"
+    "MAIN\n"
+    "• /help — this list\n"
+    "• /menu — interactive home screen\n"
+    "• /status — system health at a glance\n"
+    "• /status full — detailed mesh + inference report\n"
+    "• /portfolio — holdings + 24h moves\n"
+    "• /signals — active signals + accuracy\n"
+    "• /security — threat posture + CVEs\n"
+    "• /brief — today's intelligence brief\n"
+    "• /reports — drafts + ready queue\n"
+    "• /settings — heartbeat + alert prefs\n"
+    "\n"
+    "OPS\n"
+    "• /health — deep service probe\n"
+    "• /services — service inventory\n"
+    "• /sources — configured data sources\n"
+    "• /dev pulse — engineering pulse\n"
     "• /routines list\n"
     "• /routines status\n"
     "• /routines pause <name>\n"
     "• /routines resume <name> CONFIRM\n"
-    "• /digest morning\n"
-    "• /digest dev\n"
     "• /cancel-routine <name> CONFIRM\n"
-    "• /whoami"
+    "• /digest morning | dev\n"
+    "\n"
+    "WORK\n"
+    "• /pm list [--project <id>]\n"
+    "• /pm new <title>\n"
+    "• /rag <query>\n"
+    "• /whoami\n"
+    "\n"
+    "You can also tag the bot in a group, e.g. @{bot} status"
 )
+DEFAULT_BOT_MENTION = "SapphirePMBot"
 TASK_STATE_ORDER = ("todo", "in_progress", "in_review", "blocked")
 PRIORITY_LABELS = {
     "no_priority": "no_priority",
@@ -254,6 +273,7 @@ def _normalize_mention_command_body(text: str) -> str:
         ("digest dev", "/digest dev"),
         ("routines list", "/routines list"),
         ("routines status", "/routines status"),
+        ("status full", "/status full"),
         ("routines pause ", "/routines pause "),
         ("routines resume ", "/routines resume "),
         ("cancel-routine ", "/cancel-routine "),
@@ -263,7 +283,14 @@ def _normalize_mention_command_body(text: str) -> str:
         ("claw ", "/claw "),
         ("help", "/help"),
         ("start", "/start"),
+        ("menu", "/menu"),
         ("status", "/status"),
+        ("portfolio", "/portfolio"),
+        ("signals", "/signals"),
+        ("security", "/security"),
+        ("brief", "/brief"),
+        ("reports", "/reports"),
+        ("settings", "/settings"),
         ("health", "/health"),
         ("services", "/services"),
         ("sources", "/sources"),
@@ -632,7 +659,11 @@ def _format_status_report() -> dict[str, Any]:
 
 
 def _handle_help() -> dict[str, Any]:
-    escaped = "\n".join(escape_markdown_v2(line) for line in STATUS_HELP_TEXT.splitlines())
+    rendered = STATUS_HELP_TEXT.format(
+        bot=os.getenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "").strip().lstrip("@")
+        or DEFAULT_BOT_MENTION
+    )
+    escaped = "\n".join(escape_markdown_v2(line) for line in rendered.splitlines())
     return _response(escaped, "MarkdownV2")
 
 
@@ -1309,6 +1340,62 @@ def _handle_whoami(update: dict[str, Any]) -> dict[str, Any]:
     return _response("\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2")
 
 
+def _build_menu_context():
+    """Assemble the menu runtime context.
+
+    Imported lazily so the plugin tool still works in environments where
+    the repo-root ``lib`` package isn't importable (the plugin ships its
+    own ``lib`` that can shadow it in some test harnesses).
+    """
+    from lib.telegram import menu_providers, menus, settings_store
+
+    current = settings_store.load()
+    return menus, menus.MenuContext(
+        webapp_url=os.getenv("SAPPHIRE_TELEGRAM_WEBAPP_URL", "").strip() or None,
+        heartbeat_enabled=current.heartbeat_enabled,
+        heartbeat_hours=current.heartbeat_hours,
+        providers=menu_providers.build_providers(),
+    )
+
+
+def _menu_response(
+    token: str,
+    fallback: Callable[[], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Render a menu screen, degrading to ``fallback`` if the menu layer is absent.
+
+    The inline-menu modules live under the repo-root ``lib`` package, which
+    is not importable in every context this tool runs in (the plugin ships
+    its own ``lib`` that can shadow it). The menu is an enhancement layer,
+    so an import failure degrades to the plain-text handler rather than
+    surfacing an error to the operator.
+    """
+    try:
+        menus, ctx = _build_menu_context()
+        render = menus.dispatch_menu_callback(f"{menus.CALLBACK_PREFIX}{token}", ctx)
+    except Exception:
+        logger.warning(
+            "inline menu unavailable for token=%s; falling back to plain text", token
+        )
+        if fallback is not None:
+            return fallback()
+        return _handle_help()
+    payload = _response(render.text, render.parse_mode)
+    payload["reply_markup"] = render.reply_markup
+    return payload
+
+
+def _handle_menu_home() -> dict[str, Any]:
+    return _menu_response("h", _handle_help)
+
+
+def _handle_menu_section(
+    token: str,
+    fallback: Callable[[], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return _menu_response(token, fallback)
+
+
 def _dispatch(text: str, update: dict[str, Any]) -> dict[str, Any]:
     """Pure command-dispatch table. Allowlist + safety guards are upstream.
 
@@ -1318,10 +1405,29 @@ def _dispatch(text: str, update: dict[str, Any]) -> dict[str, Any]:
     is sensitive, also extend the forbidden-command list in
     ``_telegram_safety``.
     """
-    if text in {"/help", "/start"}:
+    if text in {"/start", "/menu"}:
+        return _handle_menu_home()
+    if text == "/help":
         return _handle_help()
-    if text == "/status":
+    if text == "/portfolio":
+        return _handle_menu_section("pf")
+    if text == "/signals":
+        return _handle_menu_section("sg")
+    if text == "/security":
+        return _handle_menu_section("sec")
+    if text == "/brief":
+        return _handle_menu_section("br")
+    if text == "/reports":
+        return _handle_menu_section("rp")
+    if text == "/settings":
+        return _handle_menu_section("cfg")
+    if text in {"/status full", "/status detail"}:
+        # Legacy detailed report: mesh device topology + inference proxy
+        # health + today's signal count. Kept because the at-a-glance
+        # snapshot below deliberately omits that depth.
         return _format_status_report()
+    if text == "/status":
+        return _handle_menu_section("st", _format_status_report)
     if text == "/health":
         return _handle_health()
     if text == "/services":

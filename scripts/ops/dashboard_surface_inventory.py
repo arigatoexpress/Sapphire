@@ -43,6 +43,7 @@ KEEP_ROUTES = {
     "/health",
     "/static/<path:filename>",
     "/api/production/readiness",
+    "/telegram/miniapp",
 }
 REDIRECT_ROUTES = {
     "/unified",
@@ -219,10 +220,17 @@ OWNER_RULES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
         ("/settings", "/static/<path:filename>"),
         (),
     ),
+    (
+        # The Telegram Mini App is a mobile front door onto the same
+        # read-only showcase payload, so it belongs with Home.
+        "Home / Worldline",
+        ("/telegram/miniapp",),
+        (),
+    ),
 )
 
 TEMPLATE_OWNER_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Home / Worldline", ("overview", "showcase")),
+    ("Home / Worldline", ("overview", "showcase", "telegram_miniapp")),
     (
         "Operations",
         (

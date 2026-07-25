@@ -64,7 +64,6 @@ _ROUTINE_PAUSE_DIR = Path.home() / ".sapphire" / "routine_pause"
 # Pi-less mode: services run on Mac (localhost) and rari2 (Tailscale)
 RARI1_IP = os.environ.get("RARI1_IP", "127.0.0.1")  # control-plane on Mac
 RARI2_IP = os.environ.get("RARI2_IP", "100.x.x.y")  # rari2 via Tailscale
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 # Auth configuration — credentials required via environment variables
 AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "sapphire")
@@ -1625,6 +1624,47 @@ def index():
         current_page="showcase",
         page_title="Unified Dashboard",
         unified_dashboard=_build_unified_dashboard_payload(),
+    )
+
+
+@app.route("/telegram/miniapp")
+def telegram_miniapp():
+    """Telegram Mini App entry point.
+
+    Authenticates via the Mini App ``initData`` HMAC rather than the
+    dashboard's basic-auth, because a Telegram in-app browser cannot
+    present those credentials. Verification is delegated to
+    ``lib.telegram.login_widget.verify_webapp_init_data``.
+
+    Serves a mobile-optimized read-only view. No mutation endpoints are
+    reachable from here.
+    """
+    from lib.telegram.login_widget import verify_webapp_init_data
+
+    init_data = request.args.get("tgWebAppData", "") or request.form.get("initData", "")
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+
+    user = None
+    auth_error = ""
+    if not token:
+        auth_error = "TELEGRAM_BOT_TOKEN is not configured on the dashboard host."
+    elif not init_data:
+        auth_error = "Open this page from the Telegram app to authenticate."
+    else:
+        try:
+            user = verify_webapp_init_data(init_data, token)
+        except ValueError as exc:
+            auth_error = str(exc)
+        if user is None and not auth_error:
+            auth_error = "Telegram signature verification failed."
+
+    return render_template(
+        "pages/telegram_miniapp.html",
+        current_page="miniapp",
+        page_title="Sapphire",
+        telegram_user=user.to_dict() if user is not None else None,
+        auth_error=auth_error,
+        unified_dashboard=_build_unified_dashboard_payload() if user is not None else None,
     )
 
 
