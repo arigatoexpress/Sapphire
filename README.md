@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-7%2C629%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
+[![Tests](https://img.shields.io/badge/tests-7%2C682%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
 [![License](https://img.shields.io/badge/license-proprietary-0A2540)](LICENSE)
 
 **A self-sovereign operating system for capital intelligence, autonomous operations, and acquisition-grade diligence.**
@@ -23,7 +23,9 @@ Sapphire connects market data, on-chain signals, threat intelligence, and macro 
 
 - **Auto-executor paper lane** — autonomous trading executor bridging confirmation-firewall approvals to paper execution, with exactly-once execution, a single-instance lock, and Telegram-gated approvals (`services/alpha/auto_executor.py`, `com.sapphire.auto-executor` LaunchAgent).
 - **TradingView durable webhook pipeline** — Mac-side webhook receiver + Cloudflare Quick Tunnel ingress, durable alert log, idempotent dedup, live dashboard probe, and auto-sync of the Cloud Run `TV_WEBHOOK_URL`.
-- **TDR Pro sync** — autonomous podcast/RSS sync pipeline feeding the daily brief and the public dashboard's clips widget.
+- **Sovereign research authority** — Ari's thesis owns conviction; Cowen leads the
+  current cycle view, while Hayes, Bankless, Limitless, and Nadeau remain bounded,
+  attributed advisory lenses with evidence-share caps and falsifiers.
 - **Robinhood Crypto client** — Ed25519-signed REST client (`lib/portfolio/robinhood.py`): accounts, holdings, best bid/ask, order history, reconstructed cost basis.
 - **Fleet status monitor** — unified aggregator (`services/pipeline/fleet_status.py`) probing services, LaunchAgents, and the L2 wallet; feeds the daily brief.
 - **pm-bot Telegram gate** — PM bot owns Telegram (polling mode with shared-token safety); producer alerts become reviewed local drafts.
@@ -68,7 +70,7 @@ Six concerns share one event bus (Redis Streams + JSONL fallback):
 - Fail-closed trading: $5/order cap, $25/day loss limit, global kill switch
 - 4-tier inference mesh (GPU → Pi ×2 → Mac CPU → Kimi Cloud)
 - Live public Mission Control at `sapphirealpha.xyz` (`/api/v1/status`, `/api/v1/live`, `/api/v1/transparency`, `/api/v1/widgets`, `/api/fleet`)
-- 7,629+ passing tests across 456 files
+- 7,682+ passing tests across 458 files
 - 3 Solidity contracts on Robinhood Chain testnet
 
 ## Tech stack
