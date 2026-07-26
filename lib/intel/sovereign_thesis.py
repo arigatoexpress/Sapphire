@@ -21,6 +21,30 @@ from lib.core.provenance import write_envelope_sidecar
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = ROOT / "config" / "investment_thesis.yaml"
 
+DEFAULT_RESEARCH_AUTHORITY: dict[str, Any] = {
+    "owner": {
+        "id": "ari",
+        "label": "Ari's investment thesis",
+        "role": "mandate",
+    },
+    "rules": {
+        "single_analyst_evidence_cap": 0.25,
+        "minimum_independent_primary_sources": 2,
+        "analysts_are_advisory_only": True,
+        "analyst_can_set_conviction": False,
+        "analyst_can_authorize_execution": False,
+        "require_falsifier": True,
+    },
+    "current_cycle_prior": {
+        "as_of": None,
+        "posture": "operator_thesis_only",
+        "primary_lens": None,
+        "claims": [],
+        "invalidators": [],
+    },
+    "advisory_lenses": [],
+}
+
 
 SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
     "chain:client_diversity": {
@@ -439,6 +463,100 @@ def parse_lenses(config: dict[str, Any]) -> list[ThesisLens]:
 
 def parse_assets(config: dict[str, Any]) -> list[ThesisAsset]:
     return [_asset_from_mapping(_as_mapping(row)) for row in _as_list(config.get("assets"))]
+
+
+def build_research_authority(config: dict[str, Any]) -> dict[str, Any]:
+    """Normalize and fail closed on the research-authority contract.
+
+    Asset conviction is authored in the checked-in operator thesis. Analyst
+    material may challenge it with cited evidence, but it cannot mutate that
+    field or authorize execution. The cap applies to an analyst's share of an
+    evidence packet, not to the operator's mandate.
+    """
+
+    configured = _as_mapping(config.get("research_authority"))
+    authority = configured or DEFAULT_RESEARCH_AUTHORITY
+    owner = _as_mapping(authority.get("owner"))
+    rules = _as_mapping(authority.get("rules"))
+    prior = _as_mapping(authority.get("current_cycle_prior"))
+
+    if str(owner.get("id") or "").strip().lower() != "ari":
+        raise ValueError("research authority owner must be ari")
+    if str(owner.get("role") or "").strip() != "mandate":
+        raise ValueError("research authority owner role must be mandate")
+
+    cap = _as_float(rules.get("single_analyst_evidence_cap"), 0.25)
+    if cap < 0 or cap > 0.25:
+        raise ValueError("single analyst evidence cap must not exceed 0.25")
+    minimum_sources = int(_as_float(rules.get("minimum_independent_primary_sources"), 2))
+    if minimum_sources < 2:
+        raise ValueError("research requires at least two independent primary sources")
+    if not bool(rules.get("analysts_are_advisory_only", True)):
+        raise ValueError("analysts must remain advisory only")
+    if bool(rules.get("analyst_can_set_conviction", False)):
+        raise ValueError("analysts cannot set conviction")
+    if bool(rules.get("analyst_can_authorize_execution", False)):
+        raise ValueError("analysts cannot authorize execution")
+    if not bool(rules.get("require_falsifier", True)):
+        raise ValueError("research authority must require a falsifier")
+
+    lenses: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in _as_list(authority.get("advisory_lenses")):
+        row = _as_mapping(raw)
+        lens_id = str(row.get("id") or "").strip()
+        if not lens_id:
+            raise ValueError("advisory research lens requires id")
+        if lens_id in seen:
+            raise ValueError(f"duplicate advisory research lens: {lens_id}")
+        seen.add(lens_id)
+        if bool(row.get("can_set_conviction", False)):
+            raise ValueError(f"analyst {lens_id} cannot set conviction")
+        if bool(row.get("can_authorize_execution", False)):
+            raise ValueError(f"analyst {lens_id} cannot authorize execution")
+        lenses.append(
+            {
+                "id": lens_id,
+                "label": str(row.get("label") or lens_id),
+                "domain": str(row.get("domain") or "advisory"),
+                "scope": str(row.get("scope") or "advisory_only"),
+                "stance": str(row.get("stance") or ""),
+                "claims": [str(item) for item in _as_list(row.get("claims"))],
+                "invalidators": [str(item) for item in _as_list(row.get("invalidators"))],
+                "source_url": str(row.get("source_url") or ""),
+                "can_set_conviction": False,
+                "can_authorize_execution": False,
+            }
+        )
+
+    primary_lens = str(prior.get("primary_lens") or "").strip() or None
+    if primary_lens and primary_lens not in seen:
+        raise ValueError("current cycle primary lens must name an advisory lens")
+
+    return {
+        "owner": {
+            "id": "ari",
+            "label": str(owner.get("label") or "Ari's investment thesis"),
+            "role": "mandate",
+            "can_set_conviction": True,
+        },
+        "rules": {
+            "single_analyst_evidence_cap": cap,
+            "minimum_independent_primary_sources": minimum_sources,
+            "analysts_are_advisory_only": True,
+            "analyst_can_set_conviction": False,
+            "analyst_can_authorize_execution": False,
+            "require_falsifier": bool(rules.get("require_falsifier", True)),
+        },
+        "current_cycle_prior": {
+            "as_of": prior.get("as_of"),
+            "posture": str(prior.get("posture") or "operator_thesis_only"),
+            "primary_lens": primary_lens,
+            "claims": [str(item) for item in _as_list(prior.get("claims"))],
+            "invalidators": [str(item) for item in _as_list(prior.get("invalidators"))],
+        },
+        "advisory_lenses": lenses,
+    }
 
 
 def _inferred_lens_value(asset: ThesisAsset, lens: ThesisLens) -> float:
@@ -887,6 +1005,7 @@ def build_sovereign_thesis_report(config_path: str | Path | None = None) -> dict
     """Build a read-only thesis matrix for dashboard/API consumers."""
     started = time.perf_counter()
     config = load_thesis_config(config_path)
+    research_authority = build_research_authority(config)
     lenses = parse_lenses(config)
     assets = parse_assets(config)
     if not lenses:
@@ -930,6 +1049,7 @@ def build_sovereign_thesis_report(config_path: str | Path | None = None) -> dict
         "mode": "research_intel_only",
         "config_path": str(Path(config_path) if config_path else DEFAULT_CONFIG_PATH),
         "worldview": _as_mapping(config.get("worldview")),
+        "research_authority": research_authority,
         "safety": {
             "live_trading_enabled": False,
             "execution_enabled": False,
@@ -940,6 +1060,9 @@ def build_sovereign_thesis_report(config_path: str | Path | None = None) -> dict
                 "no_order_submission",
                 "no_external_mutation",
                 "invalidation_before_action",
+                "operator_thesis_is_mandate",
+                "analysts_are_advisory_only",
+                "multi_source_corroboration_required",
             ],
         },
         "totals": {
@@ -1002,8 +1125,10 @@ def main(argv: list[str] | None = None) -> int:
 
 __all__ = [
     "DEFAULT_CONFIG_PATH",
+    "DEFAULT_RESEARCH_AUTHORITY",
     "ThesisAsset",
     "ThesisLens",
+    "build_research_authority",
     "build_thesis_materialization_plan",
     "build_thesis_materialization_rows",
     "build_sovereign_thesis_report",

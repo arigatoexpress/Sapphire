@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from lib.intel.sovereign_thesis import (
+    build_research_authority,
     build_sovereign_thesis_report,
     build_thesis_materialization_rows,
     load_thesis_config,
@@ -127,7 +130,24 @@ def test_default_sovereign_thesis_report_covers_ari_universe() -> None:
     rows = {row["symbol"]: row for row in report["assets"]}
 
     assert report["worldview"]["stance"] == "cypherpunk_austrian"
+    authority = report["research_authority"]
+    assert authority["owner"]["id"] == "ari"
+    assert authority["owner"]["role"] == "mandate"
+    assert authority["current_cycle_prior"]["primary_lens"] == "benjamin_cowen"
+    assert authority["current_cycle_prior"]["posture"] == "late_cycle_capital_preservation"
+    lenses = {row["id"]: row for row in authority["advisory_lenses"]}
+    assert lenses["benjamin_cowen"]["domain"] == "cycle_and_risk"
+    assert lenses["arthur_hayes"]["domain"] == "macro_liquidity"
+    assert lenses["bankless"]["domain"] == "crypto_market_structure"
+    assert lenses["limitless"]["domain"] == "ai_and_frontier_technology"
+    assert lenses["michael_nadeau"]["domain"] == "fundamentals_and_value_accrual"
+    assert lenses["michael_nadeau"]["scope"] == "fundamentals_only"
+    assert all(not row["can_set_conviction"] for row in lenses.values())
+    assert all(not row["can_authorize_execution"] for row in lenses.values())
+    assert authority["rules"]["single_analyst_evidence_cap"] <= 0.25
     assert report["safety"]["telegram_sends_enabled"] is False
+    assert "operator_thesis_is_mandate" in report["safety"]["guards"]
+    assert "analysts_are_advisory_only" in report["safety"]["guards"]
     assert report["totals"]["assets"] >= 30
     assert report["totals"]["lenses"] >= 15
     assert report["assets"][0]["symbol"] == "ETH"
@@ -154,6 +174,90 @@ def test_default_sovereign_thesis_report_covers_ari_universe() -> None:
     assert 0 < report["totals"]["evidence_coverage_pct"] < report["totals"]["evidence_wired_pct"]
     assert rows["BTC"]["evidence_summary"]["needs_wiring"] >= 1
     assert "fred:M2SL" in {row["source_id"] for row in rows["BTC"]["evidence_ledger"]}
+
+
+def test_research_authority_rejects_an_analyst_who_can_change_conviction() -> None:
+    config = {
+        "research_authority": {
+            "owner": {"id": "ari", "label": "Ari", "role": "mandate"},
+            "rules": {
+                "single_analyst_evidence_cap": 0.25,
+                "minimum_independent_primary_sources": 2,
+            },
+            "current_cycle_prior": {
+                "as_of": "2026-07-25",
+                "posture": "late_cycle_capital_preservation",
+                "primary_lens": "benjamin_cowen",
+            },
+            "advisory_lenses": [
+                {
+                    "id": "michael_nadeau",
+                    "label": "Michael Nadeau",
+                    "domain": "fundamentals_and_value_accrual",
+                    "scope": "fundamentals_only",
+                    "can_set_conviction": True,
+                    "can_authorize_execution": False,
+                }
+            ],
+        }
+    }
+
+    with pytest.raises(ValueError, match="cannot set conviction"):
+        build_research_authority(config)
+
+
+def test_research_authority_rejects_single_analyst_dominance() -> None:
+    config = {
+        "research_authority": {
+            "owner": {"id": "ari", "label": "Ari", "role": "mandate"},
+            "rules": {
+                "single_analyst_evidence_cap": 0.75,
+                "minimum_independent_primary_sources": 2,
+            },
+            "current_cycle_prior": {
+                "as_of": "2026-07-25",
+                "posture": "late_cycle_capital_preservation",
+                "primary_lens": "benjamin_cowen",
+            },
+            "advisory_lenses": [],
+        }
+    }
+
+    with pytest.raises(ValueError, match="must not exceed 0.25"):
+        build_research_authority(config)
+
+
+@pytest.mark.parametrize(
+    ("rule", "value", "message"),
+    [
+        ("analysts_are_advisory_only", False, "advisory only"),
+        ("analyst_can_set_conviction", True, "cannot set conviction"),
+        ("analyst_can_authorize_execution", True, "cannot authorize execution"),
+        ("require_falsifier", False, "require a falsifier"),
+    ],
+)
+def test_research_authority_rejects_global_analyst_privilege(
+    rule: str, value: bool, message: str
+) -> None:
+    config = {
+        "research_authority": {
+            "owner": {"id": "ari", "label": "Ari", "role": "mandate"},
+            "rules": {
+                "single_analyst_evidence_cap": 0.25,
+                "minimum_independent_primary_sources": 2,
+                rule: value,
+            },
+            "current_cycle_prior": {
+                "as_of": "2026-07-25",
+                "posture": "late_cycle_capital_preservation",
+                "primary_lens": None,
+            },
+            "advisory_lenses": [],
+        }
+    }
+
+    with pytest.raises(ValueError, match=message):
+        build_research_authority(config)
 
 
 def test_default_sovereign_thesis_tracks_invalidations_and_sources() -> None:

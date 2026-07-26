@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "Sapphire Sovereign Thesis Matrix",
   "mode": "research_intel_only",
   "worldview": {
@@ -18,6 +18,141 @@
       "energy_abundance_as_real_growth",
       "defense_autonomy_as_resilience",
       "falsifiable_theses_over_narrative"
+    ]
+  },
+  "research_authority": {
+    "owner": {
+      "id": "ari",
+      "label": "Ari's investment thesis",
+      "role": "mandate"
+    },
+    "rules": {
+      "single_analyst_evidence_cap": 0.25,
+      "minimum_independent_primary_sources": 2,
+      "analysts_are_advisory_only": true,
+      "analyst_can_set_conviction": false,
+      "analyst_can_authorize_execution": false,
+      "require_falsifier": true
+    },
+    "current_cycle_prior": {
+      "as_of": "2026-07-25",
+      "posture": "late_cycle_capital_preservation",
+      "primary_lens": "benjamin_cowen",
+      "claims": [
+        "restrictive_liquidity_and_weak_breadth_define_the_base_case",
+        "time_based_capitulation_is_more_likely_than_an_immediate_broad_risk_reacceleration",
+        "capital_preservation_precedes_broad_altcoin_risk",
+        "stablecoin_adjusted_bitcoin_dominance_and_market_breadth_are_regime_checks"
+      ],
+      "invalidators": [
+        "durable_breadth_expansion_across_independent_market_measures",
+        "stablecoin_adjusted_bitcoin_dominance_trend_reversal",
+        "documented_and_persistent_liquidity_easing",
+        "business_cycle_reset_with_confirmed_risk_reacceleration"
+      ]
+    },
+    "advisory_lenses": [
+      {
+        "id": "benjamin_cowen",
+        "label": "Benjamin Cowen / Into The Cryptoverse",
+        "domain": "cycle_and_risk",
+        "scope": "primary_cycle_lens",
+        "stance": "late_cycle_time_based_capitulation_and_capital_preservation",
+        "claims": [
+          "market_breadth_remains_weak",
+          "stablecoin_adjusted_bitcoin_dominance_remains_elevated",
+          "liquidity_remains_restrictive",
+          "selective_tactical_deployment_beats_broad_speculation"
+        ],
+        "invalidators": [
+          "breadth_and_participation_recover_durably",
+          "liquidity_regime_eases_persistently",
+          "bitcoin_dominance_reverses_with_confirmed_altcoin_relative_strength"
+        ],
+        "source_url": "https://www.benjamincowen.com/reports/crypto-risk-memo-q2-2026",
+        "can_set_conviction": false,
+        "can_authorize_execution": false
+      },
+      {
+        "id": "arthur_hayes",
+        "label": "Arthur Hayes",
+        "domain": "macro_liquidity",
+        "scope": "scenario_and_countercase",
+        "stance": "energy_and_ai_credit_stress_can_break_risk_assets_before_policy_liquidity_reflates_bitcoin",
+        "claims": [
+          "energy_prices_and_credit_conditions_are_reflexive_market_variables",
+          "ai_capex_can_create_credit_deflation_and_concentrated_risk",
+          "a_policy_liquidity_response_can_become_a_later_bitcoin_tailwind"
+        ],
+        "invalidators": [
+          "ai_capex_deleverages_without_credit_stress",
+          "energy_shocks_fade_without_financial_tightening",
+          "liquidity_expands_without_bitcoin_relative_strength"
+        ],
+        "source_url": "https://cryptohayes.medium.com/reality-test-c8e4f49def52",
+        "can_set_conviction": false,
+        "can_authorize_execution": false
+      },
+      {
+        "id": "bankless",
+        "label": "Bankless",
+        "domain": "crypto_market_structure",
+        "scope": "structural_theme_discovery",
+        "stance": "defi_tokenization_capital_formation_prediction_markets_and_agentic_payments_are_multicycle_themes",
+        "claims": [
+          "theme_fitness_matters_more_than_blanket_sector_exposure",
+          "stablecoin_payments_and_tokenization_have_structural_adoption",
+          "ai_agents_are_natural_users_of_programmable_money"
+        ],
+        "invalidators": [
+          "themes_fail_to_produce_retained_users_or_fees",
+          "permissioned_chokepoints_remove_open_settlement_or_exit_rights",
+          "capital_formation_outpaces_product_market_fit"
+        ],
+        "source_url": "https://www.bankless.com/podcast/investing-trends-for-2026",
+        "can_set_conviction": false,
+        "can_authorize_execution": false
+      },
+      {
+        "id": "limitless",
+        "label": "Limitless",
+        "domain": "ai_and_frontier_technology",
+        "scope": "technology_theme_discovery",
+        "stance": "compute_memory_inference_local_models_and_specialized_applications_are_the_durable_ai_stack",
+        "claims": [
+          "compute_and_memory_remain_bottlenecks",
+          "value_is_moving_from_training_toward_inference_and_specialized_applications",
+          "local_models_and_new_devices_expand_the_application_surface"
+        ],
+        "invalidators": [
+          "capex_growth_fails_to_convert_into_utilization_or_cash_flow",
+          "model_efficiency_collapses_infrastructure_demand_faster_than_new_workloads_expand_it",
+          "application_revenue_fails_to_escape_subsidized_adoption"
+        ],
+        "source_url": "https://limitless.fm/episodes/50781cd9-4f20-4a46-aa9c-cb8bbba710ef",
+        "can_set_conviction": false,
+        "can_authorize_execution": false
+      },
+      {
+        "id": "michael_nadeau",
+        "label": "Michael Nadeau / The DeFi Report",
+        "domain": "fundamentals_and_value_accrual",
+        "scope": "fundamentals_only",
+        "stance": "fees_token_capture_and_net_supply_are_asset_quality_checks_not_a_market_cycle_oracle",
+        "claims": [
+          "real_user_fees_must_be_separated_from_incentives",
+          "protocol_revenue_is_not_token_cash_flow_without_capture",
+          "buybacks_and_burns_must_be_net_of_emissions_and_vesting"
+        ],
+        "invalidators": [
+          "reported_fees_do_not_reconcile_to_primary_data",
+          "tokenholders_lack_enforceable_or_economic_value_capture",
+          "net_supply_expands_despite_gross_burn_narratives"
+        ],
+        "source_url": "https://thedefireport.io/",
+        "can_set_conviction": false,
+        "can_authorize_execution": false
+      }
     ]
   },
   "lenses": [
@@ -702,6 +837,11 @@
     "https://www.franklintempleton.com/about-us/our-teams/specialist-investment-managers/digital-assets/digital-assets-technology",
     "https://securitize.io/learn/press/blackrock-launches-first-tokenized-fund-buidl-on-the-ethereum-network",
     "https://docs.ondo.finance/",
-    "https://docs.ondo.finance/ondo-global-markets"
+    "https://docs.ondo.finance/ondo-global-markets",
+    "https://www.benjamincowen.com/reports/crypto-risk-memo-q2-2026",
+    "https://cryptohayes.medium.com/reality-test-c8e4f49def52",
+    "https://www.bankless.com/podcast/investing-trends-for-2026",
+    "https://limitless.fm/episodes/50781cd9-4f20-4a46-aa9c-cb8bbba710ef",
+    "https://thedefireport.io/"
   ]
 }
