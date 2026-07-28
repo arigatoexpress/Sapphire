@@ -18,6 +18,63 @@ sys.modules[SPEC.name] = sweep
 SPEC.loader.exec_module(sweep)
 
 
+def _safety_report_result(inferred_active: bool | None, source: str) -> sweep.RunResult:
+    payload = {
+        "kill_switch": {
+            "inferred_active": inferred_active,
+            "state_source": source,
+            "state_confidence": "unknown" if inferred_active is None else "operator_observed",
+        },
+        "confirmation_firewall": {"expired_pending_count": 0},
+        "autonomy_audit": {
+            "schema": {
+                "unredacted_secret_risk_records": 0,
+            }
+        },
+    }
+    return sweep.RunResult(0, json.dumps(payload), "", 1)
+
+
+def test_probe_safety_fails_closed_when_kill_switch_state_is_unknown(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sweep,
+        "run",
+        lambda *_args, **_kwargs: _safety_report_result(None, "audit_missing"),
+    )
+
+    check = next(item for item in sweep.probe_safety() if item.name == "kill_switch_inactive")
+
+    assert check.status == "FAIL"
+    assert "inferred_active=unknown" in check.evidence
+    assert "source=audit_missing" in check.evidence
+
+
+def test_probe_safety_passes_only_explicit_inactive_state(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sweep,
+        "run",
+        lambda *_args, **_kwargs: _safety_report_result(False, "operator_baseline"),
+    )
+
+    check = next(item for item in sweep.probe_safety() if item.name == "kill_switch_inactive")
+
+    assert check.status == "PASS"
+    assert "inferred_active=false" in check.evidence
+
+
+def test_probe_safety_rejects_inactive_value_without_bound_source(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sweep,
+        "run",
+        lambda *_args, **_kwargs: _safety_report_result(False, "audit_missing"),
+    )
+
+    check = next(item for item in sweep.probe_safety() if item.name == "kill_switch_inactive")
+
+    assert check.status == "FAIL"
+    assert "source=audit_missing" in check.evidence
+
+
 def test_parse_json_from_mixed_output_handles_cli_warnings() -> None:
     output = 'Warning: terminal\n{"response": "SAPPHIRE_GEMINI_PROBE_OK"}\n'
 
