@@ -1368,13 +1368,27 @@ def probe_safety() -> list[Check]:
         return [Check("safety", "safety_status_report", "FAIL", "invalid JSON", result.duration_ms)]
     checks: list[Check] = []
     kill = report.get("kill_switch", {})
-    active = bool(kill.get("inferred_active"))
+    inferred_active = kill.get("inferred_active")
+    state_source = str(kill.get("state_source") or "unknown")
+    state_confidence = str(kill.get("state_confidence") or "unknown")
+    state_is_bound = state_source in {"last_transition", "operator_baseline"}
+    explicitly_inactive = inferred_active is False and state_is_bound
+    rendered_state = (
+        "true"
+        if inferred_active is True
+        else "false"
+        if inferred_active is False
+        else "unknown"
+    )
     checks.append(
         Check(
             "safety",
             "kill_switch_inactive",
-            "PASS" if not active else "FAIL",
-            f"inferred_active={active}",
+            "PASS" if explicitly_inactive else "FAIL",
+            (
+                f"inferred_active={rendered_state}; source={state_source}; "
+                f"confidence={state_confidence}"
+            ),
         )
     )
     firewall = report.get("confirmation_firewall", {})
