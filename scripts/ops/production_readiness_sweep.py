@@ -38,22 +38,22 @@ DEFAULT_BQ_TABLE = "production_readiness_probes"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_SECRET_ENV = Path.home() / ".sapphire" / "secrets.env"
 SAPPHIRE_SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
-DEFAULT_WINDOWS_GPU_URL = "http://100.x.x.z:11434"
-DEFAULT_WINDOWS_HOST = "100.x.x.z"
+DEFAULT_WINDOWS_GPU_URL = "http://192.168.1.61:11434"
+DEFAULT_WINDOWS_HOST = "192.168.1.61"
 DEFAULT_WINDOWS_HTTP_TIMEOUT_SECONDS = 5.0
 DEFAULT_WINDOWS_TCP_TIMEOUT_SECONDS = 3.0
 DEFAULT_WINDOWS_SSH_TIMEOUT_SECONDS = 8
 GEMINI_PROBE_PROMPT = "Return exactly SAPPHIRE_GEMINI_PROBE_OK and nothing else."
 GEMINI_PROBE_RESPONSE = "SAPPHIRE_GEMINI_PROBE_OK"
 WINDOWS_REQUIRED_MODELS = {
-    "fast": "gemma4:latest",
-    "balanced": "gemma4:latest",
-    "code": "gemma4:latest",
+    "fast": "gemma3:4b",
+    "balanced": "gemma3:4b",
+    "code": "qwen2.5-coder:14b",
     "reason": "deepseek-r1:14b",
-    "qwen-reason": "qwen3.5:9b",
+    "qwen-reason": "qwen3.5:4b",
     "deep": "qwen3:14b",
-    "qwen3.6": "qwen3.6:27b",
-    "large": "qwen2.5:32b",
+    "qwen3.6": "qwen3.6:35b-a3b",
+    "large": "qwen3-coder:30b",
 }
 WINDOWS_SERVICE_PORTS = {
     "desktop_ssh_tcp": 22,

@@ -3,10 +3,10 @@
 Current agentic Telegram direction:
   - Kimi/Gemini hosted lanes are primary for operator work and structured triage.
   - The PM bot owns Telegram ingress; this proxy must not create a sender path.
-  - Local Ollama is fallback-only, with Gemma 4 as the fresh Mac default.
+  - Local Ollama is fallback-only, with an inventory-verified common model.
 
 Legacy/local tiers:
-Tier 1: Windows GPU (100.x.x.z:11434) - deprecated for new default routing
+Tier 1: Windows GPU (192.168.1.61:11434) - primary local accelerator
 Tier 2: Pi (rari1/rari2 via Tailscale) - disabled unless explicitly enabled
 Tier 3: Mac local (127.0.0.1:11434) - sensitive/local fallback
 Tier 4: Kimi Cloud (api.moonshot.ai/cn) - non-sensitive cloud fallback
@@ -18,8 +18,9 @@ Routing rules:
   - All tiers use OpenAI-compatible output regardless of backend format
 
 Fresh routing:
-  auto/fast/quick/balanced/code -> gemma4:latest local fallback
-  qwen3.6                      -> qwen3.6:27b heavy local fallback
+  auto/fast/quick/balanced     -> gemma3:4b common Mac/Windows fallback
+  code/fast-code               -> qwen2.5-coder:14b common coder
+  qwen3.6                      -> qwen3.6:35b-a3b exact Windows route
   kimi/cloud/research          -> Kimi Cloud, non-sensitive only
   nemotron/hermes              -> explicit compatibility only, never default
 
@@ -101,7 +102,7 @@ except Exception as e:
     _X402_AVAILABLE = False
 
 # ─── Endpoints (overridable via env vars for network changes) ────────────────
-WINDOWS_GPU = os.getenv("WINDOWS_GPU_URL", "http://100.x.x.z:11434")
+WINDOWS_GPU = os.getenv("WINDOWS_GPU_URL", "http://192.168.1.61:11434")
 PI_RARI1 = os.getenv("PI_RARI1_URL", "http://100.x.x.x:11434")
 PI_RARI2 = os.getenv("PI_RARI2_URL", "http://100.x.x.y:11434")
 MAC_LOCAL = os.getenv("MAC_LOCAL_URL", "http://127.0.0.1:11434")
@@ -128,28 +129,28 @@ PORT = 11435
 MODEL_TIERS = {
     # Fresh local fallback. Hosted Kimi/Gemini lanes are primary for agentic Telegram;
     # local aliases are for sensitive/offline work only.
-    "auto": "gemma4:latest",
-    "balanced": "gemma4:latest",
-    "fast": "gemma4:latest",
-    "quick": "gemma4:latest",
-    "tiny": "llama3.2:3b",
-    "local": "gemma4:latest",
-    "local-fallback": "gemma4:latest",
+    "auto": "gemma3:4b",
+    "balanced": "gemma3:4b",
+    "fast": "gemma3:4b",
+    "quick": "gemma3:4b",
+    "tiny": "gemma3:4b",
+    "local": "gemma3:4b",
+    "local-fallback": "gemma3:4b",
     # Heavy/local explicit routes
     "deep": "qwen3:14b",  # verified on Windows — deep multi-step
-    "code": "gemma4:latest",  # fresh local code fallback
-    "fast-code": "gemma4:latest",  # alias
+    "code": "qwen2.5-coder:14b",  # exact common Mac/Windows coder
+    "fast-code": "qwen2.5-coder:14b",  # alias
     "reason": "deepseek-r1:14b",  # 80 tok/s, 9.0 GB — structured R1 reasoning
-    "qwen-reason": "qwen3.5:9b",  # verified on Windows — fast reasoning
-    "fast-reason": "qwen3.5:9b",  # alias
-    "large": "qwen2.5:32b",  # 2.7 tok/s, 19.9 GB — background/batch (RAM spill)
-    "cascade": "nemotron-cascade-2",  # 16 tok/s, 22.6 GB — MoE, fits 16 GB VRAM
-    "moe": "nemotron-cascade-2",  # alias
-    "qwen3.6": "qwen3.6:27b",  # latest Qwen generation; Windows primary, Mac exact fallback
+    "qwen-reason": "qwen3.5:4b",  # exact installed Windows reasoning route
+    "fast-reason": "qwen3.5:4b",  # alias
+    "large": "qwen3-coder:30b",  # exact installed Windows large route
+    "cascade": "qwen3.6:35b-a3b",  # compatibility alias to installed MoE
+    "moe": "qwen3.6:35b-a3b",  # alias
+    "qwen3.6": "qwen3.6:35b-a3b",  # exact installed Windows model
     # Legacy aliases (kept for compatibility)
-    "legacy-nemotron": "nemotron-mini:latest",
-    "qwen2.5-coder": "qwen2.5-coder:14b",  # 72 tok/s — superseded by gemma4 for code
-    "phi4": "phi4:latest",  # 83 tok/s, 9.1 GB — good general + code
+    "legacy-nemotron": "nemotron-3-nano:4b",
+    "qwen2.5-coder": "qwen2.5-coder:14b",  # installed on both Mac and Windows
+    "phi4": "deepseek-r1:14b",  # compatibility alias; phi4 is not installed
     # Kimi Cloud routes (non-sensitive only)
     "kimi": "kimi-cloud",
     "kimi-fast": "kimi-cloud",
@@ -162,26 +163,18 @@ MODEL_TIERS = {
 
 # Models that require Windows GPU (too large for Pi/Mac).
 # gemma3:27b removed — consistently times out on llama-server b8795 (OOM at 17.4 GB).
-# gemma4:latest and qwen3.6:27b are installed on Mac. Keep them out of
-# GPU_ONLY_MODELS so explicit fresh-runtime requests can fall back locally.
-# qwen3.6:35b-a3b remains GPU-only.
+# The common 4B/14B fallbacks are installed on both Mac and Windows.
+# Windows-only names fail closed rather than silently changing model families.
 GPU_ONLY_MODELS = {
-    # Benchmarked 14B+ class — confirmed GPU-only (fit in 16 GB VRAM or spill)
-    "qwen2.5-coder:14b",
-    "deepseek-r1:14b",
-    "phi4:latest",
+    # Exact Windows-only models.
     "qwen3:14b",
-    # Large class — RAM spill but still routed to Windows only
-    "deepseek-r1:32b",
-    "qwen2.5:32b",
-    "qwen2.5:14b",
-    "qwen3.5:9b",
-    # Oversized / exotic
-    "llama3.3:70b",
-    "qwq:latest",
+    "qwen3.5:4b",
     "qwen3.6:35b-a3b",
-    # MoE — 22.6 GB, fits in 16 GB VRAM via sparse activation
-    "nemotron-cascade-2",
+    "qwen3-coder:30b",
+    "gemma4:12b",
+    "gpt-oss:20b",
+    "qwen2.5:14b",
+    "llama3.3:70b",
 }
 
 # Models that fit on Pi in principle (used for aliasing + inventory visibility).
@@ -198,20 +191,22 @@ PI_MODELS = {
 # default instead of blackholing "fast" traffic.
 PI_SERVE_MODELS = {"qwen2.5:0.5b", "smollm2:1.7b", "gemma2:2b"}
 PI_DEFAULT_MODEL = "qwen2.5:0.5b"  # fastest Pi model (~20s cold load)
-MAC_FALLBACK_MODEL = "gemma4:latest"
+MAC_FALLBACK_MODEL = "gemma3:4b"
 
 # Mac models (models confirmed available locally)
 MAC_MODELS = {
-    "gemma4:latest",
-    "qwen3.6:27b",
-    "llama3.2:3b",
-    "llama3.2:latest",
-    "hermes3:8b",
-    "nemotron-mini:latest",
+    "gemma3:4b",
+    "codestral:22b",
+    "deepseek-r1:14b",
+    "qwen2.5-coder:14b",
+    "nemotron-3-nano:4b",
+    "nemotron-3-nano:4b-64k",
+    "sov-coder:latest",
+    "sov-reason:latest",
 }
 MAC_MODEL_ALIASES = {
-    "nemotron-mini": "nemotron-mini:latest",
-    "nemotron-mini:4b": "nemotron-mini:latest",
+    "nemotron-3-nano": "nemotron-3-nano:4b",
+    "nemotron-3-nano:latest": "nemotron-3-nano:4b",
 }
 MAC_EXACT_FALLBACK_MODELS = (MAC_MODELS | set(MAC_MODEL_ALIASES)) - PI_SERVE_MODELS
 
