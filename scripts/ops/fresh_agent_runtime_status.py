@@ -70,7 +70,7 @@ def collect_report(
         check(
             "required_local_models_installed",
             "fail" if missing_models(required_models, installed_models) else "ok",
-            "Gemma/Qwen local fallback models should be installed before relying on local fallback.",
+            "The inventory-pinned local fallback models must be installed before relying on local fallback.",
             {
                 "required": required_models,
                 "installed_matches": [

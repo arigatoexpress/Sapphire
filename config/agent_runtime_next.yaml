@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: "2026-05-11"
+updated_at: "2026-07-28"
 purpose: "Fresh Sapphire agent runtime profile: Kimi/Gemini first, PM bot single-ingress, local models as explicit fallback only."
 
 policy:
@@ -62,8 +62,8 @@ model_lanes:
     safety: "Research context only; never personalized financial advice or execution instructions."
   - id: local_sensitive_fallback
     provider: ollama
-    recommended_model: gemma4:latest
-    fallback_model: qwen3.6:27b
+    recommended_model: gemma3:4b
+    fallback_model: deepseek-r1:14b
     default: false
     use: "Sensitive local fallback when hosted Kimi/Gemini paths are inappropriate or unavailable."
     runtime: mac_local
@@ -81,7 +81,7 @@ deprecated_runtimes:
     reason: "Legacy direct-send health watcher; PM bot draft queue should own notifications."
   - label: com.sapphire.mac-to-windows-tunnel
     expected_state: disabled
-    reason: "Windows inference path is no longer a default dependency for new agentic Telegram work."
+    reason: "The obsolete tunnel is disabled; the Windows workhorse is reached directly on the trusted LAN and remains an active compute tier."
 
 deprecated_default_models:
   - model: nemotron-mini:4b

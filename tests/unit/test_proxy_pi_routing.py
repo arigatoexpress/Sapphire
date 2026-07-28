@@ -260,24 +260,24 @@ def test_pi_routing_falls_back_to_rari2_when_rari1_fails(
 def test_default_qwen_routes_match_verified_windows_inventory() -> None:
     """Default Qwen routes should use models actually installed on Windows."""
     assert proxy_app.MODEL_TIERS["deep"] == "qwen3:14b"
-    assert proxy_app.MODEL_TIERS["qwen-reason"] == "qwen3.5:9b"
-    assert proxy_app.MODEL_TIERS["fast-reason"] == "qwen3.5:9b"
+    assert proxy_app.MODEL_TIERS["qwen-reason"] == "qwen3.5:4b"
+    assert proxy_app.MODEL_TIERS["fast-reason"] == "qwen3.5:4b"
     assert "qwen3:14b" in proxy_app.GPU_ONLY_MODELS
-    assert "qwen3.5:9b" in proxy_app.GPU_ONLY_MODELS
+    assert "qwen3.5:4b" in proxy_app.GPU_ONLY_MODELS
 
 
-def test_qwen36_alias_can_fall_back_to_exact_mac_model() -> None:
-    """qwen3.6 keeps exact Mac fallback even when Windows is unavailable."""
-    assert proxy_app.MODEL_TIERS["qwen3.6"] == "qwen3.6:27b"
-    assert "qwen3.6:27b" in proxy_app.MAC_MODELS
-    assert "qwen3.6:27b" in proxy_app.MAC_EXACT_FALLBACK_MODELS
-    assert "qwen3.6:27b" not in proxy_app.GPU_ONLY_MODELS
+def test_qwen36_alias_is_exact_windows_only_model() -> None:
+    """qwen3.6 names the exact installed Windows model and never substitutes."""
+    assert proxy_app.MODEL_TIERS["qwen3.6"] == "qwen3.6:35b-a3b"
+    assert "qwen3.6:35b-a3b" not in proxy_app.MAC_MODELS
+    assert "qwen3.6:35b-a3b" not in proxy_app.MAC_EXACT_FALLBACK_MODELS
+    assert "qwen3.6:35b-a3b" in proxy_app.GPU_ONLY_MODELS
 
 
-def test_qwen36_alias_skips_pi_substitution_for_exact_mac_fallback(
+def test_qwen36_alias_fails_closed_when_windows_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Windows miss should fall through to exact Mac qwen3.6, not a Pi tiny model."""
+    """Windows miss must not silently replace the requested qwen3.6 model."""
     monkeypatch.setattr(proxy_app, "PI_RARI1_ENABLED", True)
     monkeypatch.setattr(proxy_app, "PI_RARI2_ENABLED", False)
     monkeypatch.setattr(proxy_app, "PI_ENABLED", True)
@@ -295,21 +295,17 @@ def test_qwen36_alias_skips_pi_substitution_for_exact_mac_fallback(
         timeout: int = 60,
     ) -> dict | None:
         assert endpoint_name == "windows-gpu"
-        assert model == "qwen3.6:27b"
+        assert model == "qwen3.6:35b-a3b"
         return None
 
-    def fake_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]:
-        payload = json.loads(body.decode())
-        assert path == "/v1/chat/completions"
-        assert model == "qwen3.6:27b"
-        assert payload["model"] == "qwen3.6:27b"
-        return 200, json.dumps({"model": payload["model"], "choices": []}).encode()
+    def fail_mac_local(*args: Any, **kwargs: Any) -> tuple[int, bytes]:
+        pytest.fail("Mac tier must not substitute for a GPU-only exact model")
 
     def fail_pi_tier(*args: Any, **kwargs: Any) -> tuple[str | None, dict | None, list[str]]:
-        pytest.fail("Pi tier should be skipped for qwen3.6 exact Mac fallback")
+        pytest.fail("Pi tier must not substitute for a GPU-only exact model")
 
     monkeypatch.setattr(proxy_app, "_try_ollama_native", fake_ollama_native)
-    monkeypatch.setattr(proxy_app, "_try_mac_local", fake_mac_local)
+    monkeypatch.setattr(proxy_app, "_try_mac_local", fail_mac_local)
     monkeypatch.setattr(proxy_app, "_try_pi_tier", fail_pi_tier)
 
     server, thread, base_url = _start_proxy()
@@ -328,12 +324,12 @@ def test_qwen36_alias_skips_pi_substitution_for_exact_mac_fallback(
             method="POST",
         )
 
-        with urllib.request.urlopen(req, timeout=2) as response:
-            payload = json.loads(response.read().decode())
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=2)
 
-        assert response.status == 200
-        assert response.headers["X-Inference-Tier"] == "mac-local"
-        assert payload["model"] == "qwen3.6:27b"
+        assert exc_info.value.code == 503
+        payload = json.loads(exc_info.value.read().decode())
+        assert payload["code"] == "gpu_only_unavailable"
     finally:
         server.shutdown()
         server.server_close()

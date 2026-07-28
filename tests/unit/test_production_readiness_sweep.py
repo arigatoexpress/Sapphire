@@ -276,12 +276,13 @@ def test_scheduled_launchagent_nonzero_last_status_warns(monkeypatch) -> None:
 
 def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> None:
     names = [
-        "gemma4:latest",
+        "gemma3:4b",
+        "qwen2.5-coder:14b",
         "deepseek-r1:14b",
-        "qwen3.5:9b",
+        "qwen3.5:4b",
         "qwen3:14b",
-        "qwen3.6:27b",
-        "qwen2.5:32b",
+        "qwen3.6:35b-a3b",
+        "qwen3-coder:30b",
     ]
 
     def fake_urlopen(request: object, timeout: int) -> _FakeHTTPResponse:
@@ -294,7 +295,7 @@ def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> No
     check = sweep.windows_ollama_inventory_check("http://100.x.x.z:11434")
 
     assert check.status == "PASS"
-    assert "models=6" in check.evidence
+    assert "models=7" in check.evidence
     assert "required_present=8/8" in check.evidence
     assert "missing_aliases" not in check.evidence
 

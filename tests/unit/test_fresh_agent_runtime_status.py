@@ -4,10 +4,10 @@ from scripts.ops import fresh_agent_runtime_status as status
 
 
 def test_missing_models_uses_exact_tag_match() -> None:
-    installed = ["gemma4:latest", "qwen3.6:27b"]
+    installed = ["gemma3:4b", "deepseek-r1:14b"]
 
-    assert status.missing_models(["gemma4:latest", "qwen3.6:27b"], installed) == []
-    assert status.missing_models(["gemma4:26b"], installed) == ["gemma4:26b"]
+    assert status.missing_models(["gemma3:4b", "deepseek-r1:14b"], installed) == []
+    assert status.missing_models(["gemma4:12b"], installed) == ["gemma4:12b"]
 
 
 def test_overall_status_prefers_fail_then_warn() -> None:
@@ -19,7 +19,11 @@ def test_overall_status_prefers_fail_then_warn() -> None:
 def test_collect_report_flags_loaded_deprecated_launchagent(monkeypatch) -> None:
     profile = status.load_runtime_profile()
 
-    monkeypatch.setattr(status, "list_ollama_models", lambda: ["gemma4:latest", "qwen3.6:27b"])
+    monkeypatch.setattr(
+        status,
+        "list_ollama_models",
+        lambda: ["gemma3:4b", "deepseek-r1:14b"],
+    )
     monkeypatch.setattr(
         status,
         "check_deprecated_launchagents",

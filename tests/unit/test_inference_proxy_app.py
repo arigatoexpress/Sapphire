@@ -81,21 +81,21 @@ def reset_health_and_metrics(app_module, monkeypatch, tmp_path):
 
 class TestModelAliases:
     def test_fast_resolves_to_fresh_local_fallback(self, app_module):
-        assert app_module.MODEL_TIERS["fast"] == "gemma4:latest"
-        assert app_module.MODEL_TIERS["quick"] == "gemma4:latest"
+        assert app_module.MODEL_TIERS["fast"] == "gemma3:4b"
+        assert app_module.MODEL_TIERS["quick"] == "gemma3:4b"
 
-    def test_auto_and_balanced_resolve_to_gemma4(self, app_module):
-        assert app_module.MODEL_TIERS["auto"] == "gemma4:latest"
-        assert app_module.MODEL_TIERS["balanced"] == "gemma4:latest"
+    def test_auto_and_balanced_resolve_to_common_local_model(self, app_module):
+        assert app_module.MODEL_TIERS["auto"] == "gemma3:4b"
+        assert app_module.MODEL_TIERS["balanced"] == "gemma3:4b"
 
     def test_kimi_aliases_resolve_to_kimi_cloud(self, app_module):
         for alias in ("kimi", "kimi-fast", "kimi-large", "kimi-cloud", "cloud", "research"):
             assert app_module.MODEL_TIERS[alias] == "kimi-cloud", alias
 
-    def test_code_alias_resolves_to_gemma4(self, app_module):
-        assert app_module.MODEL_TIERS["code"] == "gemma4:latest"
-        assert app_module.MODEL_TIERS["fast-code"] == "gemma4:latest"
-        assert app_module.MODEL_TIERS["local-fallback"] == "gemma4:latest"
+    def test_code_alias_resolves_to_common_coder(self, app_module):
+        assert app_module.MODEL_TIERS["code"] == "qwen2.5-coder:14b"
+        assert app_module.MODEL_TIERS["fast-code"] == "qwen2.5-coder:14b"
+        assert app_module.MODEL_TIERS["local-fallback"] == "gemma3:4b"
 
     def test_reason_alias_resolves_to_deepseek_r1(self, app_module):
         assert app_module.MODEL_TIERS["reason"] == "deepseek-r1:14b"
@@ -114,11 +114,10 @@ class TestTierMembership:
     def test_gpu_only_models_routed_to_windows(self, app_module):
         # Models that need Windows GPU and should NOT fall back through
         # smaller tiers.
-        assert "deepseek-r1:14b" in app_module.GPU_ONLY_MODELS
-        assert "qwen2.5:32b" in app_module.GPU_ONLY_MODELS
-        assert "gemma4:latest" not in app_module.GPU_ONLY_MODELS
-        assert "gemma4:latest" in app_module.MAC_MODELS
-        assert "nemotron-cascade-2" in app_module.GPU_ONLY_MODELS
+        assert "deepseek-r1:14b" not in app_module.GPU_ONLY_MODELS
+        assert "qwen2.5-coder:14b" not in app_module.GPU_ONLY_MODELS
+        assert "qwen3.6:35b-a3b" in app_module.GPU_ONLY_MODELS
+        assert "gemma3:4b" in app_module.MAC_MODELS
 
     def test_pi_serve_models_subset(self, app_module):
         # nemotron-mini is in PI_MODELS for inventory but excluded from
@@ -130,23 +129,26 @@ class TestTierMembership:
     def test_mac_exact_fallback_excludes_pi_serve(self, app_module):
         # Models on Mac that aren't Pi-serveable should be preferred on Mac
         # rather than substituted to PI_DEFAULT_MODEL.
-        assert "hermes3:8b" in app_module.MAC_EXACT_FALLBACK_MODELS
-        assert "gemma4:latest" in app_module.MAC_EXACT_FALLBACK_MODELS
-        assert "nemotron-mini" in app_module.MAC_EXACT_FALLBACK_MODELS
-        assert "nemotron-mini:4b" in app_module.MAC_EXACT_FALLBACK_MODELS
+        assert "codestral:22b" in app_module.MAC_EXACT_FALLBACK_MODELS
+        assert "gemma3:4b" in app_module.MAC_EXACT_FALLBACK_MODELS
+        assert "nemotron-3-nano" in app_module.MAC_EXACT_FALLBACK_MODELS
+        assert "nemotron-3-nano:4b" in app_module.MAC_EXACT_FALLBACK_MODELS
         # Pi-serveable models should NOT be in the exact-fallback set.
         for m in app_module.PI_SERVE_MODELS:
             assert m not in app_module.MAC_EXACT_FALLBACK_MODELS
 
     def test_select_pi_model_substitutes_when_not_pi_safe(self, app_module):
-        assert app_module._select_pi_model("hermes3:8b") == app_module.PI_DEFAULT_MODEL
+        assert app_module._select_pi_model("codestral:22b") == app_module.PI_DEFAULT_MODEL
         assert app_module._select_pi_model("qwen2.5:0.5b") == "qwen2.5:0.5b"
 
     def test_select_mac_model_preserves_nemotron_alias(self, app_module):
-        assert app_module._select_mac_model("nemotron-mini") == "nemotron-mini:latest"
-        assert app_module._select_mac_model("nemotron-mini:4b") == "nemotron-mini:latest"
-        assert app_module._select_mac_model("gemma4:latest") == "gemma4:latest"
-        assert app_module._select_mac_model("qwen3.6:27b") == "qwen3.6:27b"
+        assert app_module._select_mac_model("nemotron-3-nano") == "nemotron-3-nano:4b"
+        assert app_module._select_mac_model("nemotron-3-nano:latest") == "nemotron-3-nano:4b"
+        assert app_module._select_mac_model("gemma3:4b") == "gemma3:4b"
+        assert app_module._select_mac_model("qwen3.6:35b-a3b") == "gemma3:4b"
+
+    def test_default_windows_endpoint_is_real_lan_address(self, app_module):
+        assert app_module.WINDOWS_GPU == "http://192.168.1.61:11434"
 
     def test_enabled_pi_targets_respects_flags(self, app_module, monkeypatch):
         # Monkey-patch the module-level flags rather than env (env is already
@@ -847,7 +849,7 @@ class TestPostValidation:
         monkeypatch.setattr(app_module, "_probe_endpoint", lambda *a, **kw: False)
         body = json.dumps(
             {
-                "model": "qwen2.5:32b",
+                "model": "qwen3.6:35b-a3b",
                 "messages": [{"role": "user", "content": "hi"}],
             }
         ).encode()
