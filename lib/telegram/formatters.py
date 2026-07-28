@@ -108,6 +108,69 @@ def fmt_int(value: int | None) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Duration / age
+# ---------------------------------------------------------------------------
+
+
+def fmt_duration(seconds: float | int | None, *, missing: str = "missing") -> str:
+    """Auto-scale a duration to the coarsest unit that still fits.
+
+    Every subsystem that surfaces a "how long since …" age (freshness
+    rows, staleness monitor, dispatch history) used to roll its own
+    formatter — and each stopped at a different granularity. The
+    `4011m` screenshot came from one that never scaled past minutes,
+    turning "2d 18h" into an opaque bare-minute number.
+
+    Rules (kept intentionally boring so agents and humans read the same
+    thing):
+
+        < 0 or None           → ``missing`` (default "missing")
+        < 60 s                → ``"<Ns"``
+        < 60 min              → ``"<Nm"``
+        < 48 h  and mins==0   → ``"<Nh"``
+        < 48 h                → ``"<Nh Nm"``
+        >= 48 h and hrs==0    → ``"<Nd"``
+        >= 48 h               → ``"<Nd Nh"``
+
+    Plain string — callers wrap in ``code()`` if they want monospace.
+    """
+    if seconds is None:
+        return missing
+    try:
+        total = int(seconds)
+    except (TypeError, ValueError):
+        return missing
+    if total < 0:
+        return missing
+    if total < 60:
+        return f"{total}s"
+    if total < 3600:
+        return f"{total // 60}m"
+    if total < 48 * 3600:
+        hours = total // 3600
+        remaining_minutes = (total % 3600) // 60
+        if remaining_minutes == 0:
+            return f"{hours}h"
+        return f"{hours}h {remaining_minutes}m"
+    days = total // 86_400
+    remaining_hours = (total % 86_400) // 3600
+    if remaining_hours == 0:
+        return f"{days}d"
+    return f"{days}d {remaining_hours}h"
+
+
+def fmt_age(
+    delta_seconds: float | int | None, *, suffix: str = "ago", missing: str = "missing"
+) -> str:
+    """Render an age (like ``2d 18h ago``). Wraps ``fmt_duration`` for the
+    common "N ago" case that used to be re-implemented everywhere."""
+    body = fmt_duration(delta_seconds, missing=missing)
+    if body == missing:
+        return missing
+    return f"{body} {suffix}"
+
+
+# ---------------------------------------------------------------------------
 # Tables
 # ---------------------------------------------------------------------------
 
@@ -489,8 +552,10 @@ __all__ = [
     "delta_arrow",
     "esc",
     "fixed_table",
+    "fmt_age",
     "fmt_brief",
     "fmt_brief_section",
+    "fmt_duration",
     "fmt_heartbeat_line",
     "fmt_int",
     "fmt_pct",

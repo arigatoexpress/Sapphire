@@ -306,7 +306,8 @@ def check_data_freshness() -> dict:
             path = files[0]
 
         mtime = datetime.fromtimestamp(path.stat().st_mtime)
-        age_hours = (now - mtime).total_seconds() / 3600
+        age_seconds = (now - mtime).total_seconds()
+        age_hours = age_seconds / 3600
         size = path.stat().st_size
 
         if age_hours < 24:
@@ -316,9 +317,20 @@ def check_data_freshness() -> dict:
         else:
             status = "red"
 
+        # Coarsest-unit age string so a 72h-stale file reads as "3d",
+        # not the opaque "72h" (or worse — the "4011m" the old Telegram
+        # heartbeat used to show).
+        try:
+            sys.path.insert(0, str(SAPPHIRE_DIR))
+            from lib.telegram.formatters import fmt_duration
+
+            age_text = fmt_duration(int(age_seconds))
+        except Exception:
+            age_text = f"{age_hours:.0f}h"
+
         results[name] = {
             "status": status,
-            "detail": f"{age_hours:.0f}h old, {size:,} bytes",
+            "detail": f"{age_text} old, {size:,} bytes",
             "last_updated": mtime.isoformat(),
         }
 
