@@ -46,7 +46,7 @@ redis==7.4.0
 numpy==2.4.6
 pandas==3.0.3
 scipy==1.17.1
-scikit-learn==1.8.0
+scikit-learn==1.9.0
 
 # reporting / pdf — pulled in by lib/research_notes (added by 2026-04-28
 # `feat(research): LP-grade research notes pipeline 0.1.0`)
