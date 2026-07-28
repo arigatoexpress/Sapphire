@@ -41,6 +41,38 @@ def test_readiness_matrix_tracks_pm_bot_tunnel_not_hermes_gateway() -> None:
     assert "ai.hermes.gateway" not in matrix.ALWAYS_ON_LAUNCHAGENTS
 
 
+def test_readiness_defaults_to_personal_project_and_current_memberships() -> None:
+    assert matrix.DEFAULT_PROJECT == "sapphire-479610"
+    assert matrix.DEFAULT_MEMBERSHIPS == (
+        "google_developer_premium",
+        "google_ai_ultra",
+    )
+
+
+def test_intentionally_absent_hermes_gateway_is_a_pass(monkeypatch) -> None:
+    monkeypatch.setattr(
+        matrix.hermes_runtime_readiness,
+        "collect_readiness",
+        lambda: {
+            "status": "fail",
+            "runtime": {"exists": False},
+            "launchagent": {"exists": False},
+            "required_runtime_controls": {},
+            "quick_commands": {
+                "exec_quick_command_count": 0,
+                "production_adjacent_exec_count": 0,
+            },
+            "next_action": "Restore the gateway.",
+        },
+    )
+
+    result = matrix.hermes_surfaces()[0]
+
+    assert result["status"] == "pass"
+    assert "gateway_fenced=yes" in result["evidence"]
+    assert "Keep the Hermes messaging gateway disabled" in result["next_action"]
+
+
 def test_latest_local_ci_report_uses_newest_valid_json(tmp_path: Path) -> None:
     older = tmp_path / "local-ci-verify-20260101T000000Z.json"
     newer = tmp_path / "local-ci-verify-20260102T000000Z.json"
