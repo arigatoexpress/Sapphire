@@ -56,12 +56,21 @@ resolve_plist() {
 }
 
 INFRA=(control-plane openbb-api heartbeat logrotate telemetry-collector
-       dashboard inference-proxy)
+       dashboard inference-proxy service-supervisor)
+# service-supervisor lives under services/service_supervisor/launchagent/ and
+# fires every 60s to self-heal downed Sapphire services; keeping it in `infra`
+# means `--all` restores the watchdog whenever the fleet gets brought back up.
 INTEL=(chain-refresh correlation-refresh threat-refresh market-intel
-       continuous-intelligence-daily morning-brief gemini-ooda-daily
+       continuous-intelligence-daily morning-brief morning-digest
+       gemini-ooda-daily telegram-intel-reader
        fleet-status readiness-cache security-pipeline tdr-pro-sync
        foundry-sync gcp-sync backtest-weekly self-optimization
        lead-pipeline content-engine)
+# morning-digest and telegram-intel-reader also live under services/*/launchagent/.
+# morning-digest writes an 8 AM local draft (PM-bot reviewed, never sends direct).
+# telegram-intel-reader is a READER daemon that no-ops unless
+# SAPPHIRE_TELEGRAM_INTEL_LIVE=1 + config files are present, so restoring it in
+# batch is safe — it exits clean without live config, and does not send outward.
 TRADING=(signal-logger alpha-agent auto-executor trading-shadow-controller
          webhook-receiver-mac webhook-tunnel tv-webhook-url-sync
          tradingview-cdp tradingview-ta-capture tradingview-pine-batch)

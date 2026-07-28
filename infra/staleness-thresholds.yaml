@@ -17,15 +17,25 @@ targets:
   - label: system-events
     path: data/system_events.jsonl
     max_age_h: 6
-  - label: signal-stream
-    path: data/signals/*.jsonl
-    max_age_h: 24
-  - label: paper-portfolio
-    path: data/paper_portfolio.json
-    max_age_h: 72
-  - label: paper-trading-log
-    path: data/paper_trading.jsonl
-    max_age_h: 24
+  # signal-stream, paper-portfolio, paper-trading-log producers (market-pulse
+  # and trading-research scheduled tasks) are NOT currently installed on this
+  # Mac. CLAUDE.md ("22 Scheduled Tasks" section) documents that only 3 of the
+  # 22 tasks are installed, and explicitly forbids auto-restoring the trading
+  # tasks — reinstalling either needs an explicit paper-vs-live decision that
+  # hasn't been made. Until that decision, these targets are dormant, not
+  # broken. Keeping the entries here (commented) so intent stays visible; when
+  # the decision lands, uncomment and set the threshold to the producer's
+  # actual cadence.
+  #
+  # - label: signal-stream
+  #   path: data/signals/*.jsonl
+  #   max_age_h: 24
+  # - label: paper-portfolio
+  #   path: data/paper_portfolio.json
+  #   max_age_h: 72
+  # - label: paper-trading-log
+  #   path: data/paper_trading.jsonl
+  #   max_age_h: 24
   - label: intelligence-latest
     path: data/intelligence/latest
     max_age_h: 24
