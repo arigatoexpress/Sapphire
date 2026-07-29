@@ -100,7 +100,7 @@ class TierStats:
             "calls_per_hour",
         ):
             v = d.get(key)
-            if isinstance(v, (int, float)):
+            if isinstance(v, int | float):
                 d[key] = round(float(v), 3)
         d["cost_usd"] = round(self.cost_usd, 6)
         return d
@@ -154,7 +154,7 @@ def _parse_timestamp(raw: Any) -> datetime | None:
         return None
     if isinstance(raw, datetime):
         return raw if raw.tzinfo else raw.replace(tzinfo=UTC)
-    if isinstance(raw, (int, float)):
+    if isinstance(raw, int | float):
         try:
             return datetime.fromtimestamp(float(raw), tz=UTC)
         except (OSError, OverflowError, ValueError):

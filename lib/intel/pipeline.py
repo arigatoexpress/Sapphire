@@ -58,7 +58,7 @@ def run(
     hot = [
         l
         for l in leads
-        if isinstance(l.get("score"), (int, float)) and l["score"] >= HOT_LEAD_THRESHOLD
+        if isinstance(l.get("score"), int | float) and l["score"] >= HOT_LEAD_THRESHOLD
     ]
 
     finished_at = datetime.now(UTC)
@@ -109,7 +109,7 @@ def stats() -> dict[str, Any]:
         )
         if lead.get("urgency"):
             by_urgency[lead["urgency"]] = by_urgency.get(lead["urgency"], 0) + 1
-        if isinstance(lead.get("score"), (int, float)):
+        if isinstance(lead.get("score"), int | float):
             score_sum += float(lead["score"])
             score_n += 1
             if lead["score"] >= HOT_LEAD_THRESHOLD:

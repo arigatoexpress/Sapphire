@@ -113,7 +113,7 @@ def _parse_iso(value: Any) -> datetime | None:
         return None
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         # Epoch seconds: a small heuristic distinguishes ms.
         v = float(value)
         if v > 1e12:

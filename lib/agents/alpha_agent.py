@@ -383,10 +383,10 @@ class AlphaAgent(BaseAgent):
         if isinstance(parsed, list) and parsed:
             last_bar = parsed[-1]
             price = last_bar.get("close")
-            return float(price) if isinstance(price, (int, float)) else None
+            return float(price) if isinstance(price, int | float) else None
         if isinstance(parsed, dict):
             price = parsed.get("price")
-            return float(price) if isinstance(price, (int, float)) else None
+            return float(price) if isinstance(price, int | float) else None
         return None
 
     def _todo_close_hook(self, action: Action) -> dict[str, Any]:

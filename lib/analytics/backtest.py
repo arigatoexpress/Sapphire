@@ -525,7 +525,7 @@ class Backtester:
     ):
         if isinstance(cfg, BacktestConfig):
             base_cfg = cfg
-        elif isinstance(cfg, (int, float)):
+        elif isinstance(cfg, int | float):
             if bankroll is not None:
                 raise TypeError("bankroll cannot be provided twice")
             base_cfg = BacktestConfig(initial_capital=float(cfg))

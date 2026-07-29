@@ -344,7 +344,7 @@ class Kumbaya:
         """
         if isinstance(path, list):
             encoded = encode_path(path)
-        elif isinstance(path, (bytes, bytearray)):
+        elif isinstance(path, bytes | bytearray):
             encoded = bytes(path)
         else:
             raise TypeError(f"path must be bytes or list, got {type(path).__name__}")

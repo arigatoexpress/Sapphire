@@ -145,7 +145,7 @@ def normalize_direction(value: str | int | float | None) -> int:
         # bool is a subclass of int; treat True/False as bull/neutral so we don't
         # accidentally cast True→1 to BULL while False→0 to BEAR.
         return _BULL if value else _NEUTRAL
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         if value > 0:
             return _BULL
         if value < 0:

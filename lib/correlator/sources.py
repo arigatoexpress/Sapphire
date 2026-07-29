@@ -124,7 +124,7 @@ def _parse_iso(ts: Any) -> datetime | None:
     if not ts:
         return None
     try:
-        if isinstance(ts, (int, float)):
+        if isinstance(ts, int | float):
             return datetime.fromtimestamp(float(ts), tz=UTC)
         s = str(ts)
         if s.endswith("Z"):

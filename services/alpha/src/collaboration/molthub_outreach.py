@@ -374,7 +374,7 @@ class MolthubOutreach:
             if key in idea:
                 value = idea[key]
                 # Only allow primitives (str, int, float, bool)
-                if isinstance(value, (str, int, float, bool)):
+                if isinstance(value, str | int | float | bool):
                     clean_idea[key] = value
 
         # Validate required fields

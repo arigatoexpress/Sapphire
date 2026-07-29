@@ -81,7 +81,7 @@ def _as_mapping(value: Any) -> dict[str, Any]:
 def _as_list(value: Any) -> list[str]:
     if isinstance(value, str):
         return [chunk.strip() for chunk in re.split(r"\n+|;|•", value) if chunk.strip()]
-    if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
+    if isinstance(value, Sequence) and not isinstance(value, bytes | bytearray):
         return [str(item).strip() for item in value if str(item).strip()]
     return []
 

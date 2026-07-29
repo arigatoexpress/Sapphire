@@ -153,7 +153,7 @@ def load_symbol_config(path: Path | None = None) -> SymbolConfig:
     else:
         raw = []
 
-    raw_list = list(raw) if isinstance(raw, (list, tuple)) else []
+    raw_list = list(raw) if isinstance(raw, list | tuple) else []
     symbols = normalize_symbols(raw_list)
     if not symbols:
         return SymbolConfig(tuple(DEFAULT_SYMBOLS), path=config_path, source="default-empty")
@@ -371,7 +371,7 @@ class HyperliquidSignalEngine:
     def process_bbo(self, bbo: dict[str, Any], *, now: float | None = None) -> list[dict[str, Any]]:
         symbol = str(bbo.get("coin") or "").upper()
         levels = bbo.get("bbo")
-        if not symbol or not isinstance(levels, (list, tuple)) or len(levels) != 2:
+        if not symbol or not isinstance(levels, list | tuple) or len(levels) != 2:
             return []
 
         observed = _event_time_seconds(bbo, now)
@@ -424,7 +424,7 @@ class HyperliquidSignalEngine:
     ) -> list[dict[str, Any]]:
         symbol = str(book.get("coin") or "").upper()
         levels = book.get("levels")
-        if not symbol or not isinstance(levels, (list, tuple)):
+        if not symbol or not isinstance(levels, list | tuple):
             return []
 
         observed = _event_time_seconds(book, now)

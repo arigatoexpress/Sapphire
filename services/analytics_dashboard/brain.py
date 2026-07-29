@@ -84,7 +84,7 @@ def _is_admin_request() -> bool:
 
 def _public_brain_narrative(payload: dict[str, Any]) -> str:
     score = payload.get("health_score")
-    if isinstance(score, (int, float)):
+    if isinstance(score, int | float):
         if score >= 0.8:
             posture = "healthy"
         elif score >= 0.55:

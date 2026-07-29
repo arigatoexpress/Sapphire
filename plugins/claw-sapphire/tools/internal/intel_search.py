@@ -212,9 +212,9 @@ def _coerce_text(blob: Any, *, max_chars: int = 4000) -> str:
         parts: list[str] = []
         for key in sorted(blob.keys()):
             value = blob[key]
-            if isinstance(value, (str, int, float, bool)) or value is None:
+            if isinstance(value, str | int | float | bool) or value is None:
                 parts.append(f"{key}: {value}")
-            elif isinstance(value, (list, tuple)):
+            elif isinstance(value, list | tuple):
                 snippet = ", ".join(str(v) for v in value[:8])
                 parts.append(f"{key}: [{snippet}]")
             elif isinstance(value, dict):
@@ -261,7 +261,7 @@ def _records_from_sovereign_thesis(payload: Any, *, root: Path) -> list[dict[str
         if thesis:
             text_parts.append(str(thesis))
         themes = entry.get("themes") or entry.get("thesis_tags")
-        if isinstance(themes, (list, tuple)):
+        if isinstance(themes, list | tuple):
             text_parts.append("themes: " + ", ".join(str(t) for t in themes[:8]))
         text = " — ".join(p for p in text_parts if p).strip()
         if not text:
@@ -280,7 +280,7 @@ def _records_from_sovereign_thesis(payload: Any, *, root: Path) -> list[dict[str
                     "symbol": symbol,
                     "name": name,
                     "asset_class": entry.get("asset_class"),
-                    "themes": list(themes) if isinstance(themes, (list, tuple)) else None,
+                    "themes": list(themes) if isinstance(themes, list | tuple) else None,
                 },
             }
         )
@@ -439,7 +439,7 @@ def _resolve_snapshot_dirs(payload: dict[str, Any], *, root: Path) -> list[Path]
     if raw:
         if isinstance(raw, str):
             raw = [raw]
-        if not isinstance(raw, (list, tuple)):
+        if not isinstance(raw, list | tuple):
             return []
         return [(root / p).resolve() if not Path(p).is_absolute() else Path(p) for p in raw]
     return [root / d for d in DEFAULT_SNAPSHOT_DIRS]

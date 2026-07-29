@@ -517,7 +517,7 @@ def redact_record(record: Any, *, _depth: int = 0) -> Any:
             else:
                 out[k] = redact_record(v, _depth=_depth + 1)
         return out
-    if isinstance(record, (list, tuple)):
+    if isinstance(record, list | tuple):
         result = [redact_record(item, _depth=_depth + 1) for item in record]
         return result if isinstance(record, list) else tuple(result)
     if isinstance(record, str):
@@ -529,7 +529,7 @@ def redact(value: Any) -> Any:
     """Type-dispatched redaction convenience entry point."""
     if value is None:
         return ""
-    if isinstance(value, (dict, list, tuple)):
+    if isinstance(value, dict | list | tuple):
         return redact_record(value)
     if isinstance(value, str):
         return redact_text(value)

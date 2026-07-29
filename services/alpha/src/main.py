@@ -696,7 +696,7 @@ class AlphaEngine:
 
         for rule in self._tradingview_strategy_rules.values():
             strategy_cap = rule.get("max_quantity")
-            if isinstance(strategy_cap, (int, float)) and float(strategy_cap) > 0:
+            if isinstance(strategy_cap, int | float) and float(strategy_cap) > 0:
                 caps.append(float(strategy_cap))
 
         return min(caps) if caps else None

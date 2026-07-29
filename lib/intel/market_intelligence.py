@@ -837,7 +837,7 @@ def _snap_to_dict(snap: MarketIntelSnapshot) -> dict:
     def _conv(obj):
         if obj is None:
             return None
-        if isinstance(obj, (str, int, float, bool)):
+        if isinstance(obj, str | int | float | bool):
             return obj
         if isinstance(obj, list):
             return [_conv(i) for i in obj]

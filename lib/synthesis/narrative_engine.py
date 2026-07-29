@@ -136,7 +136,7 @@ def _as_str_list(value: Any) -> list[str]:
         return []
     if isinstance(value, str):
         return [chunk.strip() for chunk in re.split(r"\n+|;|•", value) if chunk.strip()]
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [str(item).strip() for item in value if str(item).strip()]
     return [str(value).strip()] if str(value).strip() else []
 

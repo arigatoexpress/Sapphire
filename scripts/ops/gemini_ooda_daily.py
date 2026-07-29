@@ -56,7 +56,7 @@ def date_key(now: datetime | None = None) -> str:
 
 
 def truncate_value(value: Any, limit: int = MAX_DIFF_VALUE_CHARS) -> str:
-    text = json.dumps(value, sort_keys=True) if isinstance(value, (dict, list)) else str(value)
+    text = json.dumps(value, sort_keys=True) if isinstance(value, dict | list) else str(value)
     return text if len(text) <= limit else f"{text[: limit - 3]}..."
 
 

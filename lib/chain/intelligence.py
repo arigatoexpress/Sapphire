@@ -529,7 +529,7 @@ class ChainIntelligence:
 
         # BTC dominance delta: compare to last persisted snapshot
         last = _read_last_state() or {}
-        if btc_dominance is not None and isinstance(last.get("btc_dominance"), (int, float)):
+        if btc_dominance is not None and isinstance(last.get("btc_dominance"), int | float):
             btc_dominance_24h_change = btc_dominance - float(last["btc_dominance"])
 
         btc_funding = _fetch_funding("BTCUSDT")

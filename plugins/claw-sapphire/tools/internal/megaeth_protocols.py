@@ -167,7 +167,7 @@ def _to_jsonable(value: Any) -> Any:
     # ``.name`` the LLM consumes. Same goes for ``StrEnum`` vs str.
     if isinstance(value, enum.Enum):
         return value.name
-    if value is None or isinstance(value, (bool, int, str)):
+    if value is None or isinstance(value, bool | int | str):
         return value
     if isinstance(value, Decimal):
         # ``str(Decimal)`` keeps precision; ``float`` would lose it on 18-dec tokens.
@@ -178,7 +178,7 @@ def _to_jsonable(value: Any) -> Any:
         # ``asdict`` recurses into nested dataclasses already; we still walk
         # the result to handle Decimal / enum leaves the dataclass holds.
         return _to_jsonable(dataclasses.asdict(value))
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [_to_jsonable(v) for v in value]
     if isinstance(value, dict):
         return {str(k): _to_jsonable(v) for k, v in value.items()}

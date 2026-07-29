@@ -233,7 +233,7 @@ def _as_str(value: Any) -> str:
 def _as_float(value: Any) -> float | None:
     if value is None:
         return None
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     raw = str(value).strip().replace(",", "").replace("$", "")
     if not raw:

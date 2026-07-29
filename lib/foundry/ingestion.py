@@ -627,7 +627,7 @@ def _normalize_iso(value: Any) -> str | None:
         return None
     if isinstance(value, datetime):
         return value.isoformat()
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         if value <= 0:
             return None
         try:

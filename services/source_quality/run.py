@@ -125,7 +125,7 @@ def _walk_feed(root: Path) -> Iterable[dict]:
 def _normalise_direction(value: object) -> str:
     if isinstance(value, str):
         return value
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         if value > 0:
             return "bull"
         if value < 0:
@@ -134,7 +134,7 @@ def _normalise_direction(value: object) -> str:
 
 
 def _coerce_timestamp(value: object) -> datetime | None:
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         try:
             return datetime.fromtimestamp(float(value), tz=UTC)
         except (OSError, ValueError, OverflowError):

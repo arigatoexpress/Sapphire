@@ -340,7 +340,7 @@ class EventBus:
 
         if sentiment := latest.get("sentiment.update"):
             fg = sentiment.data.get("fear_greed")
-            if isinstance(fg, (int, float)):
+            if isinstance(fg, int | float):
                 ws.fear_greed = int(fg)
 
         if corr := latest.get("correlation.broken"):
