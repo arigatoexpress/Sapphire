@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Sapphire log rotation — runs daily via LaunchAgent.
 
-Rotates logs in ~/autonomy-status/logs/ and ~/.hermes/logs/.
-Keeps the 3 most recent rotated copies; deletes older ones.
-Max size before rotation: 5MB.
+Rotates every directory in LOG_DIRS. Keeps the 3 most recent rotated copies;
+deletes older ones. Max size before rotation: 5MB.
+
+Coverage matters more than it looks: this job exits 0 whether or not it found
+anything, so a directory missing from LOG_DIRS is silently unrotated forever
+while the run still reports success.
 """
 
 import gzip
@@ -24,6 +27,12 @@ KEEP_COPIES = 3
 LOG_DIRS = [
     Path.home() / "autonomy-status" / "logs",
     Path.home() / ".hermes" / "logs",
+    # Added 2026-07-28. com.sapphire.moss-publisher retries a 503 endpoint every
+    # 60s and had written a 6.7MB .err here over ~4 days while logrotate exited
+    # 0 the whole time — the directory simply was not in this list.
+    Path.home() / "ops-state" / "logs",
+    # Holds webhook-tunnel.log, the largest log on the box (15MB and growing).
+    ROOT / "data" / "logs",
 ]
 
 EXTENSIONS = {".log", ".err"}
