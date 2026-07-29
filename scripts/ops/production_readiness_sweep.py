@@ -233,6 +233,35 @@ def probe_repo() -> list[Check]:
             status.duration_ms + branch.duration_ms,
         )
     )
+    # Clean != current. On 2026-07-28 this checkout was 0-modified (so
+    # canonical_checkout_clean was PASS) while sitting on a feature branch that
+    # did not contain two merged fixes. LaunchAgents execute from the working
+    # checkout, not from main, so both fixes were merged, green, and not running
+    # — and nothing reported it. No fetch here: launchd runs offline-tolerant, so
+    # this compares against the last-known origin/main and degrades to WARN when
+    # that ref cannot be resolved.
+    behind = run(["git", "rev-list", "--count", "HEAD..origin/main"], cwd=ROOT)
+    if not behind.ok:
+        behind_status, behind_evidence = (
+            "WARN",
+            "origin/main unavailable — cannot prove the checkout carries merged work",
+        )
+    else:
+        count = behind.stdout.strip() or "0"
+        if count == "0":
+            behind_status, behind_evidence = "PASS", "checkout contains origin/main"
+        else:
+            behind_status, behind_evidence = (
+                "WARN",
+                f"checkout is {count} commit(s) behind origin/main — "
+                "LaunchAgents run this tree, so merged fixes are NOT live",
+            )
+    checks.append(
+        Check(
+            "repo", "canonical_checkout_current", behind_status, behind_evidence, behind.duration_ms
+        )
+    )
+
     worktrees = run(["git", "worktree", "list"], cwd=ROOT)
     checks.append(
         Check(
@@ -1374,11 +1403,7 @@ def probe_safety() -> list[Check]:
     state_is_bound = state_source in {"last_transition", "operator_baseline"}
     explicitly_inactive = inferred_active is False and state_is_bound
     rendered_state = (
-        "true"
-        if inferred_active is True
-        else "false"
-        if inferred_active is False
-        else "unknown"
+        "true" if inferred_active is True else "false" if inferred_active is False else "unknown"
     )
     checks.append(
         Check(
