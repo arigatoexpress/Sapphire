@@ -79,7 +79,7 @@ def _owner_private_bytes(root: Path, path: Path) -> bytes:
 
     if path.parent != root:
         raise FoundryIncidentError("incident file path is invalid")
-    required = ("O_CLOEXEC", "O_DIRECTORY", "O_NOFOLLOW")
+    required = ("O_CLOEXEC", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")
     if any(not hasattr(os, name) for name in required):
         raise FoundryIncidentError("incident file primitives are unavailable")
     root_fd: int | None = None
@@ -98,7 +98,7 @@ def _owner_private_bytes(root: Path, path: Path) -> bytes:
             raise FoundryIncidentError("incident outbox is not owner-private")
         file_fd = os.open(
             path.name,
-            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
             dir_fd=root_fd,
         )
         before = os.fstat(file_fd)

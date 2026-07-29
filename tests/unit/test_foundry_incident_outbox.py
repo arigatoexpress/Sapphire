@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
+import os
 from pathlib import Path
 
 import pytest
@@ -26,6 +28,21 @@ def _assert_content_addressed(path: Path) -> dict[str, object]:
     assert path.stem == hashlib.sha256(raw).hexdigest()
     assert raw.endswith(b"\n")
     return json.loads(raw)
+
+
+def _observe_failure_in_child(queue, root: Path) -> None:
+    try:
+        FoundryIncidentOutbox(
+            root=root,
+            config_generation="config-r1",
+        ).observe_failure(
+            ["403 forbidden"],
+            observed_at="2026-07-20T05:22:26+00:00",
+        )
+    except FoundryIncidentError:
+        queue.put("refused")
+    else:
+        queue.put("accepted")
 
 
 def test_july20_seventeen_cycle_sequence_is_one_open_incident(tmp_path):
@@ -185,6 +202,34 @@ def test_existing_digest_is_read_bounded_no_follow_and_same_descriptor(tmp_path,
             ["403 forbidden"],
             observed_at="2026-07-20T05:22:26+00:00",
         )
+
+
+def test_existing_digest_fifo_is_refused_without_blocking(tmp_path):
+    seed = FoundryIncidentOutbox(
+        root=tmp_path / "seed",
+        config_generation="config-r1",
+    )
+    seed_path = seed.observe_failure(
+        ["403 forbidden"],
+        observed_at="2026-07-20T05:22:26+00:00",
+    )
+    assert seed_path is not None
+
+    root = tmp_path / "outbox"
+    FoundryIncidentOutbox(root=root, config_generation="config-r1")
+    os.mkfifo(root / seed_path.name, mode=0o600)
+    context = multiprocessing.get_context("fork")
+    queue = context.Queue()
+    process = context.Process(target=_observe_failure_in_child, args=(queue, root))
+    process.start()
+    process.join(1)
+    still_running = process.is_alive()
+    if still_running:
+        process.terminate()
+        process.join(1)
+
+    assert still_running is False
+    assert queue.get(timeout=1) == "refused"
 
 
 def test_foundry_runtime_contains_no_direct_message_transport():
