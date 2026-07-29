@@ -49,6 +49,8 @@ def test_visible_control_plane_claims_are_notification_only():
         ROOT / "services" / "control-plane" / ".env.example",
         FRONTEND / "index.html",
         FRONTEND / "assets" / "app.js",
+        FRONTEND / "assets" / "architecture.js",
+        FRONTEND / "assets" / "secops.js",
     ]
     visible = "\n".join(path.read_text(encoding="utf-8") for path in paths)
 

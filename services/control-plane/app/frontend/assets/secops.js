@@ -177,7 +177,7 @@ function renderRedactionEnvelope(payload) {
   const rows = [
     ["Mode", redaction.mode || "unknown"],
     ["Surface", (payload.classification || {}).surface || "unknown"],
-    ["Command", (payload.classification || {}).command_channel || "telegram"],
+    ["Authority", (payload.classification || {}).command_channel || "owner_secure_review"],
     ["Tokens", fieldsRemoved.includes("task_ids") ? "aliased" : "redacted"],
     ["Paths", fieldsRemoved.includes("local_paths") ? "suppressed" : "unknown"],
     ["URLs", fieldsRemoved.includes("raw_repo_urls") ? "suppressed" : "unknown"],
@@ -246,9 +246,9 @@ function renderPrivacyPosture(payload) {
     },
     {
       label: "Auth Boundaries",
-      status: (posture.auth_boundaries || {}).telegram_webhook_secret_configured ? "stable" : "guarded",
+      status: (posture.auth_boundaries || {}).telegram_inbound_authority === "none" ? "stable" : "guarded",
       metrics: posture.auth_boundaries || {},
-      analysis: "Token guards and webhook secret controls are reported as booleans only.",
+      analysis: "Telegram is notification-only; this control plane accepts no chat authority.",
     },
     {
       label: "Hardening Signals",

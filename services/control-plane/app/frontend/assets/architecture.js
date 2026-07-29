@@ -146,7 +146,7 @@ function buildAutonomyMermaid(stats, policy) {
   const mode = String(policy?.mode || "custom");
   return `flowchart TB
   CRON["30m Scheduler"] --> HUB["PM Hub (Local Control Plane)"]
-  TG["Telegram Operator Channel"] --> HUB
+  HUB --> TG["Telegram notification-only"]
   HUB --> ROUTER["Membership Router + Policy\\\\nmode:${mode}"]
   ROUTER --> QUEUE["Control Queue\\\\nQ:${queued} L:${leased} F:${failed}"]
   QUEUE --> A1["rari1 / execution rail"]
@@ -173,7 +173,7 @@ function buildGcpPiMermaid(stats) {
     R1["rari1\\\\nexecution rail"]
     R2["rari2\\\\nresearch rail"]
   end
-  TEL["Telegram Bots"] --> RUN
+  RUN --> TEL["Telegram review notice"]
   SCHED --> RUN
   RUN --> R1
   RUN --> R2
@@ -215,7 +215,7 @@ function buildAgentWorkflowMermaid(payload) {
     R1["${rari1Label}"]
     R2["${rari2Label}"]
   end
-  TG["Telegram bots"] --> HUB
+  HUB --> TG["Telegram notification-only"]
   DESK --> HUB
   SECRETS --> HUB
   HUB --> ROUTER --> QUEUE
@@ -226,7 +226,6 @@ function buildAgentWorkflowMermaid(payload) {
   R1 --> HUB
   R2 --> HUB
   HUB --> DESK
-  HUB --> TG
   HUB --- META["agents_online:${agentsOnline}"]`;
 }
 
@@ -261,7 +260,7 @@ function buildSecurityBoundaryMermaid(payload, opsInventory) {
     KIMI["kimi-main\\nworkspace=${workspace.replace(/"/g, "'")}"]
     TR2["rari2-trader\\nseparate trading.env"]
   end
-  TG["Telegram bots"] --> HUB
+  HUB --> TG["Telegram notification-only"]
   APP --> HUB
   HUB --> LOCK
   LOCK --> KIMI

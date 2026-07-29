@@ -44,8 +44,6 @@ from app.runtime_policy import (
     allowed_executor_membership_ids,
     load_runtime_policy,
 )
-from app.storage import build_store
-from app.telegram_api import TelegramClient
 
 log = logging.getLogger(__name__)
 
@@ -63,9 +61,6 @@ FRONTEND_PAGES = {
 }
 _OPS_CACHE: dict[str, Any] = {"ts": 0.0, "payload": None}
 _OPS_CACHE_TTL_SECONDS = 20.0
-
-_store = None
-_telegram: TelegramClient | None = None
 
 
 def _utc_now() -> datetime:
@@ -656,7 +651,7 @@ def _build_frontend_overview_payload() -> dict[str, Any]:
         "status": "ok" if overview.get("slo", {}).get("status", "ok") == "ok" else "degraded",
         "generated_at": _utc_iso_now(),
         "frontend_asset_version": _asset_version(),
-        "control_channel": "telegram",
+        "control_channel": "owner_secure_review",
         "store": "local-memory+sqlite",
         "service_name": _service_name(),
         "service_revision": _service_revision(),
@@ -1027,14 +1022,14 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
             )
             else "guarded",
         ),
-        ("telegram", "Telegram", "Operator channel", "stable"),
+        ("telegram", "Telegram", "Notification-only", "guarded"),
     ]:
         topology_nodes.append(
             {"id": node_id, "label": label, "subtitle": subtitle, "status": status}
         )
     topology_links.extend(
         [
-            {"from": "telegram", "to": "control", "label": "commands"},
+            {"from": "control", "to": "telegram", "label": "review notice"},
             {"from": "mac", "to": "control", "label": "local operator"},
             {"from": "control", "to": "rari1", "label": "task leases"},
             {"from": "control", "to": "rari2", "label": "task leases"},
@@ -1043,7 +1038,7 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
     mermaid = (
         "flowchart LR\n"
         '  MAC["Mac / Codex Workspace"] --> HUB["Sapphire Control Plane\\nlocal-first"]\n'
-        '  TG["Telegram Operator"] --> HUB\n'
+        '  HUB --> TG["Telegram notification-only"]\n'
         '  HUB --> R1["rari1\\nexecution rail"]\n'
         '  HUB --> R2["rari2\\nresearch rail"]\n'
         '  HUB --> REPOS["/Users/aribs/Code\\nSapphire + client repos"]\n'
@@ -1181,7 +1176,7 @@ def _build_secops_payload(*, refresh: bool = False, event_limit: int = 80) -> di
                     ]
                 ],
                 "links": [
-                    {"from": "telegram", "to": "control", "label": "commands"},
+                    {"from": "control", "to": "telegram", "label": "review notice"},
                     {"from": "control", "to": "rari1", "label": "leases"},
                     {"from": "control", "to": "rari2", "label": "leases"},
                 ],
@@ -1217,16 +1212,15 @@ def _build_secops_payload(*, refresh: bool = False, event_limit: int = 80) -> di
         },
         "classification": {
             "surface": "public-read-only",
-            "command_channel": "telegram",
+            "command_channel": "owner_secure_review",
+            "telegram_role": "notification_only",
         },
         "security_posture": {
             "privacy_first": {
                 "public_prompting_enabled": False,
                 "browser_token_storage": "operator-local-only",
             },
-            "auth_boundaries": {
-                "telegram_webhook_secret_configured": bool(get_settings().telegram_webhook_secret)
-            },
+            "auth_boundaries": {"telegram_inbound_authority": "none"},
             "hardening_signals": {"openclaw_embedded_secret_key_count": 0},
             "recommended_actions": [
                 "Keep control tokens off public surfaces and use operator-only pages for mutations.",
@@ -1255,23 +1249,10 @@ def _build_secops_payload(*, refresh: bool = False, event_limit: int = 80) -> di
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _store, _telegram
-    settings = get_settings()
-    _store = build_store(settings)
-    _telegram = TelegramClient(settings.telegram_bot_token)
-
-    if settings.startup_register_webhook and settings.public_base_url:
-        url = f"{settings.public_base_url}/telegram/webhook"
-        try:
-            await _telegram.set_webhook(url, settings.telegram_webhook_secret)
-            log.info("Telegram webhook registered: %s", url)
-        except Exception as exc:
-            log.warning("Telegram webhook registration failed: %s", exc)
-
     append_event(
         "control_plane.startup",
         source="control-plane",
-        message=f"Control plane started (store={'memory' if settings.use_in_memory_store else 'firestore'})",
+        message="Control plane started (store=local-sqlite+jsonl)",
         tags=["service:control-plane", "type:pm"],
     )
     log.info("Control plane ready — runtime=%s revision=%s", _runtime_mode(), _service_revision())
@@ -1498,12 +1479,10 @@ async def router_overview(refresh: bool = False):
                 {
                     "name": "Telegram",
                     "provider": "telegram",
-                    "auth_status": "configured"
-                    if bool(get_settings().telegram_bot_token)
-                    else "missing",
-                    "auth_detail": "Bot token presence only; commands remain off-page.",
+                    "auth_status": "external",
+                    "auth_detail": "Telegram notification-only; secure review is separate.",
                     "portal_url": "https://t.me",
-                    "cli_login_command": "export TELEGRAM_BOT_TOKEN=...",
+                    "cli_login_command": "",
                 },
             ]
         },
@@ -1684,27 +1663,9 @@ async def kimi_pm(request: Request, x_control_token: str = Header(default="")):
 
 
 @app.post("/telegram/webhook")
-async def telegram_webhook(request: Request):
-    settings = get_settings()
-    secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-    if settings.telegram_webhook_secret and secret != settings.telegram_webhook_secret:
-        raise HTTPException(status_code=403, detail="invalid secret")
-
-    try:
-        update: dict[str, Any] = await request.json()
-    except Exception as exc:  # pragma: no cover - FastAPI validation guard
-        raise HTTPException(status_code=400, detail="invalid JSON") from exc
-
-    msg = update.get("message") or update.get("edited_message") or {}
-    chat_id = (msg.get("chat") or {}).get("id")
-    text = msg.get("text", "")
-    if chat_id and text:
-        log.info("Telegram update chat_id=%s text=%r", chat_id, text[:80])
-        append_event(
-            "telegram.message",
-            source="control-plane",
-            message=f"chat={chat_id}: {text[:100]}",
-            tags=["service:control-plane", "type:pm", "agent:kimi"],
-        )
-
-    return {"ok": True}
+async def telegram_webhook(_request: Request):
+    return {
+        "status": "REFUSED_TELEGRAM_HAS_NO_AUTHORITY",
+        "authority": "NONE",
+        "mutation_allowed": False,
+    }

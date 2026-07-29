@@ -310,7 +310,7 @@ async function refreshOverview() {
       stateEls.servicePill.classList.toggle("degraded", !healthy);
     }
 
-    setText(stateEls.controlChannel, data.control_channel || "telegram");
+    setText(stateEls.controlChannel, data.control_channel || "owner_secure_review");
     setText(stateEls.storeMode, data.store || "-");
     setText(
       stateEls.syncMeta,
@@ -330,7 +330,7 @@ async function refreshOverview() {
       const publicPrompting = Boolean(data.public_prompting_enabled);
       stateEls.promptLock.textContent = publicPrompting
         ? "Warning: public prompting exposed"
-        : "Prompt surface locked to Telegram";
+        : "Telegram notification-only";
       stateEls.promptLock.style.borderColor = publicPrompting ? "rgba(196, 103, 57, 0.45)" : "rgba(0, 95, 134, 0.3)";
     }
 

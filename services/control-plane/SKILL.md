@@ -1,6 +1,6 @@
 ---
 name: control-plane
-description: PM hub — project board, task scoring, event stream, Telegram integration
+description: PM hub — project board, task scoring, event stream, Telegram notification-only status
 type: service
 runtime: python
 deploy_target: rari1
@@ -13,7 +13,10 @@ build_command: docker build -t control-plane .
 # Control Plane
 
 ## Purpose
-Central project management and coordination service. Manages the project board, scores tasks, publishes events, and integrates with Telegram for agent-human communication.
+Central project management and coordination service. Manages the project board,
+scores tasks, and publishes local events. Telegram notification-only delivery
+belongs to the separate secure-review rail; this service accepts no Telegram
+authority.
 
 ## Event System
 Publishes tagged events: `task.created`, `task.completed`, `deploy.started`, `alert.fired`
@@ -21,12 +24,11 @@ Tags: `project:`, `agent:`, `priority:`, `type:`
 Agents subscribe to relevant tags for notifications.
 
 ## Key Files
-- `app/main.py` — FastAPI entry point (health, events, tasks, Kimi bridge, Telegram webhook)
+- `app/main.py` — FastAPI entry point (health, events, tasks, Kimi bridge, constant-refusal Telegram tombstone)
 - `app/control_plane.py` — State management and persistence (SQLite default)
 - `app/project_board.py` — Project and task CRUD
 - `app/scoring.py` — Task priority scoring
 - `app/event_stream.py` — JSONL event log (no GCP — file-based)
-- `app/storage.py` — Telegram chat store (in-memory default when not on Cloud Run)
 - `app/kimi_bridge.py` — `/api/kimi/pm` dispatch endpoint
 - `app/frontend/` — PM dashboard HTML pages
 
