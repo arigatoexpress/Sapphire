@@ -72,7 +72,7 @@ class FhevmClient:
     ) -> bytes:
         """Return a 32-byte deterministic commitment over (weights, salt)."""
 
-        if not isinstance(salt, (bytes, bytearray)):
+        if not isinstance(salt, bytes | bytearray):
             raise TypeError("salt must be bytes")
         if len(salt) == 0:
             raise ValueError("salt must be non-empty (≥16 bytes recommended)")

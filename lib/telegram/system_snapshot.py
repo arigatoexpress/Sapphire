@@ -187,7 +187,7 @@ def _portfolio_total(data_dir: Path) -> float | None:
         return None
     for key in ("total_value", "equity", "portfolio_value", "cash"):
         value = payload.get(key)
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
     return None
 

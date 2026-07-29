@@ -113,7 +113,7 @@ class PublisherClient:
         """A JSON-safe snapshot of the request the client would send."""
         out: dict[str, Any] = {}
         for k, v in kwargs.items():
-            if isinstance(v, (str, int, float, bool, list, dict)) or v is None:
+            if isinstance(v, str | int | float | bool | list | dict) or v is None:
                 out[k] = v
             else:
                 out[k] = repr(v)

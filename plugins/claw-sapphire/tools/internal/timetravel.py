@@ -91,7 +91,7 @@ def _coerce_scope(payload: dict[str, Any]) -> tuple[str, ...]:
         return DEFAULT_SCOPE
     if isinstance(raw, str):
         scopes = [s.strip() for s in raw.split(",") if s.strip()]
-    elif isinstance(raw, (list, tuple)):
+    elif isinstance(raw, list | tuple):
         scopes = [str(s).strip() for s in raw if str(s).strip()]
     else:
         raise ValueError("'scope' must be a comma-separated string or list")

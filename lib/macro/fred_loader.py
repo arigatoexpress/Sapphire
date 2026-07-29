@@ -195,7 +195,7 @@ def parse_fred_observations(
     """Parse a FRED observations payload into a typed snapshot."""
 
     rows = payload.get("observations")
-    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
+    if not isinstance(rows, Sequence) or isinstance(rows, str | bytes):
         raise FredLoaderError("FRED payload missing observations array")
 
     cleaned_series_id = _clean_series_id(series_id)

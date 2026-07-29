@@ -312,7 +312,7 @@ def sanitize_status_payload(payload: Any) -> Any:
             key_text = str(key)
             if looks_sensitive_key(key_text):
                 out[key_text] = "<redacted>"
-            elif isinstance(value, (dict, list)):
+            elif isinstance(value, dict | list):
                 out[key_text] = sanitize_status_payload(value)
             elif isinstance(value, str) and looks_like_secret_value(value):
                 out[key_text] = "<redacted>"

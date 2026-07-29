@@ -1417,15 +1417,15 @@ class SapphireForumService:
             operator = parsed_tokens[offset + 1]
             right = parsed_tokens[offset + 2]
             if (
-                isinstance(left, (int, float))
+                isinstance(left, int | float)
                 and isinstance(operator, str)
-                and isinstance(right, (int, float))
+                and isinstance(right, int | float)
             ):
                 result = cls._compute_challenge_result(float(left), operator, float(right))
                 if result is not None:
                     return f"{result:.2f}"
 
-        numeric_terms = [float(item) for item in parsed_tokens if isinstance(item, (int, float))]
+        numeric_terms = [float(item) for item in parsed_tokens if isinstance(item, int | float)]
         operators = [
             item for item in parsed_tokens if isinstance(item, str) and item in {"+", "-", "*", "/"}
         ]

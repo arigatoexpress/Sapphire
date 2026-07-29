@@ -747,7 +747,7 @@ class IntelFeedAggregator:
                     published_at = datetime.fromtimestamp(float(ts_value), tz=UTC)
                 except Exception:
                     published_at = _now_utc()
-            if isinstance(ts_value, (int, float)):
+            if isinstance(ts_value, int | float):
                 try:
                     published_at = datetime.fromtimestamp(float(ts_value), tz=UTC)
                 except Exception:

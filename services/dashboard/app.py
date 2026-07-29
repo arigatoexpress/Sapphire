@@ -906,7 +906,7 @@ def _count_test_functions(path: Path) -> int:
     return sum(
         1
         for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
         and node.name.startswith("test_")
     )
 
@@ -4829,7 +4829,7 @@ def _filter_leads(leads, *, score_min=None, source=None, zip_code=None, urgency=
     for lead in leads:
         if score_min is not None:
             s = lead.get("score")
-            if not isinstance(s, (int, float)) or s < score_min:
+            if not isinstance(s, int | float) or s < score_min:
                 continue
         if source and lead.get("source") != source:
             continue
@@ -6026,7 +6026,7 @@ def api_autonomy_quant_intelligence():
 
 
 def _truncate_gemini_ooda_diff_value(value: Any, limit: int = 180) -> str:
-    if isinstance(value, (dict, list)):
+    if isinstance(value, dict | list):
         text = json.dumps(value, sort_keys=True)
     else:
         text = str(value)

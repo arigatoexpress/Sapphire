@@ -635,7 +635,7 @@ def fmt(value: Any) -> str:
         return "-"
     if isinstance(value, float):
         return f"{value:.6g}"
-    text = json.dumps(value, sort_keys=True) if isinstance(value, (dict, list)) else str(value)
+    text = json.dumps(value, sort_keys=True) if isinstance(value, dict | list) else str(value)
     return text.replace("|", "\\|")
 
 
