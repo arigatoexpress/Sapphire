@@ -33,13 +33,29 @@ LOG_DIRS = [
     Path.home() / "ops-state" / "logs",
     # Holds webhook-tunnel.log, the largest log on the box (15MB and growing).
     ROOT / "data" / "logs",
+    # Added 2026-07-29. 43MB of .log/.err across 12 files, never rotated —
+    # clean-watchlist.log was already past the threshold at 9.2MB. Safe to rotate:
+    # rh_agent_health.py keeps state in `state_files` (*.json) and reads these only
+    # for existence/mtime/size/tail, and rotation truncates in place so the launchd
+    # writers keep their fd. `rh-chain/history/` is 733MB of DATA and is protected
+    # by the non-recursive walk plus the suffix filter below.
+    Path.home() / "ops-state" / "rh-chain",
 ]
 
 EXTENSIONS = {".log", ".err"}
 
 
 def rotate_file(path: Path) -> bool:
-    """Rotate a single log file if it exceeds MAX_BYTES. Returns True if rotated."""
+    """Rotate a single log file if it exceeds MAX_BYTES. Returns True if rotated.
+
+    The suffix guard is enforced here, not only in ``main``'s loop. rh-chain keeps
+    live desk state next to its logs (`clean-watchlist.json`,
+    `fresh-decay-state.json`), and this function truncates in place — so a caller
+    reaching for it directly could zero a state file. Belt and braces: the caller
+    filters, and so does this.
+    """
+    if path.suffix not in EXTENSIONS:
+        return False
     if not path.exists() or path.stat().st_size < MAX_BYTES:
         return False
 
