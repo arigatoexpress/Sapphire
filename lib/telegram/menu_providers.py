@@ -121,9 +121,7 @@ def portfolio_by_venue() -> str:
         status = str(source.get("status") or "unknown")
         emoji = "✅" if status.lower() in {"ok", "live", "connected"} else "⚠️"
         value = source.get("total_value")
-        value_text = (
-            fmt.fmt_usd(float(value)) if isinstance(value, (int, float)) else fmt.code("—")
-        )
+        value_text = fmt.fmt_usd(float(value)) if isinstance(value, (int, float)) else fmt.code("—")
         rows.append((f"{emoji} {name}", value_text))
     return f"{fmt.bold('💰 By Venue')}\n\n" + fmt.kv_table(rows)
 
@@ -308,16 +306,12 @@ def security_cves() -> str:
 def security_kill_switch() -> str:
     snap = system_snapshot.build_snapshot()
     if snap.kill_switch_armed:
-        return (
-            f"🛑 {fmt.bold('KILL SWITCH ARMED')}\n\n"
-            + fmt.esc(
-                "All order placement is blocked. Remove "
-                "~/.sapphire/hyperliquid_trading_pause to resume."
-            )
+        return f"🛑 {fmt.bold('KILL SWITCH ARMED')}\n\n" + fmt.esc(
+            "All order placement is blocked. Remove "
+            "~/.sapphire/hyperliquid_trading_pause to resume."
         )
-    return (
-        f"✅ {fmt.bold('Kill switch OFF')}\n\n"
-        + fmt.esc("Trading executors are permitted to place orders under their caps.")
+    return f"✅ {fmt.bold('Kill switch OFF')}\n\n" + fmt.esc(
+        "Trading executors are permitted to place orders under their caps."
     )
 
 
@@ -351,10 +345,7 @@ def brief_today() -> str:
         if isinstance(value, str) and value.strip():
             sections.append((key.title(), fmt.esc(value.strip()[:600])))
         elif isinstance(value, dict):
-            rows = [
-                (str(k), fmt.code(str(v)[:32]))
-                for k, v in list(value.items())[:6]
-            ]
+            rows = [(str(k), fmt.code(str(v)[:32])) for k, v in list(value.items())[:6]]
             sections.append((key.title(), fmt.kv_table(rows)))
     if not sections:
         return _unavailable("☀️ Today's Brief", "brief.json had no readable sections.")
@@ -410,9 +401,7 @@ def reports_list() -> str:
         if not directory.exists():
             continue
         try:
-            files = sorted(
-                directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
-            )
+            files = sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         except OSError:
             continue
         for path in files[:5]:
