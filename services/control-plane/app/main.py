@@ -656,9 +656,6 @@ def _build_frontend_overview_payload() -> dict[str, Any]:
         "service_name": _service_name(),
         "service_revision": _service_revision(),
         "heartbeat_interval_minutes": settings.heartbeat_interval_minutes,
-        "allowlist_enabled": bool(
-            settings.allowed_telegram_user_ids or settings.allowed_telegram_chat_ids
-        ),
         "public_prompting_enabled": False,
         "alpha_stream": {"items": alpha_items},
         "signals": alpha_items,
@@ -781,7 +778,7 @@ def _organization_units() -> list[dict[str, Any]]:
             "id": "trading-intelligence",
             "name": "Trading + Market Intelligence",
             "purpose": "Signal intake, venue routing, market/news analysis, and execution readiness for ASTER/LIGHTER.",
-            "surfaces": ["alpha-engine", "telegram", "rari1", "rari2"],
+            "surfaces": ["alpha-engine", "telegram-notifications", "rari1", "rari2"],
             "roots": ["/Users/aribs/Code/Sapphire", "/Users/aribs/.openclaw"],
         },
         {

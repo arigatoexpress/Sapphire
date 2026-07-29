@@ -7,7 +7,6 @@ const stateEls = {
   signalCount: document.getElementById("signal-count"),
   signalList: document.getElementById("signal-list"),
   lastRefresh: document.getElementById("last-refresh"),
-  allowlistState: document.getElementById("allowlist-state"),
   promptLock: document.getElementById("prompt-lock"),
   pulsePath: document.getElementById("pulse-path"),
   pulseArea: document.getElementById("pulse-area"),
@@ -323,9 +322,6 @@ async function refreshOverview() {
     setText(stateEls.signalCount, String(signalItems.length));
     setText(stateEls.lastRefresh, `Last refresh: ${isoToUtcLabel(data.generated_at)}`);
 
-    const allowlistEnabled = Boolean(data.allowlist_enabled);
-    setText(stateEls.allowlistState, `Allowlist enforcement status: ${allowlistEnabled ? "enabled" : "disabled"}`);
-
     if (stateEls.promptLock) {
       const publicPrompting = Boolean(data.public_prompting_enabled);
       stateEls.promptLock.textContent = publicPrompting
@@ -357,26 +353,5 @@ async function refreshOverview() {
   }
 }
 
-function wireCommandCopy() {
-  const buttons = document.querySelectorAll("[data-copy]");
-  buttons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const value = button.getAttribute("data-copy") || "";
-      if (!value) return;
-      try {
-        await navigator.clipboard.writeText(value);
-        const previous = button.textContent;
-        button.textContent = "Copied";
-        setTimeout(() => {
-          button.textContent = previous;
-        }, 850);
-      } catch (_err) {
-        // No-op for restricted clipboard environments.
-      }
-    });
-  });
-}
-
-wireCommandCopy();
 refreshOverview();
 setInterval(refreshOverview, 60000);

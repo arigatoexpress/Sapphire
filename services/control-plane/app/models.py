@@ -12,9 +12,9 @@ class ChatConfig:
     heartbeat_interval_minutes: int = 60
     # assistant_mode=personal prioritizes compact coaching + decisions over raw telemetry.
     assistant_mode: str = "personal"
-    # Optional project scope for Telegram-first tasking/briefing.
+    # Optional project scope for local tasking and briefing.
     focus_project: str = ""
-    # Proactive assistant check-ins in Telegram.
+    # Proactive local assistant check-ins.
     proactive_checkins_enabled: bool = True
     assistant_checkin_interval_minutes: int = 120
     # Decision SLA reminder threshold (minutes).
@@ -22,7 +22,7 @@ class ChatConfig:
     aster_assets: list[str] = field(default_factory=list)
     lighter_assets: list[str] = field(default_factory=list)
     extra_keywords: list[str] = field(default_factory=list)
-    # Operator-provided focus that steers the bot's updates.
+    # Operator-provided focus for local summaries.
     operator_directive: str = ""
     # Per-chat assistant style preferences.
     preference_tone: str = "concise"
