@@ -148,6 +148,45 @@ def test_outbox_refuses_nonprivate_directory_and_symlink_state(tmp_path):
         outbox.observe_failure(["403 forbidden"], observed_at="2026-07-20T05:22:26+00:00")
 
 
+def test_outbox_refuses_timestamp_that_cannot_fit_adapter_envelope(tmp_path):
+    outbox = FoundryIncidentOutbox(
+        root=tmp_path / "outbox",
+        config_generation="config-r1",
+    )
+    oversized = "2026-07-20T05:22:26+" + ("0" * (1024 * 1024)) + ":00"
+    with pytest.raises(FoundryIncidentError):
+        outbox.observe_failure(["403 forbidden"], observed_at=oversized)
+    assert _envelopes(outbox.root) == []
+
+
+@pytest.mark.parametrize("attack", ("symlink", "oversized"))
+def test_existing_digest_is_read_bounded_no_follow_and_same_descriptor(tmp_path, attack):
+    seed = FoundryIncidentOutbox(
+        root=tmp_path / "seed",
+        config_generation="config-r1",
+    )
+    seed_path = seed.observe_failure(
+        ["403 forbidden"],
+        observed_at="2026-07-20T05:22:26+00:00",
+    )
+    assert seed_path is not None
+
+    root = tmp_path / "outbox"
+    outbox = FoundryIncidentOutbox(root=root, config_generation="config-r1")
+    planted = root / seed_path.name
+    if attack == "symlink":
+        planted.symlink_to(seed_path)
+    else:
+        planted.write_bytes(b"x" * (1024 * 1024 + 1))
+        planted.chmod(0o600)
+
+    with pytest.raises(FoundryIncidentError):
+        outbox.observe_failure(
+            ["403 forbidden"],
+            observed_at="2026-07-20T05:22:26+00:00",
+        )
+
+
 def test_foundry_runtime_contains_no_direct_message_transport():
     foundry_root = Path(__file__).resolve().parents[2] / "lib" / "foundry"
     source = "\n".join(

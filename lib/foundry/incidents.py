@@ -29,6 +29,8 @@ _ERROR_CLASSES = {
 _IDENTITY_SCHEMA = "sapphire.foundry_incident_identity.v1"
 _ENVELOPE_SCHEMA = "sapphire.foundry_incident.v1"
 _STATE_SCHEMA = "sapphire.foundry_incident_state.v1"
+_MAX_FILE_BYTES = 1024 * 1024
+_MAX_TIMESTAMP_BYTES = 64
 
 
 class FoundryIncidentError(RuntimeError):
@@ -58,7 +60,10 @@ def _write_all(descriptor: int, raw: bytes) -> None:
 
 
 def _valid_timestamp(value: str) -> str:
-    if type(value) is not str:
+    if (
+        type(value) is not str
+        or len(value.encode("utf-8")) > _MAX_TIMESTAMP_BYTES
+    ):
         raise FoundryIncidentError("incident timestamp is invalid")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -67,6 +72,77 @@ def _valid_timestamp(value: str) -> str:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise FoundryIncidentError("incident timestamp must be timezone-aware")
     return value
+
+
+def _owner_private_bytes(root: Path, path: Path) -> bytes:
+    """Read one direct child through stable, owner-private descriptors."""
+
+    if path.parent != root:
+        raise FoundryIncidentError("incident file path is invalid")
+    required = ("O_CLOEXEC", "O_DIRECTORY", "O_NOFOLLOW")
+    if any(not hasattr(os, name) for name in required):
+        raise FoundryIncidentError("incident file primitives are unavailable")
+    root_fd: int | None = None
+    file_fd: int | None = None
+    try:
+        root_fd = os.open(
+            root,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW,
+        )
+        root_info = os.fstat(root_fd)
+        if (
+            not stat.S_ISDIR(root_info.st_mode)
+            or root_info.st_uid != os.getuid()
+            or root_info.st_mode & 0o077
+        ):
+            raise FoundryIncidentError("incident outbox is not owner-private")
+        file_fd = os.open(
+            path.name,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            dir_fd=root_fd,
+        )
+        before = os.fstat(file_fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_uid != os.getuid()
+            or before.st_mode & 0o077
+            or before.st_nlink != 1
+            or before.st_size > _MAX_FILE_BYTES
+        ):
+            raise FoundryIncidentError("incident file is not owner-private")
+        chunks: list[bytes] = []
+        observed = 0
+        while True:
+            chunk = os.read(file_fd, min(65536, _MAX_FILE_BYTES + 1 - observed))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            observed += len(chunk)
+            if observed > _MAX_FILE_BYTES:
+                raise FoundryIncidentError("incident file is too large")
+        after = os.fstat(file_fd)
+        identity = (
+            "st_dev",
+            "st_ino",
+            "st_mode",
+            "st_uid",
+            "st_nlink",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+        )
+        if any(getattr(before, field) != getattr(after, field) for field in identity):
+            raise FoundryIncidentError("incident file changed during read")
+        return b"".join(chunks)
+    except FoundryIncidentError:
+        raise
+    except (OSError, AttributeError) as exc:
+        raise FoundryIncidentError("incident file is unavailable") from exc
+    finally:
+        if file_fd is not None:
+            os.close(file_fd)
+        if root_fd is not None:
+            os.close(root_fd)
 
 
 def classify_failure(errors: list[str]) -> str:
@@ -135,15 +211,7 @@ class FoundryIncidentOutbox:
         if not self._state_path.exists() and not self._state_path.is_symlink():
             return None
         try:
-            info = self._state_path.lstat()
-            if (
-                stat.S_ISLNK(info.st_mode)
-                or not stat.S_ISREG(info.st_mode)
-                or info.st_uid != os.getuid()
-                or info.st_mode & 0o077
-            ):
-                raise FoundryIncidentError("incident state is not owner-private")
-            raw = self._state_path.read_bytes()
+            raw = _owner_private_bytes(self.root, self._state_path)
             state = json.loads(raw.decode("utf-8"))
         except FoundryIncidentError:
             raise
@@ -200,7 +268,7 @@ class FoundryIncidentOutbox:
         try:
             descriptor = os.open(path, flags, 0o600)
         except FileExistsError:
-            if path.read_bytes() != raw:
+            if _owner_private_bytes(self.root, path) != raw:
                 raise FoundryIncidentError("incident digest collision")
             return path
         except OSError as exc:
