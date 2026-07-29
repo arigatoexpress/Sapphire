@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sapphire OS — Command Center</title>
+<title>Sapphire OS — Operations Status</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0f; color: #e0e0e0; padding: 16px; font-size: 13px; }
@@ -49,7 +49,7 @@
 <body>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-  <h1>🔷 Sapphire OS — Command Center</h1>
+  <h1>🔷 Sapphire OS — Operations Status</h1>
   <div style="display:flex;gap:8px">
     <a href="http://100.71.10.48:3001" target="_blank" style="padding:6px 12px;background:#1a1a2e;border:1px solid #3b82f6;color:#3b82f6;border-radius:6px;text-decoration:none;font-size:11px;font-weight:600">🖥️ Windows Telemetry</a>
     <a href="http://127.0.0.1:8787/intel" target="_blank" style="padding:6px 12px;background:#1a1a2e;border:1px solid #8b5cf6;color:#8b5cf6;border-radius:6px;text-decoration:none;font-size:11px;font-weight:600">🔍 Regional Intel</a>
@@ -78,13 +78,13 @@
 const tasks = [
   {t:'2 AM',d:'Creative Lab — R&D experiments'},{t:'3:41 AM',d:'Test Guardian — 1,130+ tests'},
   {t:'5:42 AM',d:'Trading Research — TA predictions'},{t:'6:27 AM',d:'Threat Intel — CISA/NVD/MITRE'},
-  {t:'7:19 AM',d:'GitHub Discovery — trending repos'},{t:'8:03 AM',d:'Morning Briefing → Telegram'},
+  {t:'7:19 AM',d:'GitHub Discovery — trending repos'},{t:'8:03 AM',d:'Morning briefing → notification-only review'},
   {t:'8:37 AM',d:'Market Pulse (M-F pre-market)'},{t:'10:11 AM',d:'Client Delivery — THO check'},
   {t:'11:07 AM',d:'THO Test Writer'},{t:'12:37 PM',d:'Market Pulse (M-F midday)'},
   {t:'1:03 PM',d:'Code Quality Sweep'},{t:'2:27 PM',d:'Threat Intel — afternoon'},
   {t:'3:41 PM',d:'Test Guardian — afternoon'},{t:'4:37 PM',d:'Market Pulse (M-F close)'},
-  {t:'5:53 PM',d:'Evening Digest → Telegram'},{t:'8:53 PM',d:'Self-Improvement → priorities'},
-  {t:'11:07 PM',d:'THO Test Writer — evening'},{t:'*/2h',d:'Watchdog Health Alerts → Telegram'},
+  {t:'5:53 PM',d:'Evening digest → notification-only review'},{t:'8:53 PM',d:'Self-Improvement → priorities'},
+  {t:'11:07 PM',d:'THO Test Writer — evening'},{t:'*/2h',d:'Watchdog health → notification-only review'},
   {t:'*/3h',d:'CI Monitor — all repos'},{t:'*/4h',d:'Vote Monitor — pool snapshots'},
   {t:'*/6h',d:'Factory Repo Fixer'},
 ];

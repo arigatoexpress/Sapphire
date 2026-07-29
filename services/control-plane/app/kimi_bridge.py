@@ -1,4 +1,4 @@
-"""Kimi-Claw PM bridge — relay endpoint for cloud/Telegram agents.
+"""Kimi-Claw PM bridge — authenticated endpoint for local agents.
 
 Provides POST /api/kimi/pm so Kimi agents on rari1 (or cloud) can orchestrate the
 control plane: create tasks, sync boards, query state, run autonomy cycles.

@@ -86,8 +86,7 @@ body {
 .muted,
 .workspace-meta,
 .card-note,
-.empty-state,
-.allowlist-state {
+.empty-state {
   color: var(--dark-text-soft) !important;
 }
 
@@ -152,8 +151,7 @@ h4,
 .telegram-link,
 .workspace-chip,
 .pill,
-.badge,
-.command {
+.badge {
   border-color: rgba(99, 177, 231, 0.35) !important;
   color: #d6ecff !important;
   background: rgba(22, 45, 67, 0.82) !important;
@@ -164,8 +162,7 @@ h4,
 .telegram-link,
 .project-link,
 button.btn.solid,
-button[type="submit"].btn,
-.command:hover {
+button[type="submit"].btn {
   background: linear-gradient(125deg, var(--dark-btn-a), var(--dark-btn-b)) !important;
   border-color: rgba(74, 201, 255, 0.4) !important;
   color: #ecf8ff !important;
@@ -239,7 +236,6 @@ th {
 .surface-card span,
 .policy-list li,
 .simple-list li,
-.command-grid .command,
 .project-meta,
 .workspace-chip,
 .pill,
