@@ -121,7 +121,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/pipeline/` | service | GCP sync — events → GCS + BigQuery (hourly watermark). |
 | `services/scout-sandbox/` | service | External-collaborator least-privilege sandbox. |
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
-| `services/pm_bot/` | service | PM bot webhook and reviewed Telegram draft queue [Mac:18082]. |
+| `services/pm_bot/` | service | PM bot webhook and reviewed Telegram draft queue [Mac:18082]. Built, not deployed. |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
 | `plugins/claw-sapphire/` | plugin | 118 tool scripts on disk (64 at top level + 52 in `internal/` + 2 in `_deprecated/`), 10 libs, 604 collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor — first live mandate minted 2026-07-25: BRODIE token @ $0.38, all four safety boundaries proved). Deployed on Robinhood Chain **testnet (chain 46630)** via `scripts/deploy_robinhood_chain.py`; **mainnet (chain 4663, live since 2026-07-01)** deployment is a follow-up. |
@@ -143,7 +143,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 - **Port caveat (verified 2026-07-25):** `com.sovereign.openwebui` LaunchAgent occupies **8080**, so the dashboard cannot bind its conventional port while open-webui is loaded. `PORT=8085` is the working slot on this Mac (dashboard code default `PORT=8082` collides with control-plane).
 - **LaunchAgent state (verified 2026-07-25):** 33 `com.sapphire.*` agents are installed under `~/Library/LaunchAgents/` (infra + intelligence + trading tiers restored via `scripts/ops/restore_launchagents.sh --all`; the outward `content-publisher` tier stays excluded and must be enabled explicitly).
 - inference-proxy:11435 (4-tier failover)
-- pm-bot:18082 (com.sapphire.pm-bot LaunchAgent, Telegram webhook owner)
+- pm-bot:18082 (com.sapphire.pm-bot LaunchAgent - NOT installed; see Telegram PM Bot section)
 - content-engine (com.sapphire.content-engine LaunchAgent, weekly cadence)
 - OpenBB:6900, Redis:6379, Ollama:11434
 
@@ -275,12 +275,33 @@ Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
 
 ## Telegram PM Bot
 
-PM bot replaced the old custom bot and Hermes polling gateway as Telegram owner.
+**Status: BUILT, NOT DEPLOYED.** PM bot is intended to replace the old custom bot
+and the Hermes polling gateway as Telegram owner, but it does not own Telegram
+today. As of 2026-07-29 the `com.sapphire.pm-bot` LaunchAgent is not loaded on the
+Mac and nothing is listening on 18082. Do not describe PM bot as the Telegram
+owner until this section says otherwise.
+
 - Service: `services/pm_bot/server.py`
-- LaunchAgent: `com.sapphire.pm-bot`
-- Health: `curl http://127.0.0.1:18082/telegram/ownership`
-- Policy: webhook mode, shared-token polling disabled, producer alerts become local drafts.
-- Legacy: `ai.hermes.gateway` must remain disabled unless PM bot is deliberately retired.
+- LaunchAgent (not installed): `services/pm_bot/launchagent/com.sapphire.pm-bot.plist`
+- Health (once running): `curl http://127.0.0.1:18082/telegram/ownership`
+- Intended policy: webhook mode, shared-token polling disabled, producer alerts
+  become local drafts.
+- Legacy: `ai.hermes.gateway` must remain disabled unless PM bot is deliberately
+  retired.
+
+### Blockers before installing
+
+1. **No public webhook URL chosen.** `server.py` defaults to `MODE=webhook`, and
+   `services/pm_bot/README.md` plus `docs/ops/fresh-agent-runtime-rollout.md` both
+   say to set `SAPPHIRE_PM_BOT_WEBHOOK_URL` "once a public URL is chosen". It has
+   not been chosen. The service binds 127.0.0.1, so Telegram cannot reach it.
+2. **The shipped plist sets `MODE=polling` with
+   `SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1`.** `server.py` treats shared-token
+   polling as a deliberate break-glass path because it conflicts with Hermes and
+   webhook consumers. Do not install the plist as-is.
+3. **The shipped plist uses `/usr/local/bin/python3`** (Python 3.12 framework
+   build). Sapphire standardizes on `/opt/homebrew/bin/python3`. Fix the
+   interpreter path before loading.
 
 ## Event System
 
