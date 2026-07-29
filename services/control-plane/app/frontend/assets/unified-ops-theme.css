@@ -80,7 +80,6 @@
 .theme-deck .intro-copy,
 .theme-deck .eyebrow,
 .theme-deck .sync-meta,
-.theme-deck .allowlist-state,
 .theme-projects .eyebrow,
 .theme-projects .subhead,
 .theme-architecture .eyebrow,
@@ -219,7 +218,6 @@
 .theme-organization .repo-table-wrap,
 .theme-deck .signal-card,
 .theme-deck .surface-card,
-.theme-deck .command,
 .theme-deck .pulse-chart,
 .theme-deck .analysis-card,
 .theme-deck .analysis-list li {
@@ -304,15 +302,6 @@
 .theme-projects input::placeholder,
 .theme-projects textarea::placeholder {
   color: var(--ops-muted) !important;
-}
-
-.theme-deck .command {
-  color: #d8f1ff !important;
-}
-
-.theme-deck .command:hover {
-  box-shadow: none !important;
-  transform: translateY(-1px);
 }
 
 .theme-deck .analysis-bar-track {

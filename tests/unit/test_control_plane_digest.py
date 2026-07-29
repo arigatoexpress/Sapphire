@@ -224,9 +224,10 @@ def test_format_digest_empty_news_returns_no_match_message():
     assert "2026-04-27 14:30 UTC" in msg
     assert "No high-confidence headlines" in msg
     assert "Aster: BTC" in msg
-    assert "/setaster" in msg
-    assert "/setlighter" in msg
-    assert "/setkeywords" in msg
+    assert "/setaster" not in msg
+    assert "/setlighter" not in msg
+    assert "/setkeywords" not in msg
+    assert "owner configuration surface" in msg
 
 
 # ── format_digest_message: with news ───────────────────────────────
@@ -496,7 +497,7 @@ def test_format_alpha_stream_uses_default_action_when_missing():
     assert "Action: monitor" in msg
 
 
-def test_format_alpha_stream_uses_routes_or_defaults():
+def test_format_alpha_stream_omits_command_routes():
     cfg = _config()
 
     default_msg = format_alpha_stream_message(cfg, {})
@@ -511,13 +512,13 @@ def test_format_alpha_stream_uses_routes_or_defaults():
         },
     )
 
-    assert "/alphastream" in default_msg
-    assert "alpha_stream" in default_msg
-    assert "/api/alpha-stream" in default_msg
-
-    assert "/custom" in custom_msg
-    assert "custom_action" in custom_msg
-    assert "/api/custom" in custom_msg
+    for message in (default_msg, custom_msg):
+        assert "Read-only signal projection" in message
+        assert "/alphastream" not in message
+        assert "telegram_command" not in message
+    assert "/custom" not in custom_msg
+    assert "custom_action" not in custom_msg
+    assert "/api/custom" not in custom_msg
 
 
 def test_format_alpha_stream_truncates_to_max_chars():

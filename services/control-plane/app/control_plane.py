@@ -922,7 +922,7 @@ class ControlPlaneStore:
             "heartbeat_age_seconds": heartbeat_age_seconds,
             "updated_at": row["updated_at"],
             "online": online,
-            # Backward-compat key used by some external Telegram agents.
+            # Backward-compat key used by older local workers.
             "is_online": online,
         }
 

@@ -193,7 +193,7 @@ function renderExecutorTrust(opsInventory) {
 }
 
 function buildOrgArchitectureMermaid(payload) {
-  const shellName = String(payload?.shell_app?.name || "Sapphire Command Deck");
+  const shellName = String(payload?.shell_app?.name || "Sapphire Operations Deck");
   const serviceName = String(payload?.shell_app?.service_name || "sapphire-control-plane");
   const rails = Array.isArray(payload?.trading_operations?.rails) ? payload.trading_operations.rails : [];
   const asterRail = rails.find((row) => String(row?.name || "").toLowerCase() === "aster") || {};
@@ -202,7 +202,7 @@ function buildOrgArchitectureMermaid(payload) {
   const lighterAgent = String(lighterRail.preferred_agent_id || "kimi-main");
   const asterNode = String(asterRail.preferred_node || "rari1");
   const lighterNode = String(lighterRail.preferred_node || "rari2");
-  return `flowchart TB\n  TG[\"Telegram Control Plane\"] --> HUB[\"Local Control Plane\\\\n${serviceName}\"]\n  HUB --> SHELL[\"${shellName}\"]\n  HUB --> Q[\"Lease Queue + Router\"]\n  Q --> A1[\"${asterNode}\\\\n${asterAgent}\"]\n  Q --> A2[\"${lighterNode}\\\\n${lighterAgent}\"]\n  A1 --> V1[\"Aster Rail\"]\n  A2 --> V2[\"Lighter Rail\"]\n  HUB --> PRJ[\"Projects: PM | THO | Cointracker | Workspace\"]\n  HUB --> OBS[\"Architecture + Organization Dashboards\"]`;
+  return `flowchart TB\n  HUB[\"Local Control Plane\\\\n${serviceName}\"] --> TG[\"Telegram notification-only\"]\n  HUB --> SHELL[\"${shellName}\"]\n  HUB --> Q[\"Lease Queue + Router\"]\n  Q --> A1[\"${asterNode}\\\\n${asterAgent}\"]\n  Q --> A2[\"${lighterNode}\\\\n${lighterAgent}\"]\n  A1 --> V1[\"Aster Rail\"]\n  A2 --> V2[\"Lighter Rail\"]\n  HUB --> PRJ[\"Projects: PM | THO | Cointracker | Workspace\"]\n  HUB --> OBS[\"Architecture + Organization Dashboards\"]`;
 }
 
 function renderWorkspaces(rows) {

@@ -58,7 +58,7 @@ def format_digest_message(
             f"{title}\n{stamp}\n\n"
             "No high-confidence headlines matched your Aster/Lighter watchlist in the current window.\n"
             f"<i>{watchlist}</i>\n\n"
-            "Use /setaster, /setlighter, /setkeywords to tune your feed."
+            "Watchlist changes belong to the separate owner configuration surface."
         )
 
     lines = [title, stamp, f"<i>{watchlist}</i>", ""]
@@ -109,7 +109,6 @@ def format_alpha_stream_message(
         alpha_stream.get("summary") if isinstance(alpha_stream.get("summary"), Mapping) else {}
     )
     items = alpha_stream.get("items") if isinstance(alpha_stream.get("items"), Sequence) else []
-    routes = alpha_stream.get("routes") if isinstance(alpha_stream.get("routes"), Mapping) else {}
 
     lines = [title]
     if stamp:
@@ -149,13 +148,7 @@ def format_alpha_stream_message(
     lines.extend(
         [
             "",
-            (
-                "Routes: "
-                f"{html.escape(str(routes.get('telegram_command') or '/alphastream'))} | "
-                f"{html.escape(str(routes.get('kimi_action') or 'alpha_stream'))} | "
-                f"{html.escape(str(routes.get('system_endpoint') or '/api/alpha-stream'))}"
-            ),
-            "<i>Shared signal feed for frontend, Telegram, and agent/trader consumers.</i>",
+            "<i>Read-only signal projection for local research and operator review.</i>",
         ]
     )
     return _trim("\n".join(lines), max_chars)

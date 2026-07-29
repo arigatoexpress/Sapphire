@@ -7,7 +7,6 @@ const stateEls = {
   signalCount: document.getElementById("signal-count"),
   signalList: document.getElementById("signal-list"),
   lastRefresh: document.getElementById("last-refresh"),
-  allowlistState: document.getElementById("allowlist-state"),
   promptLock: document.getElementById("prompt-lock"),
   pulsePath: document.getElementById("pulse-path"),
   pulseArea: document.getElementById("pulse-area"),
@@ -310,7 +309,7 @@ async function refreshOverview() {
       stateEls.servicePill.classList.toggle("degraded", !healthy);
     }
 
-    setText(stateEls.controlChannel, data.control_channel || "telegram");
+    setText(stateEls.controlChannel, data.control_channel || "owner_secure_review");
     setText(stateEls.storeMode, data.store || "-");
     setText(
       stateEls.syncMeta,
@@ -323,14 +322,11 @@ async function refreshOverview() {
     setText(stateEls.signalCount, String(signalItems.length));
     setText(stateEls.lastRefresh, `Last refresh: ${isoToUtcLabel(data.generated_at)}`);
 
-    const allowlistEnabled = Boolean(data.allowlist_enabled);
-    setText(stateEls.allowlistState, `Allowlist enforcement status: ${allowlistEnabled ? "enabled" : "disabled"}`);
-
     if (stateEls.promptLock) {
       const publicPrompting = Boolean(data.public_prompting_enabled);
       stateEls.promptLock.textContent = publicPrompting
         ? "Warning: public prompting exposed"
-        : "Prompt surface locked to Telegram";
+        : "Telegram notification-only";
       stateEls.promptLock.style.borderColor = publicPrompting ? "rgba(196, 103, 57, 0.45)" : "rgba(0, 95, 134, 0.3)";
     }
 
@@ -357,26 +353,5 @@ async function refreshOverview() {
   }
 }
 
-function wireCommandCopy() {
-  const buttons = document.querySelectorAll("[data-copy]");
-  buttons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const value = button.getAttribute("data-copy") || "";
-      if (!value) return;
-      try {
-        await navigator.clipboard.writeText(value);
-        const previous = button.textContent;
-        button.textContent = "Copied";
-        setTimeout(() => {
-          button.textContent = previous;
-        }, 850);
-      } catch (_err) {
-        // No-op for restricted clipboard environments.
-      }
-    });
-  });
-}
-
-wireCommandCopy();
 refreshOverview();
 setInterval(refreshOverview, 60000);

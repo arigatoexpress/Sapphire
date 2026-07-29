@@ -9,16 +9,6 @@ def _split_csv(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-def _split_csv_int(raw: str) -> list[int]:
-    output: list[int] = []
-    for item in _split_csv(raw):
-        try:
-            output.append(int(item))
-        except ValueError:
-            continue
-    return output
-
-
 def _as_bool(raw: str, default: bool = False) -> bool:
     if raw is None:
         return default
@@ -29,8 +19,6 @@ def _as_bool(raw: str, default: bool = False) -> bool:
 class Settings:
     gcp_project_id: str
     firestore_collection: str
-    telegram_bot_token: str
-    telegram_webhook_secret: str
     digest_top_k: int
     min_alpha_score: int
     max_news_age_hours: int
@@ -46,10 +34,6 @@ class Settings:
     use_in_memory_store: bool
     job_shared_token: str
     control_plane_shared_token: str
-    startup_register_webhook: bool
-    public_base_url: str
-    allowed_telegram_user_ids: list[int]
-    allowed_telegram_chat_ids: list[int]
     # Article snippet enrichment + de-dupe sizing.
     snippet_cache_ttl_seconds: float
     snippet_fetch_timeout_seconds: float
@@ -88,9 +72,7 @@ def get_settings() -> Settings:
         project_id = configured_project_id or platform_project_id or "sapphire"
     return Settings(
         gcp_project_id=project_id,
-        firestore_collection=os.getenv("FIRESTORE_COLLECTION", "telegram_chats"),
-        telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
-        telegram_webhook_secret=os.getenv("TELEGRAM_WEBHOOK_SECRET", ""),
+        firestore_collection=os.getenv("FIRESTORE_COLLECTION", "control_plane_sessions"),
         digest_top_k=int(os.getenv("DIGEST_TOP_K", "7")),
         min_alpha_score=int(os.getenv("MIN_ALPHA_SCORE", "35")),
         max_news_age_hours=int(os.getenv("MAX_NEWS_AGE_HOURS", "20")),
@@ -117,12 +99,6 @@ def get_settings() -> Settings:
         use_in_memory_store=_as_bool(os.getenv("USE_IN_MEMORY_STORE"), default=(not on_cloud_run)),
         job_shared_token=os.getenv("JOB_SHARED_TOKEN", ""),
         control_plane_shared_token=os.getenv("CONTROL_PLANE_SHARED_TOKEN", ""),
-        startup_register_webhook=_as_bool(
-            os.getenv("STARTUP_REGISTER_WEBHOOK", "false"), default=False
-        ),
-        public_base_url=os.getenv("PUBLIC_BASE_URL", "").rstrip("/"),
-        allowed_telegram_user_ids=_split_csv_int(os.getenv("ALLOWED_TELEGRAM_USER_IDS", "")),
-        allowed_telegram_chat_ids=_split_csv_int(os.getenv("ALLOWED_TELEGRAM_CHAT_IDS", "")),
         snippet_cache_ttl_seconds=float(os.getenv("SNIPPET_CACHE_TTL_SECONDS", str(6 * 3600))),
         snippet_fetch_timeout_seconds=float(
             os.getenv("SNIPPET_FETCH_TIMEOUT_SECONDS", str(request_timeout_seconds))

@@ -239,12 +239,6 @@ body {
   color: #0a4f70;
 }
 
-.allowlist-state {
-  margin: 0.64rem 0 0;
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-}
-
 .metric-grid {
   margin-top: 0.92rem;
   display: grid;
@@ -296,7 +290,7 @@ body {
     "signals security"
     "signals system"
     "signals overnight"
-    "surfaces commands";
+    "surfaces surfaces";
 }
 
 .panel {
@@ -321,10 +315,6 @@ body {
 
 .panel-surfaces {
   grid-area: surfaces;
-}
-
-.panel-commands {
-  grid-area: commands;
 }
 
 .panel-system {
@@ -492,31 +482,6 @@ body {
 .surface-card span {
   color: var(--ink-soft);
   font-size: 0.8rem;
-}
-
-.command-grid {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.command {
-  width: 100%;
-  text-align: left;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 95, 134, 0.28);
-  background: linear-gradient(180deg, rgba(245, 252, 255, 0.96), rgba(230, 245, 253, 0.95));
-  color: #0a5070;
-  padding: 0.54rem 0.65rem;
-  font-size: 0.8rem;
-  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.14s ease, box-shadow 0.14s ease;
-}
-
-.command:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 14px rgba(0, 85, 126, 0.14);
 }
 
 .system-analysis-grid {
@@ -710,8 +675,7 @@ body {
       "security"
       "system"
       "overnight"
-      "surfaces"
-      "commands";
+      "surfaces";
   }
 }
 
@@ -766,13 +730,11 @@ body {
 
 .panel-head p,
 .card-note,
-.allowlist-state,
 .surface-card span {
   font-size: 0.92rem;
 }
 
 .telegram-link,
-.btn,
-.command {
+.btn {
   font-size: 0.9rem;
 }
