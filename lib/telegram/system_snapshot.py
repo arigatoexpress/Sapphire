@@ -205,11 +205,7 @@ def build_snapshot(*, data_dir: Path | None = None) -> Snapshot:
     regime, fg = _latest_regime(target)
     portfolio = _portfolio_total(target)
     kill = _kill_switch_armed()
-    agents_ok = sum(
-        1
-        for s in services
-        if s.pid.isdigit() and int(s.pid) > 0
-    )
+    agents_ok = sum(1 for s in services if s.pid.isdigit() and int(s.pid) > 0)
     return Snapshot(
         services=services,
         freshness=freshness,

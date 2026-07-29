@@ -1374,11 +1374,7 @@ def probe_safety() -> list[Check]:
     state_is_bound = state_source in {"last_transition", "operator_baseline"}
     explicitly_inactive = inferred_active is False and state_is_bound
     rendered_state = (
-        "true"
-        if inferred_active is True
-        else "false"
-        if inferred_active is False
-        else "unknown"
+        "true" if inferred_active is True else "false" if inferred_active is False else "unknown"
     )
     checks.append(
         Check(
