@@ -72,8 +72,13 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         primary_timeframe=args.timeframe,
     )
     _write_json(args.out, manifest)
+    # Propagate a skipped sweep instead of reporting "ok" over an empty capture.
+    # A run that touched nothing must not read like a successful one — that is
+    # the silent-failure shape the readiness sweep exists to surface.
+    status = manifest.get("status") or "ok"
     summary = {
-        "status": "ok",
+        "status": status,
+        "reason": manifest.get("reason"),
         "mode": "sweep",
         "session_id": manifest["session_id"],
         "symbol_count": len(manifest["symbols"]),

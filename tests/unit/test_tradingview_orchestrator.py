@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -64,6 +65,99 @@ def test_setup_chart_blocked_without_gate(orch: TradingViewOrchestrator):
 def test_apply_indicator_stack_blocked_without_gate(orch: TradingViewOrchestrator):
     res = orch.apply_indicator_stack()
     assert res["mutated"] is False
+
+
+def test_run_returns_structured_failure_on_timeout(orch: TradingViewOrchestrator):
+    """A hung `tv` CLI must degrade to a failed row, not kill the caller.
+
+    The `tv` CLI drives TradingView Desktop over CDP :9222. When the desktop app
+    is closed (nights, reboots) every `tv` invocation hangs until the timeout.
+    Before this, the raised TimeoutExpired propagated out of the 4-hourly
+    com.sapphire.tradingview-ta-capture sweep and killed the whole job on the
+    first symbol, so no symbol was ever captured.
+    """
+    with patch(
+        "lib.trading.tradingview_orchestrator.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd=["tv", "quote"], timeout=30),
+    ):
+        res = orch._run("quote", "--symbol", "BINANCE:ETHUSDT")
+
+    assert res["ok"] is False
+    assert res["timed_out"] is True
+    assert res["returncode"] is None
+    assert res["payload"] is None
+    assert "timed out" in res["stderr"].lower()
+    assert "quote" in res["command"]
+
+
+def test_run_marks_non_timeout_results_not_timed_out(orch: TradingViewOrchestrator):
+    """The timed_out key is always present so callers can branch without .get()."""
+    completed = subprocess.CompletedProcess(
+        args=["tv", "state"], returncode=0, stdout='{"ok": true}', stderr=""
+    )
+    with patch("lib.trading.tradingview_orchestrator.subprocess.run", return_value=completed):
+        res = orch._run("state")
+
+    assert res["ok"] is True
+    assert res["timed_out"] is False
+
+
+def test_capture_sweep_skips_fast_when_tv_unreachable(orch: TradingViewOrchestrator):
+    """One cheap preflight beats N expensive timeouts.
+
+    Without this, a closed TradingView Desktop cost CAPTURE_TIMEOUT (30s) on
+    *every* probe of *every* symbol — a --limit 6 sweep ground on for minutes
+    before producing an all-empty manifest. Probe once, then bail.
+    """
+    calls: list[tuple[str, ...]] = []
+
+    def fake_run(*args: str, **kwargs: object) -> dict[str, object]:
+        calls.append(args)
+        return {
+            "command": "tv " + " ".join(args),
+            "returncode": None,
+            "ok": False,
+            "timed_out": True,
+            "stdout": "",
+            "stderr": "tv CLI timed out",
+            "payload": None,
+            "parse_error": None,
+        }
+
+    with patch.object(orch, "_run", side_effect=fake_run):
+        manifest = orch.capture_sweep(
+            [
+                {"symbol": "ETH", "tradingview_symbol": "BINANCE:ETHUSDT"},
+                {"symbol": "BTC", "tradingview_symbol": "BINANCE:BTCUSDT"},
+            ]
+        )
+
+    assert manifest["status"] == "skipped_tv_unavailable"
+    assert manifest["symbols"] == []
+    # Exactly one preflight probe — not one per symbol, not one per artifact.
+    assert len(calls) == 1
+
+
+def test_capture_sweep_proceeds_when_tv_reachable(orch: TradingViewOrchestrator):
+    """The preflight must not block the normal path."""
+    with patch.object(
+        orch,
+        "_run",
+        return_value={
+            "command": "tv status",
+            "returncode": 0,
+            "ok": True,
+            "timed_out": False,
+            "stdout": "{}",
+            "stderr": "",
+            "payload": {},
+            "parse_error": None,
+        },
+    ):
+        manifest = orch.capture_sweep([{"symbol": "ETH", "tradingview_symbol": "BINANCE:ETHUSDT"}])
+
+    assert manifest.get("status") != "skipped_tv_unavailable"
+    assert len(manifest["symbols"]) == 1
 
 
 def test_run_json_parse_success(orch: TradingViewOrchestrator):
