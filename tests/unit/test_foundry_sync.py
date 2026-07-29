@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -25,7 +27,10 @@ def _isolate_secrets(tmp_path_factory, monkeypatch):
     """Point SAPPHIRE_SECRETS_DIR at an empty tmp dir so run_sync tests
     don't pick up the developer's real foundry_url/foundry_token files."""
     empty = tmp_path_factory.mktemp("empty-secrets")
+    incidents = tmp_path_factory.mktemp("foundry-incidents")
     monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(empty))
+    monkeypatch.setenv("SAPPHIRE_FOUNDRY_INCIDENT_DIR", str(incidents))
+    monkeypatch.setenv("SAPPHIRE_FOUNDRY_CONFIG_GENERATION", "foundry-test-config-r1")
     for v in (
         "PALANTIR_FOUNDRY_URL",
         "FOUNDRY_URL",
@@ -317,13 +322,13 @@ class TestGetSyncStatus:
 
 
 # ---------------------------------------------------------------------------
-# Graceful degradation — no Telegram spam when Foundry isn't configured
+# Graceful degradation and local incident lifecycle
 # ---------------------------------------------------------------------------
 
 
 class TestRunSyncGracefulDegradation:
     def test_config_missing_exits_ok_and_skipped(self, tmp_path):
-        """With no URL configured, run_sync must exit cleanly and not page."""
+        """With no URL configured, run_sync exits cleanly without an incident."""
         # Create at least one changed source so we hit the upload path
         signals_dir = tmp_path / "data" / "signals"
         signals_dir.mkdir(parents=True)
@@ -331,16 +336,16 @@ class TestRunSyncGracefulDegradation:
             json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
         )
 
-        with mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
-            result = run_sync(tmp_path, dry_run=False, force=True)
+        result = run_sync(tmp_path, dry_run=False, force=True)
 
-        assert tg.call_count == 0, "Telegram must not fire on config_missing"
         assert result.ok is True
         assert result.skipped is True
 
         state_path = tmp_path / "data" / "foundry_sync_state.json"
         state = json.loads(state_path.read_text())
         assert state["last_status"] == "not_configured"
+        incident_root = Path(os.environ["SAPPHIRE_FOUNDRY_INCIDENT_DIR"])
+        assert list(incident_root.glob("*.json")) == []
 
     def test_foundry_preflight_config_error_exits_ok_and_skipped(self, tmp_path, monkeypatch):
         """Missing ontology/action config is a setup gap, not a per-object error."""
@@ -360,19 +365,17 @@ class TestRunSyncGracefulDegradation:
                 "lib.foundry.client.FoundryClient.validate_write_target",
                 side_effect=FoundryConfigError("Configured Foundry ontology missing"),
             ),
-            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
-        assert tg.call_count == 0
         assert result.ok is True
         assert result.skipped is True
         state_path = tmp_path / "data" / "foundry_sync_state.json"
         state = json.loads(state_path.read_text())
         assert state["last_status"] == "not_configured"
 
-    def test_auth_failure_before_first_success_does_not_telegram(self, tmp_path, monkeypatch):
-        """Auth error with no prior success → warn once, no Telegram spam."""
+    def test_auth_failure_before_first_success_opens_local_incident(self, tmp_path, monkeypatch):
+        """Auth error with no prior success warns once and opens one incident."""
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "bad-tok")
 
@@ -393,19 +396,21 @@ class TestRunSyncGracefulDegradation:
                 "lib.foundry.client.FoundryClient.upsert_objects",
                 side_effect=FoundryAuthError("401 unauthorized"),
             ),
-            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
-        assert tg.call_count == 0, "must not page on first-time auth failure"
         assert result.ok is False
         state_path = tmp_path / "data" / "foundry_sync_state.json"
         state = json.loads(state_path.read_text())
         assert state["first_success_at"] is None
         assert state["last_auth_warning_at"] is not None
+        incident_root = Path(os.environ["SAPPHIRE_FOUNDRY_INCIDENT_DIR"])
+        envelopes = [p for p in incident_root.glob("*.json") if p.name != "state.json"]
+        assert len(envelopes) == 1
+        assert json.loads(envelopes[0].read_text())["error_class"] == "foundry_auth_401"
 
-    def test_alert_fires_after_first_success_then_failure(self, tmp_path, monkeypatch):
-        """Real upload failure after prior success → Telegram alert fires."""
+    def test_incident_opens_after_first_success_then_failure(self, tmp_path, monkeypatch):
+        """Real upload failure after prior success opens one local incident."""
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
 
@@ -442,19 +447,21 @@ class TestRunSyncGracefulDegradation:
                 "lib.foundry.client.FoundryClient.upsert_objects",
                 side_effect=FoundryAPIError("500 Internal", status=500),
             ),
-            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
         assert result.ok is False
-        assert tg.call_count == 1, "page once after post-success failure"
+        incident_root = Path(os.environ["SAPPHIRE_FOUNDRY_INCIDENT_DIR"])
+        envelopes = [p for p in incident_root.glob("*.json") if p.name != "state.json"]
+        assert len(envelopes) == 1
+        assert json.loads(envelopes[0].read_text())["error_class"] == "foundry_server_5xx"
 
     def test_404_before_first_success_demotes_to_not_configured(
         self, tmp_path, monkeypatch, caplog
     ):
         """A 404 on upsert-action before any success means the ontology isn't
         provisioned yet. Downgrade to INFO, route to the not_configured state,
-        and don't Telegram-alert. This keeps foundry-sync-err.log clean while
+        and do not open an incident. This keeps foundry-sync-err.log clean while
         the user finishes setup, but preserves ERROR for real 4xx/5xx failures.
         """
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
@@ -480,12 +487,10 @@ class TestRunSyncGracefulDegradation:
                     status=404,
                 ),
             ),
-            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
             caplog.at_level("INFO"),
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
-        assert tg.call_count == 0, "ontology-not-ready must not Telegram"
         assert result.skipped is True, "should route to not_configured path"
         assert result.ok is True
         state_path = tmp_path / "data" / "foundry_sync_state.json"
@@ -536,7 +541,6 @@ class TestRunSyncGracefulDegradation:
                 "lib.foundry.client.FoundryClient.upsert_objects",
                 side_effect=side_effects,
             ),
-            mock.patch("lib.foundry.sync._send_telegram_alert"),
             caplog.at_level("INFO"),
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
@@ -556,10 +560,10 @@ class TestRunSyncGracefulDegradation:
             f"expected an ERROR log for the 500; got {error_msgs!r}"
         )
 
-    def test_404_after_first_success_pages_as_regression(self, tmp_path, monkeypatch, caplog):
+    def test_404_after_first_success_records_regression(self, tmp_path, monkeypatch, caplog):
         """Codex review #106 P1: once the sync has ever succeeded, a 404 is
         a regression (action deleted / renamed / perms revoked), not a fresh
-        setup gap. Must page + stay at ERROR, not be silently demoted to
+        setup gap. Must open an incident + stay at ERROR, not be silently demoted to
         not_configured.
         """
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
@@ -601,14 +605,16 @@ class TestRunSyncGracefulDegradation:
                     status=404,
                 ),
             ),
-            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
             caplog.at_level("INFO"),
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
         assert result.ok is False, "post-success 404 must report failure, not ok=True"
         assert result.skipped is False, "must not demote to skipped/not_configured"
-        assert tg.call_count == 1, "post-success 404 must Telegram (regression)"
+        incident_root = Path(os.environ["SAPPHIRE_FOUNDRY_INCIDENT_DIR"])
+        envelopes = [p for p in incident_root.glob("*.json") if p.name != "state.json"]
+        assert len(envelopes) == 1
+        assert json.loads(envelopes[0].read_text())["error_class"] == "foundry_target_404"
         state = json.loads(state_path.read_text())
         assert state["last_status"] == "error", "status must reflect the regression"
         # ERROR path, not INFO
@@ -642,11 +648,9 @@ class TestRunSyncGracefulDegradation:
                 "lib.foundry.client.FoundryClient.upload_dataset_objects",
                 return_value={"objects_uploaded": 1},
             ) as upload,
-            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
-        assert tg.call_count == 0
         assert result.ok is True
         assert result.skipped is False
         assert result.uploaded_types["PaperTrade"] == 1
@@ -691,11 +695,9 @@ class TestRunSyncGracefulDegradation:
                 "lib.foundry.client.FoundryClient.upload_dataset_objects",
                 side_effect=FoundryAPIError("dataset missing", status=404),
             ),
-            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
-        assert tg.call_count == 0
         assert result.ok is False
         assert result.skipped is False
         state_path = tmp_path / "data" / "foundry_sync_state.json"

@@ -14,11 +14,7 @@ from lib.foundry.incidents import (
     classify_failure,
 )
 
-FIXTURE = (
-    Path(__file__).resolve().parents[1]
-    / "fixtures"
-    / "foundry_july20_403_sequence.json"
-)
+FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "foundry_july20_403_sequence.json"
 
 
 def _envelopes(root: Path) -> list[Path]:
@@ -57,14 +53,17 @@ def test_july20_seventeen_cycle_sequence_is_one_open_incident(tmp_path):
         "schema_version": "sapphire.foundry_incident.v1",
         "subsystem": "foundry_sync",
     }
-    assert opened["incident_id"] == hashlib.sha256(
-        (
-            '{"config_generation":"foundry-config-r1",'
-            '"error_class":"foundry_auth_403",'
-            '"schema_version":"sapphire.foundry_incident_identity.v1",'
-            '"subsystem":"foundry_sync"}'
-        ).encode()
-    ).hexdigest()
+    assert (
+        opened["incident_id"]
+        == hashlib.sha256(
+            (
+                '{"config_generation":"foundry-config-r1",'
+                '"error_class":"foundry_auth_403",'
+                '"schema_version":"sapphire.foundry_incident_identity.v1",'
+                '"subsystem":"foundry_sync"}'
+            ).encode()
+        ).hexdigest()
+    )
     state = json.loads((outbox.root / "state.json").read_text(encoding="utf-8"))
     assert state["status"] == "open"
     assert state["occurrences"] == 17
@@ -86,14 +85,10 @@ def test_recovery_is_one_separate_content_addressed_envelope(tmp_path):
         observed_at="2026-07-20T05:37:27.644940+00:00",
     )
 
-    recovered = outbox.observe_recovery(
-        observed_at="2026-07-20T05:52:30.000000+00:00"
-    )
+    recovered = outbox.observe_recovery(observed_at="2026-07-20T05:52:30.000000+00:00")
 
     assert recovered is not None
-    assert outbox.observe_recovery(
-        observed_at="2026-07-20T06:07:30.000000+00:00"
-    ) is None
+    assert outbox.observe_recovery(observed_at="2026-07-20T06:07:30.000000+00:00") is None
     rows = [_assert_content_addressed(path) for path in _envelopes(outbox.root)]
     assert {row["event"] for row in rows} == {"opened", "recovered"}
     recovery = next(row for row in rows if row["event"] == "recovered")
@@ -130,12 +125,8 @@ def test_changed_configuration_generation_creates_a_distinct_incident(tmp_path):
         root=tmp_path / "outbox",
         config_generation="config-r2",
     )
-    first_path = first.observe_failure(
-        ["403 forbidden"], observed_at="2026-07-20T05:22:26+00:00"
-    )
-    second_path = second.observe_failure(
-        ["403 forbidden"], observed_at="2026-07-20T05:37:27+00:00"
-    )
+    first_path = first.observe_failure(["403 forbidden"], observed_at="2026-07-20T05:22:26+00:00")
+    second_path = second.observe_failure(["403 forbidden"], observed_at="2026-07-20T05:37:27+00:00")
     assert first_path is not None
     assert second_path is not None
     assert first_path != second_path
@@ -154,16 +145,13 @@ def test_outbox_refuses_nonprivate_directory_and_symlink_state(tmp_path):
     (root / "state.json").symlink_to(target)
     outbox = FoundryIncidentOutbox(root=root, config_generation="config-r1")
     with pytest.raises(FoundryIncidentError):
-        outbox.observe_failure(
-            ["403 forbidden"], observed_at="2026-07-20T05:22:26+00:00"
-        )
+        outbox.observe_failure(["403 forbidden"], observed_at="2026-07-20T05:22:26+00:00")
 
 
 def test_foundry_runtime_contains_no_direct_message_transport():
     foundry_root = Path(__file__).resolve().parents[2] / "lib" / "foundry"
     source = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in sorted(foundry_root.glob("*.py"))
+        path.read_text(encoding="utf-8") for path in sorted(foundry_root.glob("*.py"))
     )
     for forbidden in (
         "api.telegram.org",
