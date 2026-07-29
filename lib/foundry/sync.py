@@ -1,8 +1,8 @@
 """Foundry sync engine — 15-min delta-aware scheduled sync.
 
 Watches local Sapphire data sources, detects changes via file mtime + content
-hash, transforms changed data into Foundry ontology objects, and uploads them.
-Sends Telegram alerts on sync failure.
+hash, transforms changed data into Foundry ontology objects, uploads them, and
+records transport-free incident lifecycle envelopes for genuine failures.
 
 Usage::
 
@@ -43,6 +43,7 @@ _DEFAULT_INTERVAL = 900  # 15 minutes
 _STATE_FILE = "data/foundry_sync_state.json"
 _HISTORY_FILE = "data/foundry_sync_history.jsonl"
 _WATERMARK_DIR = Path.home() / ".cache" / "sapphire" / "foundry_sync"
+_INCIDENT_DIR = Path.home() / ".local" / "state" / "sapphire" / "foundry-incidents"
 
 # Dataset source groups — maps Foundry object type → local file patterns
 _SOURCE_PATTERNS: dict[str, list[str]] = {
@@ -156,10 +157,8 @@ def _repo_root() -> Path:
 class SyncState:
     """Tracks file modification times and content hashes between syncs.
 
-    ``first_success_at`` and ``last_auth_warning_at`` are used to rate-limit
-    Telegram alerts: a sync that has never succeeded once should not page the
-    user every 15 minutes about misconfiguration, and auth errors should warn
-    at most once per day until resolved.
+    ``first_success_at`` and ``last_auth_warning_at`` retain operational
+    history and rate-limit repeated local auth warnings.
     """
 
     files: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -301,50 +300,6 @@ def load_sync_history(root: Path | None = None, *, limit: int = 50) -> list[dict
 
 
 # ---------------------------------------------------------------------------
-# Telegram alert
-# ---------------------------------------------------------------------------
-
-
-def _send_telegram_alert(message: str) -> None:
-    """Best-effort Telegram notification on sync failure."""
-    try:
-        from lib.telegram.src.sapphire_telegram.safe_send import send
-
-        send(message, priority="high")
-        return
-    except Exception:
-        pass
-
-    # Fallback: direct API call
-    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
-    if not token or not chat_id:
-        log.warning("No Telegram credentials — cannot send sync failure alert")
-        return
-
-    import ssl
-    import urllib.request
-
-    ctx = ssl.create_default_context()
-    try:
-        import certifi
-
-        ctx.load_verify_locations(certifi.where())
-    except ImportError:
-        pass
-
-    try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        data = json.dumps({"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}).encode()
-        req = urllib.request.Request(
-            url, data=data, headers={"Content-Type": "application/json"}, method="POST"
-        )
-        urllib.request.urlopen(req, timeout=10, context=ctx)  # nosec B310 - fixed Telegram HTTPS API base.
-    except Exception as exc:
-        log.warning("Telegram alert failed: %s", exc)
-
-
-# ---------------------------------------------------------------------------
 # Sync execution
 # ---------------------------------------------------------------------------
 
@@ -387,7 +342,7 @@ def run_sync(
     2. Transform changed data into Foundry objects
     3. Upload to Foundry (unless dry_run)
     4. Update state file
-    5. Alert only on real upload failures after a prior successful connection
+    5. Record a deduplicated local incident lifecycle for genuine failures
     """
     root = root or _repo_root()
     state_path = root / _STATE_FILE
@@ -467,7 +422,7 @@ def run_sync(
             client.validate_write_target(target_types)
         except FoundryConfigError as exc:
             # No URL or credentials yet. This is expected before the user has
-            # provisioned Foundry — log once and bail without paging Telegram.
+            # provisioned Foundry — log once and bail without an incident.
             config_missing = True
             log.info("Foundry not configured, skipping sync: %s", exc)
             client = None
@@ -487,7 +442,7 @@ def run_sync(
             # has *never* succeeded. Once `state.first_success_at` is set, the
             # ontology has existed before, so a fresh 404 is a real regression
             # (action deleted / renamed / permissions revoked) and must stay at
-            # ERROR + Telegram-alerting. Otherwise a broken prod ontology
+            # ERROR + incident recording. Otherwise a broken prod ontology
             # silently looks like "skipped, no problem here".
             never_succeeded = state.first_success_at is None
             saw_404 = False
@@ -569,10 +524,33 @@ def run_sync(
     # 5. History
     _append_history(root, result.to_dict())
 
-    # 6. Alert on failure — but only when it's a real data-sync problem.
-    #    * Missing config: no alert, user hasn't finished provisioning.
-    #    * Auth failure before first success: warn at most once per 24h.
-    #    * Other upload errors after a prior success: page as before.
+    # 6. Record one bounded, content-addressed incident lifecycle. The sync
+    #    engine owns no message transport, token, callback, approval, or
+    #    execution surface.
+    from lib.foundry.incidents import FoundryIncidentError, FoundryIncidentOutbox
+
+    incident_root = Path(
+        os.environ.get("SAPPHIRE_FOUNDRY_INCIDENT_DIR", str(_INCIDENT_DIR))
+    ).expanduser()
+    config_generation = os.environ.get(
+        "SAPPHIRE_FOUNDRY_CONFIG_GENERATION",
+        "foundry-config-unversioned",
+    )
+    try:
+        outbox = FoundryIncidentOutbox(
+            root=incident_root,
+            config_generation=config_generation,
+        )
+        if not result.ok and not config_missing and result.errors:
+            outbox.observe_failure(result.errors, observed_at=now)
+        elif result.ok and not config_missing and not dry_run:
+            outbox.observe_recovery(observed_at=now)
+    except FoundryIncidentError as exc:
+        # The sync result remains truthful; a broken local notification
+        # boundary is logged but cannot mutate Foundry upload semantics.
+        log.error("Foundry incident outbox refused update: %s", exc)
+
+    # Preserve the historical local warning rate-limit without any transport.
     if not result.ok and not config_missing and result.errors:
         first_success = state.first_success_at
         auth_warn_fresh = _auth_warning_fresh(state.last_auth_warning_at, now)
@@ -580,22 +558,11 @@ def run_sync(
             if not auth_warn_fresh:
                 log.warning(
                     "Foundry auth failing and sync has never connected — "
-                    "check token/URL. (Telegram alert suppressed until first "
-                    "successful sync.)"
+                    "check the configured authentication boundary."
                 )
                 state.last_auth_warning_at = now
                 state.save(state_path)
-            # Suppress Telegram to avoid a 15-min spam loop on bad creds.
-        elif first_success:
-            msg = (
-                f"⚠️ *Foundry Sync Failed*\n"
-                f"Time: {now}\n"
-                f"Errors: {len(result.errors)}\n"
-                f"{''.join(f'• {e}' + chr(10) for e in result.errors[:5])}"
-            )
-            _send_telegram_alert(msg)
-        else:
-            # Transform or misc error before first success — log but don't page.
+        elif not first_success:
             log.warning(
                 "Foundry sync errors before first successful connection: %s",
                 result.errors[:3],
