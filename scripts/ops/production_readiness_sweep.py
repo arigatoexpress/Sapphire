@@ -38,22 +38,22 @@ DEFAULT_BQ_TABLE = "production_readiness_probes"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_SECRET_ENV = Path.home() / ".sapphire" / "secrets.env"
 SAPPHIRE_SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
-DEFAULT_WINDOWS_GPU_URL = "http://100.x.x.z:11434"
-DEFAULT_WINDOWS_HOST = "100.x.x.z"
+DEFAULT_WINDOWS_GPU_URL = "http://192.168.1.61:11434"
+DEFAULT_WINDOWS_HOST = "192.168.1.61"
 DEFAULT_WINDOWS_HTTP_TIMEOUT_SECONDS = 5.0
 DEFAULT_WINDOWS_TCP_TIMEOUT_SECONDS = 3.0
 DEFAULT_WINDOWS_SSH_TIMEOUT_SECONDS = 8
 GEMINI_PROBE_PROMPT = "Return exactly SAPPHIRE_GEMINI_PROBE_OK and nothing else."
 GEMINI_PROBE_RESPONSE = "SAPPHIRE_GEMINI_PROBE_OK"
 WINDOWS_REQUIRED_MODELS = {
-    "fast": "gemma4:latest",
-    "balanced": "gemma4:latest",
-    "code": "gemma4:latest",
+    "fast": "gemma3:4b",
+    "balanced": "gemma3:4b",
+    "code": "qwen2.5-coder:14b",
     "reason": "deepseek-r1:14b",
-    "qwen-reason": "qwen3.5:9b",
+    "qwen-reason": "qwen3.5:4b",
     "deep": "qwen3:14b",
-    "qwen3.6": "qwen3.6:27b",
-    "large": "qwen2.5:32b",
+    "qwen3.6": "qwen3.6:35b-a3b",
+    "large": "qwen3-coder:30b",
 }
 WINDOWS_SERVICE_PORTS = {
     "desktop_ssh_tcp": 22,
@@ -1368,13 +1368,27 @@ def probe_safety() -> list[Check]:
         return [Check("safety", "safety_status_report", "FAIL", "invalid JSON", result.duration_ms)]
     checks: list[Check] = []
     kill = report.get("kill_switch", {})
-    active = bool(kill.get("inferred_active"))
+    inferred_active = kill.get("inferred_active")
+    state_source = str(kill.get("state_source") or "unknown")
+    state_confidence = str(kill.get("state_confidence") or "unknown")
+    state_is_bound = state_source in {"last_transition", "operator_baseline"}
+    explicitly_inactive = inferred_active is False and state_is_bound
+    rendered_state = (
+        "true"
+        if inferred_active is True
+        else "false"
+        if inferred_active is False
+        else "unknown"
+    )
     checks.append(
         Check(
             "safety",
             "kill_switch_inactive",
-            "PASS" if not active else "FAIL",
-            f"inferred_active={active}",
+            "PASS" if explicitly_inactive else "FAIL",
+            (
+                f"inferred_active={rendered_state}; source={state_source}; "
+                f"confidence={state_confidence}"
+            ),
         )
     )
     firewall = report.get("confirmation_firewall", {})

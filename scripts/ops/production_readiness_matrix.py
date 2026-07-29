@@ -40,9 +40,9 @@ import routine_soak_status
 import safety_status_report
 
 DEFAULT_OUTPUT = ROOT / "data" / "readiness" / "production-readiness-latest.md"
-DEFAULT_PROJECT = "tho-ai-agent"
+DEFAULT_PROJECT = "sapphire-479610"
 DEFAULT_REGION = "us-central1"
-DEFAULT_MEMBERSHIPS = ("google_developer_premium", "google_ai_plus")
+DEFAULT_MEMBERSHIPS = ("google_developer_premium", "google_ai_ultra")
 
 ALWAYS_ON_LAUNCHAGENTS = (
     "com.sapphire.pm-bot",
@@ -347,16 +347,42 @@ def org_surfaces(*, external: bool) -> list[dict[str, Any]]:
 
 def hermes_surfaces() -> list[dict[str, Any]]:
     report = hermes_runtime_readiness.collect_readiness()
+    runtime = report.get("runtime", {})
+    launchagent = report.get("launchagent", {})
     required = report.get("required_runtime_controls", {})
     quick = report.get("quick_commands", {})
     status = report.get("status")
-    if status == "fail":
+    gateway_fenced = bool(
+        not runtime.get("exists")
+        and not launchagent.get("exists")
+        and not quick.get("production_adjacent_exec_count", 0)
+    )
+    if gateway_fenced:
+        matrix_status = "pass"
+        next_action = (
+            "Keep the Hermes messaging gateway disabled; use the Hermes CLI only "
+            "through the normal local command and approval boundaries."
+        )
+    elif status == "fail":
         matrix_status = "fail"
+        next_action = str(
+            report.get("next_action")
+            or "Repair the explicitly enabled Hermes runtime before using it."
+        )
     elif status == "pass":
         matrix_status = "pass"
+        next_action = str(
+            report.get("next_action")
+            or "Keep Hermes quick exec gated through Sapphire CommandGuard."
+        )
     else:
         matrix_status = "warn"
+        next_action = str(
+            report.get("next_action")
+            or "Keep Hermes quick exec gated through Sapphire CommandGuard."
+        )
     evidence = (
+        f"gateway_fenced={'yes' if gateway_fenced else 'no'}, "
         f"runtime_guard={'yes' if required.get('runtime_quick_exec_command_guard') else 'no'}, "
         f"sapphire_repo_path_env={'yes' if required.get('launchagent_sapphire_repo_path_env') else 'no'}, "
         f"exec_quick={quick.get('exec_quick_command_count', 0)}, "
@@ -368,10 +394,7 @@ def hermes_surfaces() -> list[dict[str, Any]]:
             "agents",
             matrix_status,
             evidence,
-            str(
-                report.get("next_action")
-                or "Keep Hermes quick exec gated through Sapphire CommandGuard."
-            ),
+            next_action,
         )
     ]
 

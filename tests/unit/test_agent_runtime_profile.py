@@ -20,7 +20,7 @@ def test_runtime_profile_loads_repo_config() -> None:
     profile = load_runtime_profile(ROOT / "config" / "agent_runtime_next.yaml")
 
     assert profile["policy"]["bot_api_ingress_owner"] == "sapphire_pm_bot"
-    assert "gemma4:latest" in required_local_models(profile)
+    assert required_local_models(profile) == ["gemma3:4b", "deepseek-r1:14b"]
     assert "com.sapphire.healthz-watcher" in deprecated_launchagent_labels(profile)
 
 
