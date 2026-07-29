@@ -100,6 +100,68 @@ class TestNumbers:
         assert fmt.fmt_int(1234567) == "`1,234,567`"
 
 
+class TestDuration:
+    """The screenshot's ``stale 4011m`` came from a formatter that never
+    scaled past minutes. This suite pins the coarsest-unit contract."""
+
+    @pytest.mark.parametrize(
+        "seconds,expected",
+        [
+            (0, "0s"),
+            (1, "1s"),
+            (59, "59s"),
+            (60, "1m"),
+            (150, "2m"),
+            (3599, "59m"),
+            (3600, "1h"),
+            (3660, "1h 1m"),
+            (7200, "2h"),
+            (7260, "2h 1m"),
+            # 47h 59m — still under 48h so hours-with-minutes.
+            (47 * 3600 + 59 * 60, "47h 59m"),
+            # 48h flip → days.
+            (48 * 3600, "2d"),
+            # 4011m == 66.85h == 2d 18h (integer floor).
+            (4011 * 60, "2d 18h"),
+            # 3d exactly.
+            (3 * 86_400, "3d"),
+            # 3d 5h.
+            (3 * 86_400 + 5 * 3600, "3d 5h"),
+        ],
+    )
+    def test_scales_to_coarsest_unit(self, seconds, expected):
+        assert fmt.fmt_duration(seconds) == expected
+
+    def test_none_and_negative_are_missing(self):
+        assert fmt.fmt_duration(None) == "missing"
+        assert fmt.fmt_duration(-1) == "missing"
+
+    def test_missing_label_is_configurable(self):
+        assert fmt.fmt_duration(None, missing="—") == "—"
+
+    def test_non_numeric_input_never_raises(self):
+        # Real caller (staleness monitor cron) has been known to pass a
+        # str age. Preserve the contract: coerce cleanly, don't 500.
+        assert fmt.fmt_duration("nope") == "missing"
+
+    def test_fmt_age_appends_suffix(self):
+        assert fmt.fmt_age(3600) == "1h ago"
+        assert fmt.fmt_age(0) == "0s ago"
+        assert fmt.fmt_age(None) == "missing"
+
+    def test_fmt_age_missing_stays_missing_without_suffix(self):
+        # A missing age is not "missing ago" — that reads badly.
+        assert " ago" not in fmt.fmt_age(None)
+
+    def test_the_4011m_regression(self):
+        """The exact case that motivated this helper.
+
+        4011 minutes of freshness once rendered as ``stale 4011m`` in the
+        health-pulse Telegram card. Assert we never regress that reading.
+        """
+        assert fmt.fmt_duration(4011 * 60) == "2d 18h"
+
+
 class TestTables:
     def test_kv_table_escapes_keys(self):
         out = fmt.kv_table([("a.b", "`v`")])

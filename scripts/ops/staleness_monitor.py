@@ -48,6 +48,37 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+# Make the shared telegram duration formatter importable — this script runs
+# from plain `python3` invocations (LaunchAgent + CI) without the repo on
+# PYTHONPATH.
+_STALENESS_REPO = Path(__file__).resolve().parents[2]
+if str(_STALENESS_REPO) not in sys.path:
+    sys.path.insert(0, str(_STALENESS_REPO))
+
+
+def _format_age(age_hours: float | None) -> str:
+    """Age hours → coarsest unit string ("2d 18h" not "66.9h" not "4011m").
+
+    Delegates to :func:`lib.telegram.formatters.fmt_duration` when
+    available (unit tests, PM-bot importable env). Falls back to a
+    self-contained stringification so `--json` output stays
+    deterministic even when the lib module can't be imported (e.g. a
+    cron minimal-env probe).
+    """
+    if age_hours is None:
+        return "missing"
+    try:
+        from lib.telegram.formatters import fmt_duration
+
+        return fmt_duration(int(age_hours * 3600))
+    except Exception:
+        if age_hours < 48:
+            return f"{age_hours:.1f}h"
+        days = int(age_hours // 24)
+        remaining_hours = int(age_hours - days * 24)
+        return f"{days}d {remaining_hours}h" if remaining_hours else f"{days}d"
+
+
 # Cooldown between repeat alerts for the same fingerprint. 24h is long enough
 # that a real regression doesn't get spammed hourly, short enough that if the
 # problem recurs the next day it re-alerts (in case the operator forgot).
@@ -331,7 +362,7 @@ def queue_alert(rows: list[Row], agents: list[AgentRow]) -> str:
     if stale_rows:
         body_lines.append("*Stale data*:")
         for row in stale_rows:
-            age = f"{row.age_hours:.1f}h" if row.age_hours is not None else "missing"
+            age = _format_age(row.age_hours)
             body_lines.append(
                 f"  • `{row.label}` — {age} old (threshold {row.threshold_hours:.0f}h)"
             )

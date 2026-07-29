@@ -2061,12 +2061,16 @@ async def handle_proposal_commands(
                 last_trigger = last.get("trigger", "?")
                 last_ts = last.get("ts", 0)
                 ago = int(_time.time() - last_ts)
-                if ago < 60:
+                # Delegate to the shared duration formatter so the
+                # dispatch-status card reads the same as every other
+                # age-bearing Telegram surface (freshness rows,
+                # heartbeat, staleness alert).
+                try:
+                    from lib.telegram.formatters import fmt_age
+
+                    ago_text = fmt_age(ago)
+                except Exception:
                     ago_text = f"{ago}s ago"
-                elif ago < 3600:
-                    ago_text = f"{ago // 60}m ago"
-                else:
-                    ago_text = f"{ago // 3600}h ago"
                 lines.append(
                     f"{emoji} **{agent_id}**: `{count}` dispatches | last: `{last_trigger}` ({ago_text})"
                 )

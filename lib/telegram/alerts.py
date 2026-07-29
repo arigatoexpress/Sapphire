@@ -5,9 +5,16 @@ threat sweep) call the ``alert_*`` helpers here. Each helper:
 
 1. Builds a formatted MarkdownV2 message via ``lib.telegram.formatters``.
 2. Skips if the alert's dedup key was seen in the last window.
-3. Shells out to ``plugins/claw-sapphire/tools/notify.py`` so the same
-   ``SAPPHIRE_NOTIFY_TELEGRAM_LIVE`` gate (and draft queue) applies
-   uniformly.
+3. Routes by priority:
+   * ``p1`` (kill switch, regime shift, critical CVE) — shells out to
+     ``plugins/claw-sapphire/tools/notify.py`` for an immediate send.
+   * ``p2`` / ``p3`` (large single-holding moves, lower-severity CVEs,
+     info) — appended to :mod:`lib.telegram.digest_queue` and rolled
+     into the next scheduled digest tick.
+
+The ``SAPPHIRE_NOTIFY_TELEGRAM_LIVE`` gate stays authoritative for
+outbound sends — both p1 alerts and the drained digest go through
+``notify.py``. This module never sends around it.
 
 Idempotency: a small JSONL journal at
 ``~/.cache/sapphire/telegram/alert_journal.jsonl`` remembers the last
@@ -28,7 +35,7 @@ from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lib.telegram import formatters
+from lib.telegram import digest_queue, formatters
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +45,14 @@ JOURNAL_PATH = Path.home() / ".cache" / "sapphire" / "telegram" / "alert_journal
 JOURNAL_MAX_ENTRIES = 2048
 
 
-def _load_seen(path: Path = JOURNAL_PATH) -> set[str]:
-    """Load the recent dedup keys from the journal (best-effort)."""
+def _load_seen(path: Path | None = None) -> set[str]:
+    """Load the recent dedup keys from the journal (best-effort).
+
+    ``path`` late-binds to :data:`JOURNAL_PATH` at call time so tests
+    that monkeypatch ``JOURNAL_PATH`` see the swap without threading
+    the argument through every producer.
+    """
+    path = path or JOURNAL_PATH
     if not path.exists():
         return set()
     try:
@@ -61,7 +74,8 @@ def _load_seen(path: Path = JOURNAL_PATH) -> set[str]:
         return set()
 
 
-def _append_journal(key: str, kind: str, path: Path = JOURNAL_PATH) -> None:
+def _append_journal(key: str, kind: str, path: Path | None = None) -> None:
+    path = path or JOURNAL_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     entry = {
         "key": key,
@@ -78,11 +92,39 @@ def _dedup_key(kind: str, *parts: object) -> str:
 
 
 def _dispatch(text: str, *, priority: str, dedup_key: str, kind: str, force: bool) -> bool:
+    """Route an alert to either the immediate-send channel or the digest.
+
+    Contract:
+
+    * ``priority == "p1"``  → shell to ``notify.py`` right now.
+    * ``priority in {"p2", "p3"}`` → append to
+      :mod:`lib.telegram.digest_queue`; nothing goes out until the
+      scheduled digest tick drains the journal.
+
+    Dedup applies in both cases so a re-fire on the same fingerprint
+    is a no-op regardless of channel. The digest path returns ``True``
+    when the entry landed in the queue — producers only need to know
+    whether their intent was accepted, not which channel delivered.
+    """
     if not force:
         seen = _load_seen()
         if dedup_key in seen:
             logger.info("alert %s deduped (key=%s)", kind, dedup_key)
             return False
+
+    if priority != "p1":
+        # Non-critical — batch it. The digest queue caps + trims itself,
+        # so we don't need to guard against runaway producers here.
+        queued = digest_queue.enqueue(
+            kind=kind,
+            body=_digest_body(text),
+            priority=priority,
+            metadata={"dedup_key": dedup_key},
+        )
+        if queued:
+            _append_journal(dedup_key, kind)
+        return queued
+
     if not NOTIFY_TOOL.exists():
         logger.error("notify tool missing at %s", NOTIFY_TOOL)
         return False
@@ -99,6 +141,26 @@ def _dispatch(text: str, *, priority: str, dedup_key: str, kind: str, force: boo
         return False
     _append_journal(dedup_key, kind)
     return True
+
+
+def _digest_body(text: str) -> str:
+    """Reduce a MarkdownV2 alert card to one plain-text digest line.
+
+    Digest entries render inside a grouped section — we already know
+    the kind, so we don't need the card's header. Take the first
+    non-empty line after the title, strip MDV2 escape backslashes so
+    the digest formatter can re-escape cleanly.
+    """
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    # Skip the emoji + `*Title*` header (line 0) and the blank line.
+    body_lines = lines[1:] if len(lines) > 1 else lines
+    if not body_lines:
+        return "(alert)"
+    first = body_lines[0]
+    # Strip bullet markup + MDV2 backslash escapes so downstream escaping
+    # doesn't render "\\+3\\.1%" back to the user.
+    first = first.lstrip("• ").replace("\\", "")
+    return first[:200]
 
 
 # ---------------------------------------------------------------------------

@@ -23,6 +23,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from lib.telegram import formatters as fmt
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 
@@ -96,18 +98,18 @@ def _mtime_or_none(path: Path) -> datetime | None:
 
 
 def _humanize_delta(ts: datetime | None, now: datetime | None = None) -> str:
+    """Age of a file relative to ``now``, using the shared duration formatter.
+
+    Delegates to :func:`lib.telegram.formatters.fmt_age` so the freshness
+    rows on ``/status``, the heartbeat, the staleness monitor's Telegram
+    alert, and the health-check tool all render age the same way.
+    """
     if ts is None:
         return "missing"
     now = now or datetime.now(UTC)
     delta = now - ts
     seconds = max(0, int(delta.total_seconds()))
-    if seconds < 60:
-        return f"{seconds}s ago"
-    if seconds < 3600:
-        return f"{seconds // 60}m ago"
-    if seconds < 86_400:
-        return f"{seconds // 3600}h ago"
-    return f"{seconds // 86_400}d ago"
+    return fmt.fmt_age(seconds)
 
 
 def _freshness_rows(data_dir: Path) -> list[tuple[str, str]]:
