@@ -216,6 +216,97 @@ _METRICS_MAX_SAMPLES = 2000
 _metrics_samples: list[tuple[str, str, float]] = []
 _metrics_counts: dict[str, int] = {}
 _metrics_totals: dict[str, float] = {}
+
+# ── Durable route-usage counters ───────────────────────────────────────────
+# `_metrics_counts` alone cannot answer "which routes are dead?": it lives only
+# in process memory, so any restart silently resets a multi-day study to zero.
+# These counters are the evidence base for retiring unused routes, so they are
+# mirrored to disk and summed across process lifetimes.
+ROUTE_USAGE_PATH = Path(
+    os.environ.get(
+        "SAPPHIRE_ROUTE_USAGE_PATH",
+        str(Path.home() / "autonomy-status" / "logs" / "dashboard-route-usage.json"),
+    )
+)
+# Persist every N requests rather than every request: bounded I/O on the hot path.
+_ROUTE_USAGE_FLUSH_EVERY = 50
+_route_usage_since_flush = 0
+
+
+def persist_route_usage() -> None:
+    """Mirror route counters to disk. Never raises — telemetry must not take the app down."""
+    try:
+        ROUTE_USAGE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema": "sapphire.dashboard.route_usage.v1",
+            "updated_at": datetime.now(UTC).isoformat(),
+            "counts": dict(_metrics_counts),
+        }
+        tmp = ROUTE_USAGE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        tmp.replace(ROUTE_USAGE_PATH)  # atomic: a hard kill can't leave a torn file
+    except Exception as exc:  # noqa: BLE001 — fail-open by design
+        log.debug("route usage persist failed: %s", exc)
+
+
+def load_route_usage() -> None:
+    """Seed in-memory counters from disk so counts accumulate across restarts.
+
+    Tolerates a missing or truncated store: a hard kill mid-write must never
+    prevent startup.
+    """
+    try:
+        raw = ROUTE_USAGE_PATH.read_text(encoding="utf-8")
+        counts = json.loads(raw).get("counts", {})
+        for key, value in counts.items():
+            if isinstance(key, str) and isinstance(value, int):
+                _metrics_counts[key] = _metrics_counts.get(key, 0) + value
+    except Exception as exc:  # noqa: BLE001 — absent/corrupt store is not fatal
+        log.debug("route usage load skipped: %s", exc)
+
+
+def build_route_usage_report() -> dict[str, Any]:
+    """Per-route usage keyed on `_metrics_counts`, NOT on the sample ring.
+
+    `_metrics_samples` is a bounded ring that evicts oldest-first, so a route
+    called once a week ages out of it. Deriving the route list from samples
+    therefore hides exactly the rare routes a deletion study needs to see —
+    a bias that points straight at deleting live endpoints. Latency is reported
+    as None (not 0.0) when samples have aged out, so "no data" cannot be
+    misread as "instantaneous".
+    """
+    by_route: dict[str, list[float]] = {}
+    for method, endpoint, ms in _metrics_samples:
+        by_route.setdefault(f"{method} {endpoint}", []).append(ms)
+
+    routes = []
+    for key in sorted(set(_metrics_counts) | set(by_route)):
+        samples = by_route.get(key, [])
+        routes.append(
+            {
+                "route": key,
+                "count": _metrics_counts.get(key, len(samples)),
+                "samples": len(samples),
+                "avg_ms": round(sum(samples) / len(samples), 2) if samples else None,
+                "p95_ms": round(_percentile_of(samples, 95), 2) if samples else None,
+                "max_ms": round(max(samples), 2) if samples else None,
+            }
+        )
+    routes.sort(key=lambda r: r["count"], reverse=True)
+    return {"routes": routes, "tracked_routes": len(routes)}
+
+
+def _percentile_of(values: list[float], p: float) -> float:
+    if not values:
+        return 0.0
+    s = sorted(values)
+    k = int(round((p / 100.0) * (len(s) - 1)))
+    return s[max(0, min(k, len(s) - 1))]
+
+
+# Seed from disk at import so counts survive restarts. Guarded internally; a
+# missing or corrupt store is not fatal.
+load_route_usage()
 _X402_PRODUCT_MIDDLEWARE_CACHE: dict[tuple[str, str, str, str], Any] = {}
 
 
@@ -236,8 +327,14 @@ def _metrics_after_request(response):
     _metrics_totals[key] = _metrics_totals.get(key, 0.0) + elapsed_ms
     _metrics_samples.append((request.method, endpoint, elapsed_ms))
     if len(_metrics_samples) > _METRICS_MAX_SAMPLES:
-        # Drop oldest ~10% to amortize the trim cost
+        # Drop oldest ~10% to amortize the trim cost. Counts in _metrics_counts
+        # are unaffected — that is what makes them usable as usage evidence.
         del _metrics_samples[: _METRICS_MAX_SAMPLES // 10]
+    global _route_usage_since_flush
+    _route_usage_since_flush += 1
+    if _route_usage_since_flush >= _ROUTE_USAGE_FLUSH_EVERY:
+        _route_usage_since_flush = 0
+        persist_route_usage()
     response.headers["X-Response-Time-ms"] = f"{elapsed_ms:.1f}"
     return response
 
