@@ -77,7 +77,7 @@ def test_counts_persist_across_restart(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(dashboard_app, "ROUTE_USAGE_PATH", store)
 
     dashboard_app._metrics_counts["GET api_alpha"] = 7
-    dashboard_app.persist_route_usage()
+    dashboard_app.persist_route_usage(force=True)
 
     # Simulate a restart: memory gone, disk intact.
     dashboard_app._metrics_counts.clear()
@@ -92,12 +92,12 @@ def test_persisted_counts_accumulate_rather_than_overwrite(tmp_path: Path, monke
     monkeypatch.setattr(dashboard_app, "ROUTE_USAGE_PATH", store)
 
     dashboard_app._metrics_counts["GET api_alpha"] = 4
-    dashboard_app.persist_route_usage()
+    dashboard_app.persist_route_usage(force=True)
     dashboard_app._metrics_counts.clear()
 
     dashboard_app.load_route_usage()
     dashboard_app._metrics_counts["GET api_alpha"] += 3
-    dashboard_app.persist_route_usage()
+    dashboard_app.persist_route_usage(force=True)
 
     on_disk = json.loads(store.read_text())
     assert on_disk["counts"]["GET api_alpha"] == 7
@@ -114,7 +114,7 @@ def test_persistence_failure_never_breaks_the_request(tmp_path: Path, monkeypatc
     monkeypatch.setattr(dashboard_app.Path, "write_text", boom, raising=False)
     dashboard_app._metrics_counts["GET api_alpha"] = 1
 
-    dashboard_app.persist_route_usage()  # must not raise
+    dashboard_app.persist_route_usage(force=True)  # must not raise
 
 
 def test_load_tolerates_corrupt_store(tmp_path: Path, monkeypatch) -> None:

@@ -233,8 +233,17 @@ _ROUTE_USAGE_FLUSH_EVERY = 50
 _route_usage_since_flush = 0
 
 
-def persist_route_usage() -> None:
-    """Mirror route counters to disk. Never raises — telemetry must not take the app down."""
+def persist_route_usage(*, force: bool = False) -> None:
+    """Mirror route counters to disk. Never raises — telemetry must not take the app down.
+
+    Suppressed under pytest unless ``force=True``. Dashboard tests drive the Flask
+    test client hard enough to trip the 50-request flush, and this store is the
+    evidence base for retiring unused routes — synthetic test traffic reads as real
+    demand and biases toward "looks used", which would keep routes that should go.
+    A `pytest -k dashboard` run wrote 29 fake routes here before this guard.
+    """
+    if not force and "PYTEST_CURRENT_TEST" in os.environ:
+        return
     try:
         ROUTE_USAGE_PATH.parent.mkdir(parents=True, exist_ok=True)
         payload = {
