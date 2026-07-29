@@ -39,6 +39,10 @@ DEFAULT_TV_BIN = "tv"
 DEFAULT_ARTIFACT_ROOT = Path.home() / "Code" / "Sapphire" / "data" / "tradingview_ta"
 MUTATION_ENV = "SAPPHIRE_TV_MUTATION_ENABLED"
 CAPTURE_TIMEOUT = 30
+# Cheap liveness probe for the `tv` CLI / TradingView Desktop CDP endpoint.
+# Deliberately far below CAPTURE_TIMEOUT: this runs once per sweep purely to
+# decide whether the run is viable at all.
+PREFLIGHT_TIMEOUT = 5
 
 # Event names emitted to the bus. Kept here (not in lib.core.event_bus.EVENT_TYPES)
 # because the canonical EVENT_TYPES list is reserved for trading/regime/threat
@@ -327,13 +331,35 @@ class TradingViewOrchestrator:
         parse_json: bool = True,
     ) -> dict[str, Any]:
         cmd = [self.tv_bin, *args]
-        proc = subprocess.run(  # noqa: S603
-            cmd,
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
-        )
+        try:
+            proc = subprocess.run(  # noqa: S603
+                cmd,
+                text=True,
+                capture_output=True,
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            # The `tv` CLI drives TradingView Desktop over CDP :9222. Whenever the
+            # desktop app is closed — nights, reboots, a crashed window — every
+            # invocation hangs until this timeout. Raising here propagated out of
+            # the 4-hourly capture sweep and killed the whole job on its first
+            # symbol, so nothing was captured and the LaunchAgent just logged a
+            # traceback. Degrade to a failed row instead: callers already branch
+            # on "ok", so a hung CLI costs one symbol, not the run.
+            return {
+                "command": " ".join(cmd),
+                "returncode": None,
+                "ok": False,
+                "timed_out": True,
+                "stdout": "",
+                "stderr": (
+                    f"tv CLI timed out after {timeout}s — is TradingView Desktop "
+                    "running with --remote-debugging-port=9222?"
+                ),
+                "payload": None,
+                "parse_error": None,
+            }
         payload: Any = None
         parse_error: str | None = None
         if proc.stdout.strip() and parse_json:
@@ -345,6 +371,7 @@ class TradingViewOrchestrator:
             "command": " ".join(cmd),
             "returncode": proc.returncode,
             "ok": proc.returncode == 0,
+            "timed_out": False,
             "stdout": proc.stdout,
             "stderr": proc.stderr,
             "payload": payload,
@@ -851,6 +878,15 @@ class TradingViewOrchestrator:
                 "execution_policy": "analysis_only_no_order_submit",
             },
         }
+
+        # Preflight once. The `tv` CLI needs TradingView Desktop live on CDP
+        # :9222; when it is closed every call burns the full CAPTURE_TIMEOUT.
+        # Paying that once and bailing turns a multi-minute grind into ~5s.
+        preflight = self._run("status", timeout=PREFLIGHT_TIMEOUT)
+        if preflight.get("timed_out"):
+            manifest["status"] = "skipped_tv_unavailable"
+            manifest["reason"] = preflight.get("stderr", "tv CLI unreachable")
+            return manifest
 
         for row in symbols:
             tv_symbol = str(row.get("tradingview_symbol") or row.get("symbol") or "")
