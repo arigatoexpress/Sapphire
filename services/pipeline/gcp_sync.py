@@ -136,7 +136,7 @@ def _parse_ts(s: Any) -> str:
     """Normalize to ISO-8601 timestamp (BQ accepts this for TIMESTAMP cols)."""
     if not s:
         return _now_iso()
-    if isinstance(s, (int, float)):
+    if isinstance(s, int | float):
         return datetime.fromtimestamp(s, tz=UTC).isoformat()
     if isinstance(s, str):
         if s.endswith("Z"):

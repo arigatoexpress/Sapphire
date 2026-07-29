@@ -439,7 +439,7 @@ def _build_inference_proxy(*, cache_dir: Path, now: datetime) -> InferenceProxyS
             "window": tokens.get("window") or "lifetime",
         }
         last = tokens.get("last_updated")
-        if isinstance(last, (int, float)):
+        if isinstance(last, int | float):
             snapshot.last_updated = _iso(float(last))
         elif isinstance(last, str):
             snapshot.last_updated = last
@@ -612,7 +612,7 @@ def _extract_timestamp(record: Any) -> float | None:
         value = record.get(key)
         if value is None:
             continue
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
         if isinstance(value, str):
             try:

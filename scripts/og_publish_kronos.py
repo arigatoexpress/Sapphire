@@ -192,7 +192,7 @@ def main() -> int:
 def _summarise(rows: list[dict]) -> dict:
     if not rows:
         return {"bars": 0}
-    closes = [r.get("close") for r in rows if isinstance(r.get("close"), (int, float))]
+    closes = [r.get("close") for r in rows if isinstance(r.get("close"), int | float)]
     return {
         "bars": len(rows),
         "first_close": closes[0] if closes else None,

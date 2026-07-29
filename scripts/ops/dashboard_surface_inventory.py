@@ -329,7 +329,7 @@ def _literal_str(node: ast.AST) -> str | None:
 def _literal_methods(node: ast.AST | None) -> list[str]:
     if node is None:
         return ["GET"]
-    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+    if isinstance(node, ast.List | ast.Tuple | ast.Set):
         methods = [_literal_str(item) for item in node.elts]
         return sorted(method for method in methods if method)
     if method := _literal_str(node):

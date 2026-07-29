@@ -284,10 +284,10 @@ def _validate_address(addr: str, name: str) -> None:
 
 def _validate_prices(prices: Any) -> None:
     """Sanity-check the MarketPrices tuple before encoding."""
-    if not isinstance(prices, (tuple, list)) or len(prices) != 3:
+    if not isinstance(prices, tuple | list) or len(prices) != 3:
         raise ValueError(f"prices must be 3-tuple of (min,max) pairs, got {prices!r}")
     for i, p in enumerate(prices):
-        if not isinstance(p, (tuple, list)) or len(p) != 2:
+        if not isinstance(p, tuple | list) or len(p) != 2:
             raise ValueError(f"prices[{i}] must be (min,max) pair, got {p!r}")
         mn, mx = p
         if int(mn) < 0 or int(mx) < 0:

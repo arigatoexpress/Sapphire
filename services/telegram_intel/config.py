@@ -64,7 +64,7 @@ def _as_tuple(value: Any) -> tuple[str, ...]:
         return ()
     if isinstance(value, str):
         return (value,)
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         return tuple(str(item).strip() for item in value if str(item).strip())
     return (str(value).strip(),)
 

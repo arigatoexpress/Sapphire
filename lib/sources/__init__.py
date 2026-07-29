@@ -122,7 +122,7 @@ def parse_iso(value: Any) -> datetime | None:
     if not value:
         return None
     try:
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return datetime.fromtimestamp(float(value), tz=UTC)
         text = str(value).strip()
         if text.endswith("Z"):

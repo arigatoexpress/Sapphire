@@ -347,7 +347,7 @@ class VertexGeckoEmbedder:
         counters["calls"] = [
             float(ts)
             for ts in counters.get("calls", [])
-            if isinstance(ts, (int, float)) and float(ts) >= cutoff
+            if isinstance(ts, int | float) and float(ts) >= cutoff
         ]
         month_key = _now_month_key()
         if counters.get("month_key") != month_key:

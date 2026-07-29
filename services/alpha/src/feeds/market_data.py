@@ -405,7 +405,7 @@ class MarketDataAggregator:
     def _parse_timestamp(value: Any) -> float | None:
         if value is None:
             return None
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             ts = float(value)
             if ts > 1e12:
                 ts = ts / 1000.0

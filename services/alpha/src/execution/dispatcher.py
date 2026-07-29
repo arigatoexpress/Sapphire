@@ -372,7 +372,7 @@ class ExecutionDispatcher:
             )
 
         quantity = command_payload.get("quantity")
-        if allocation < 1.0 and isinstance(quantity, (int, float)) and quantity > 0:
+        if allocation < 1.0 and isinstance(quantity, int | float) and quantity > 0:
             command_payload["quantity"] = round(float(quantity) * allocation, 8)
             command_payload["allocation_factor"] = allocation
 

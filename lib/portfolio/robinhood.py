@@ -102,7 +102,7 @@ def _encode_query(params: dict[str, Any] | None = None) -> str:
     for key, value in params.items():
         if value is None:
             continue
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, list | tuple):
             items.extend((key, str(v)) for v in value if v is not None)
         else:
             items.append((key, str(value)))

@@ -160,7 +160,7 @@ def _rows(query: str, params: list[bigquery.ScalarQueryParameter] | None = None)
 
 
 def _jsonable(v):
-    if isinstance(v, (datetime,)):
+    if isinstance(v, datetime):
         return v.isoformat()
     return v
 

@@ -66,8 +66,8 @@ def _portfolio_rows_from_payload(payload: dict) -> list[fmt.PortfolioRow]:
         rows.append(
             fmt.PortfolioRow(
                 symbol=symbol,
-                value_usd=float(value) if isinstance(value, (int, float)) else None,
-                delta_pct=float(delta) if isinstance(delta, (int, float)) else None,
+                value_usd=float(value) if isinstance(value, int | float) else None,
+                delta_pct=float(delta) if isinstance(delta, int | float) else None,
                 venue=str(item.get("venue") or ""),
             )
         )
@@ -89,14 +89,14 @@ def portfolio_overview() -> str:
 
     rows = _portfolio_rows_from_payload(payload)
     total = payload.get("total_value")
-    if not isinstance(total, (int, float)):
-        total = payload.get("equity") if isinstance(payload.get("equity"), (int, float)) else None
+    if not isinstance(total, int | float):
+        total = payload.get("equity") if isinstance(payload.get("equity"), int | float) else None
 
     day_change = payload.get("day_change_pct")
     return fmt.fmt_portfolio_table(
         rows,
-        total_usd=float(total) if isinstance(total, (int, float)) else None,
-        day_change_pct=float(day_change) if isinstance(day_change, (int, float)) else None,
+        total_usd=float(total) if isinstance(total, int | float) else None,
+        day_change_pct=float(day_change) if isinstance(day_change, int | float) else None,
         updated_at=datetime.now(UTC).strftime("%H:%M UTC"),
     )
 
@@ -122,7 +122,7 @@ def portfolio_by_venue() -> str:
         emoji = "✅" if status.lower() in {"ok", "live", "connected"} else "⚠️"
         value = source.get("total_value")
         value_text = (
-            fmt.fmt_usd(float(value)) if isinstance(value, (int, float)) else fmt.code("—")
+            fmt.fmt_usd(float(value)) if isinstance(value, int | float) else fmt.code("—")
         )
         rows.append((f"{emoji} {name}", value_text))
     return f"{fmt.bold('💰 By Venue')}\n\n" + fmt.kv_table(rows)
@@ -168,11 +168,11 @@ def signals_summary() -> str:
     win_rate = overall.get("win_rate")
     trades = overall.get("trades")
     return fmt.fmt_signals_summary(
-        active=int(trades) if isinstance(trades, (int, float)) else 0,
+        active=int(trades) if isinstance(trades, int | float) else 0,
         win_rate_pct=(
             float(win_rate) * 100 if isinstance(win_rate, float) and win_rate <= 1 else win_rate
         ),
-        last_scored=int(trades) if isinstance(trades, (int, float)) else None,
+        last_scored=int(trades) if isinstance(trades, int | float) else None,
     )
 
 
@@ -233,7 +233,7 @@ def signals_active() -> str:
                     confidence_pct=conf_pct,
                     entry=(
                         float(record["entry"])
-                        if isinstance(record.get("entry"), (int, float))
+                        if isinstance(record.get("entry"), int | float)
                         else None
                     ),
                     strategy=str(record.get("strategy") or ""),
@@ -255,7 +255,7 @@ def signals_accuracy() -> str:
 
     rows: list[tuple[str, str]] = []
     for key, value in list(report.items())[:8]:
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             rows.append((str(key), fmt.code(f"{value:.1f}")))
         else:
             rows.append((str(key), fmt.code(str(value)[:24])))

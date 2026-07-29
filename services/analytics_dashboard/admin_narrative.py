@@ -419,7 +419,7 @@ def _safe_text(value: Any) -> str:
 
 
 def _safe_value(value: Any) -> str | int | float | bool | None:
-    if value is None or isinstance(value, (int, float, bool)):
+    if value is None or isinstance(value, int | float | bool):
         return value
     return _safe_text(value)
 

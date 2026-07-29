@@ -143,7 +143,7 @@ def _parse_response(text: str) -> dict[str, Any] | None:
     score = parsed.get("score")
     reason = parsed.get("reason")
     urgency = parsed.get("urgency")
-    if not isinstance(score, (int, float)):
+    if not isinstance(score, int | float):
         return None
     if not isinstance(reason, str) or not reason:
         return None

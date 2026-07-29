@@ -74,7 +74,7 @@ def _row_for_symbol(rows: list[dict[str, Any]], symbol: str) -> dict[str, Any] |
 
 def _is_stale(payload: dict[str, Any]) -> bool:
     ts = payload.get("generated_ts")
-    if not isinstance(ts, (int, float)):
+    if not isinstance(ts, int | float):
         return True
     return (datetime.now(UTC).timestamp() - ts) > ADVISORY_STALE_SECONDS
 
@@ -102,14 +102,14 @@ def _advisory_to_decision(
         decision = "GO_LONG"
         direction = "bullish"
         confidence = (
-            min(0.95, max(0.5, (score + 0.5) / 1.5)) if isinstance(score, (int, float)) else 0.6
+            min(0.95, max(0.5, (score + 0.5) / 1.5)) if isinstance(score, int | float) else 0.6
         )
     elif signal == "SHORT":
         decision = "GO_SHORT"
         direction = "bearish"
         confidence = (
             min(0.95, max(0.5, (abs(score) + 0.5) / 1.5))
-            if isinstance(score, (int, float))
+            if isinstance(score, int | float)
             else 0.6
         )
     else:
@@ -121,9 +121,9 @@ def _advisory_to_decision(
     if proxy_symbol and proxy_symbol != symbol:
         detail += f" via {proxy_symbol}"
     detail += f" | regime={regime}"
-    if isinstance(close, (int, float)):
+    if isinstance(close, int | float):
         detail += f" | close={close:.2f}"
-    if isinstance(forecast.get("point"), (int, float)) and isinstance(close, (int, float)):
+    if isinstance(forecast.get("point"), int | float) and isinstance(close, int | float):
         pct = (forecast["point"] - close) / close * 100 if close else 0.0
         detail += f" | forecast={pct:+.1f}%"
 
@@ -224,7 +224,7 @@ def action_publish(live: bool = False) -> dict[str, Any]:
         direction = "long" if signal == "LONG" else "short"
         score = row.get("score")
         confidence = (
-            min(0.95, max(0.5, (score + 0.5) / 1.5)) if isinstance(score, (int, float)) else 0.6
+            min(0.95, max(0.5, (score + 0.5) / 1.5)) if isinstance(score, int | float) else 0.6
         )
 
         signals.append(

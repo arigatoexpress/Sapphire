@@ -394,7 +394,7 @@ def _section_threats() -> dict:
 
     threats = data.get("threats") or []
     kev = [t for t in threats if t.get("exploited") or "kev" in (t.get("tags") or [])]
-    high = [t for t in threats if isinstance(t.get("score"), (int, float)) and t["score"] >= 8.0]
+    high = [t for t in threats if isinstance(t.get("score"), int | float) and t["score"] >= 8.0]
 
     emoji = "🚨" if kev else "🟡" if high else "🟢"
     lines = [
@@ -404,7 +404,7 @@ def _section_threats() -> dict:
     for t in sorted(threats, key=lambda x: x.get("score") or 0, reverse=True)[:2]:
         cid = t.get("canonical_id") or t.get("title", "")[:40]
         score = t.get("score")
-        score_str = f" (CVSS {score:.1f})" if isinstance(score, (int, float)) else ""
+        score_str = f" (CVSS {score:.1f})" if isinstance(score, int | float) else ""
         flag = "💣" if t.get("exploited") else "•"
         lines.append(f"  {flag} `{cid}`{score_str}")
     return {
@@ -513,7 +513,7 @@ def _section_kronos() -> dict:
         direction = entry.get("direction", entry.get("prediction", "?"))
         conf = entry.get("confidence", 0.0)
         price = entry.get("current_price")
-        price_str = f"  ${price:,.0f}" if isinstance(price, (int, float)) else ""
+        price_str = f"  ${price:,.0f}" if isinstance(price, int | float) else ""
         return f"  {sym}: *{direction}*  (conf {conf:.0%}){price_str}"
 
     if isinstance(predictions, list):
@@ -855,7 +855,7 @@ def _section_leads() -> dict:
             continue
 
     # Top lead = highest score, then most recent.
-    scored = [l for l in leads if isinstance(l.get("score"), (int, float))]
+    scored = [l for l in leads if isinstance(l.get("score"), int | float)]
     scored.sort(key=lambda l: (l["score"], l.get("ingested_at", "")), reverse=True)
     top = scored[0] if scored else None
 

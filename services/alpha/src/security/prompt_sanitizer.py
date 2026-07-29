@@ -258,7 +258,7 @@ def sanitize_trade_data_for_prompt(data: dict[str, Any], max_items: int = 20) ->
         for key, value in item.items():
             if key in safe_fields:
                 # Only allow primitives, not nested structures
-                if isinstance(value, (str, int, float, bool)):
+                if isinstance(value, str | int | float | bool):
                     # Truncate strings to prevent injection via symbol name etc.
                     if isinstance(value, str):
                         value = value[:50]

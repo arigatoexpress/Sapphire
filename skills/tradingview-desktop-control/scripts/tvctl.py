@@ -244,7 +244,7 @@ def front_window_bounds() -> dict[str, int]:
             "end tell",
         ]
     )
-    x_str, y_str, w_str, h_str = [part.strip() for part in out.split(",", 3)]
+    x_str, y_str, w_str, h_str = (part.strip() for part in out.split(",", 3))
     return {
         "x": int(float(x_str)),
         "y": int(float(y_str)),
@@ -985,7 +985,7 @@ def _step_bool(step: dict[str, Any], key: str, default: bool = False) -> bool:
     value = step.get(key, default)
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return bool(value)
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "on"}
