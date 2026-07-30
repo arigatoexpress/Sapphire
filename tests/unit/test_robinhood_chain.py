@@ -159,6 +159,98 @@ class TestGetChainStatus:
         assert status.signal_verifier_address == "0xAAAA"
         assert status.payment_gate_address == "0xBBBB"
 
+    def test_falls_back_to_source_controlled_known_deployments(self, tmp_path):
+        from lib.chain.robinhood_chain import RobinhoodChainClient
+
+        known_file = tmp_path / "deployments.known.json"
+        known_file.write_text(
+            json.dumps(
+                {
+                    "robinhood_testnet": {
+                        "chain_id": 46630,
+                        "contracts": {
+                            "SapphireSentinelRegistry": {
+                                "address": "0x2EBB91F7B376cB821d90ac4A7d77B0d06b70B36F"
+                            }
+                        },
+                    }
+                }
+            )
+        )
+        client = RobinhoodChainClient(
+            deployments_file=tmp_path / "missing-runtime-deployments.json",
+            known_deployments_file=known_file,
+        )
+
+        client._load_deployments()
+
+        assert (
+            client._addresses["SapphireSentinelRegistry"]
+            == "0x2EBB91F7B376cB821d90ac4A7d77B0d06b70B36F"
+        )
+
+
+class TestSentinelRegistryReads:
+    def test_reads_deployed_mandate_receipt_and_remaining_spend(self, tmp_path):
+        from lib.chain.robinhood_chain import RobinhoodChainClient
+
+        client = RobinhoodChainClient(deployments_file=tmp_path / "dep.json")
+        contract = MagicMock()
+        contract.functions.mandates.return_value.call.return_value = (
+            "0xController",
+            "0xAgent",
+            1_000,
+            250,
+            4,
+            1_800_000_000,
+            b"\x11" * 32,
+            False,
+        )
+        contract.functions.receipts.return_value.call.return_value = (
+            b"\x22" * 32,
+            "0xPayer",
+            250,
+            b"\x33" * 32,
+            b"\x44" * 32,
+            b"\x55" * 32,
+            b"\x66" * 32,
+            1_700_000_000,
+            7,
+            True,
+        )
+        contract.functions.remainingSpend.return_value.call.return_value = 750
+
+        with patch.object(client, "_ensure_init", return_value=True):
+            client._sentinel_contract = contract
+            mandate = client.get_mandate("0x" + "22" * 32)
+            receipt = client.get_receipt("0x" + "23" * 32)
+            remaining = client.remaining_spend("0x" + "22" * 32)
+
+        assert mandate["evaluation_count"] == 4
+        assert mandate["policy_hash"] == "0x" + "11" * 32
+        assert receipt["privacy_commitment"] == "0x" + "66" * 32
+        assert receipt["decision_nonce"] == 7
+        assert remaining == 750
+
+    def test_deployed_registry_abi_keeps_replay_guard_shape(self):
+        abi_path = ROOT / "data" / "chain" / "sapphire_sentinel_registry.abi.json"
+        abi = json.loads(abi_path.read_text())
+
+        record = next(
+            item
+            for item in abi
+            if item.get("type") == "function" and item.get("name") == "recordPaymentEvaluation"
+        )
+        assert [entry["name"] for entry in record["inputs"]][-3:] == [
+            "privacyCommitment",
+            "decisionNonce",
+            "approved",
+        ]
+        assert any(
+            item.get("type") == "function" and item.get("name") == "usedDecisionNonces"
+            for item in abi
+        )
+
 
 # ---------------------------------------------------------------------------
 # RobinhoodChainClient — get_signal_history
@@ -308,7 +400,10 @@ class TestDeploymentsLoading:
     def test_handles_missing_deployments_file(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
 
-        client = RobinhoodChainClient(deployments_file=tmp_path / "nonexistent.json")
+        client = RobinhoodChainClient(
+            deployments_file=tmp_path / "nonexistent.json",
+            known_deployments_file=tmp_path / "known-nonexistent.json",
+        )
         client._load_deployments()  # must not raise
         assert client._addresses == {}
 
@@ -317,7 +412,10 @@ class TestDeploymentsLoading:
         dep_file.write_text("{not valid json")
         from lib.chain.robinhood_chain import RobinhoodChainClient
 
-        client = RobinhoodChainClient(deployments_file=dep_file)
+        client = RobinhoodChainClient(
+            deployments_file=dep_file,
+            known_deployments_file=tmp_path / "known-nonexistent.json",
+        )
         client._load_deployments()  # must not raise
         assert client._addresses == {}
 

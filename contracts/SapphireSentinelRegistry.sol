@@ -7,12 +7,17 @@ pragma solidity ^0.8.20;
 /// @dev    This contract never moves funds and never executes trades. It is an
 ///         auditable anchoring layer for off-chain x402 payments, private risk
 ///         proofs, and dry-run order drafts.
+/// @custom:deployment Robinhood Chain testnet (46630)
+///   0x2EBB91F7B376cB821d90ac4A7d77B0d06b70B36F
+/// @custom:creation-tx
+///   0xc53ab8fc8cdab4ce7ef5f09fd56fc564756fd8d5e5b7c0396238878d6cc84975
 contract SapphireSentinelRegistry {
     struct Mandate {
         address controller;
         address agent;
         uint96 maxSpendAtomic;
         uint96 spentAtomic;
+        uint32 evaluationCount;
         uint64 expiresAt;
         bytes32 policyHash;
         bool revoked;
@@ -25,7 +30,9 @@ contract SapphireSentinelRegistry {
         bytes32 resourceHash;
         bytes32 resultHash;
         bytes32 riskHash;
+        bytes32 privacyCommitment;
         uint64 timestamp;
+        uint64 decisionNonce;
         bool approved;
     }
 
@@ -35,6 +42,7 @@ contract SapphireSentinelRegistry {
 
     mapping(bytes32 => Mandate) public mandates;
     mapping(bytes32 => Receipt) public receipts;
+    mapping(bytes32 => mapping(uint64 => bool)) public usedDecisionNonces;
 
     event MandateRegistered(
         bytes32 indexed mandateId,
@@ -53,7 +61,9 @@ contract SapphireSentinelRegistry {
         uint96 amountAtomic,
         bytes32 resourceHash,
         bytes32 resultHash,
-        bytes32 riskHash
+        bytes32 riskHash,
+        bytes32 privacyCommitment,
+        uint64 decisionNonce
     );
     event OperatorTransferStarted(address indexed previousOperator, address indexed newOperator);
     event OperatorTransferred(address indexed previousOperator, address indexed newOperator);
@@ -88,6 +98,7 @@ contract SapphireSentinelRegistry {
             agent: agent,
             maxSpendAtomic: maxSpendAtomic,
             spentAtomic: 0,
+            evaluationCount: 0,
             expiresAt: expiresAt,
             policyHash: policyHash,
             revoked: false
@@ -111,6 +122,8 @@ contract SapphireSentinelRegistry {
         bytes32 resourceHash,
         bytes32 resultHash,
         bytes32 riskHash,
+        bytes32 privacyCommitment,
+        uint64 decisionNonce,
         bool approved
     ) external onlyOperator {
         require(receiptId != bytes32(0), "Zero receipt");
@@ -119,11 +132,15 @@ contract SapphireSentinelRegistry {
         require(resourceHash != bytes32(0), "Zero resource");
         require(resultHash != bytes32(0), "Zero result");
         require(riskHash != bytes32(0), "Zero risk");
+        require(privacyCommitment != bytes32(0), "Zero privacy");
+        require(decisionNonce != 0, "Zero nonce");
 
         Mandate storage mandate = mandates[mandateId];
         require(mandate.controller != address(0), "Unknown mandate");
         require(!mandate.revoked, "Mandate revoked");
         require(block.timestamp <= mandate.expiresAt, "Mandate expired");
+        require(!usedDecisionNonces[mandateId][decisionNonce], "Nonce used");
+        usedDecisionNonces[mandateId][decisionNonce] = true;
 
         if (approved) {
             require(amountAtomic > 0, "Zero amount");
@@ -133,6 +150,7 @@ contract SapphireSentinelRegistry {
             );
             mandate.spentAtomic += amountAtomic;
         }
+        mandate.evaluationCount += 1;
 
         receipts[receiptId] = Receipt({
             mandateId: mandateId,
@@ -141,7 +159,9 @@ contract SapphireSentinelRegistry {
             resourceHash: resourceHash,
             resultHash: resultHash,
             riskHash: riskHash,
+            privacyCommitment: privacyCommitment,
             timestamp: uint64(block.timestamp),
+            decisionNonce: decisionNonce,
             approved: approved
         });
 
@@ -153,7 +173,9 @@ contract SapphireSentinelRegistry {
             amountAtomic,
             resourceHash,
             resultHash,
-            riskHash
+            riskHash,
+            privacyCommitment,
+            decisionNonce
         );
     }
 

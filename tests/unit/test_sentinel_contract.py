@@ -42,6 +42,14 @@ def test_sentinel_contract_has_two_step_operator_transfer():
     assert "pendingOperator = address(0);" in accept_fn
 
 
+def test_default_sentinel_mandate_uses_valid_evm_addresses():
+    from lib.hackathon.sentinel import default_mandate
+
+    mandate = default_mandate()
+    for address in (mandate.controller, mandate.agent):
+        assert re.fullmatch(r"0x[0-9a-fA-F]{40}", address)
+
+
 def _extract_function(src: str, name: str) -> str:
     pattern = re.compile(rf"function\s+{re.escape(name)}\b")
     match = pattern.search(src)

@@ -27,6 +27,8 @@ log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[2]
 DEPLOYMENTS_FILE = ROOT / "data" / "chain" / "deployments.json"
+KNOWN_DEPLOYMENTS_FILE = ROOT / "data" / "chain" / "deployments.known.json"
+SENTINEL_REGISTRY_ABI_FILE = ROOT / "data" / "chain" / "sapphire_sentinel_registry.abi.json"
 
 TESTNET_RPC = "https://rpc.testnet.chain.robinhood.com"
 TESTNET_WSS = "wss://feed.testnet.chain.robinhood.com"
@@ -138,6 +140,8 @@ _PAYMENT_GATE_ABI = [
     },
 ]
 
+_SENTINEL_REGISTRY_ABI = json.loads(SENTINEL_REGISTRY_ABI_FILE.read_text())
+
 
 @dataclass
 class OnChainSignal:
@@ -175,14 +179,17 @@ class RobinhoodChainClient:
         rpc_url: str = TESTNET_RPC,
         private_key: str | None = None,
         deployments_file: Path = DEPLOYMENTS_FILE,
+        known_deployments_file: Path = KNOWN_DEPLOYMENTS_FILE,
     ) -> None:
         self._rpc_url = rpc_url
         self._private_key = private_key
         self._deployments_file = deployments_file
+        self._known_deployments_file = known_deployments_file
         self._w3: Any = None
         self._account: Any = None
         self._verifier_contract: Any = None
         self._payment_contract: Any = None
+        self._sentinel_contract: Any = None
         self._addresses: dict[str, str] = {}
         self._initialized = False
 
@@ -217,15 +224,24 @@ class RobinhoodChainClient:
         return True
 
     def _load_deployments(self) -> None:
-        if not self._deployments_file.exists():
-            return
-        try:
-            data = json.loads(self._deployments_file.read_text())
-            net = data.get("robinhood_testnet", {})
-            contracts = net.get("contracts", {})
-            self._addresses = {name: info["address"] for name, info in contracts.items()}
-        except Exception as exc:
-            log.warning("Failed to load deployments: %s", exc)
+        addresses: dict[str, str] = {}
+        for deployments_file in (self._known_deployments_file, self._deployments_file):
+            if not deployments_file.exists():
+                continue
+            try:
+                data = json.loads(deployments_file.read_text())
+                net = data.get("robinhood_testnet", {})
+                contracts = net.get("contracts", {})
+                addresses.update(
+                    {
+                        name: info["address"]
+                        for name, info in contracts.items()
+                        if isinstance(info, dict) and info.get("address")
+                    }
+                )
+            except Exception as exc:
+                log.warning("Failed to load deployments from %s: %s", deployments_file, exc)
+        self._addresses = addresses
 
     def _init_contracts(self) -> None:
         if not self._w3:
@@ -244,6 +260,13 @@ class RobinhoodChainClient:
             self._payment_contract = self._w3.eth.contract(
                 address=Web3.to_checksum_address(payment_addr),
                 abi=_PAYMENT_GATE_ABI,
+            )
+
+        sentinel_addr = self._addresses.get("SapphireSentinelRegistry")
+        if sentinel_addr:
+            self._sentinel_contract = self._w3.eth.contract(
+                address=Web3.to_checksum_address(sentinel_addr),
+                abi=_SENTINEL_REGISTRY_ABI,
             )
 
     # ------------------------------------------------------------------
@@ -344,6 +367,63 @@ class RobinhoodChainClient:
         except Exception as exc:
             log.warning("get_signal_history failed: %s", exc)
             return []
+
+    @staticmethod
+    def _hex(value: Any) -> str:
+        rendered = value.hex()
+        return rendered if rendered.startswith("0x") else f"0x{rendered}"
+
+    def get_mandate(self, mandate_id: str) -> dict:
+        """Read one mandate from the deployed non-custodial registry."""
+        if not self._ensure_init() or not self._sentinel_contract:
+            return {"error": "SapphireSentinelRegistry unavailable"}
+        try:
+            row = self._sentinel_contract.functions.mandates(mandate_id).call()
+            return {
+                "controller": row[0],
+                "agent": row[1],
+                "max_spend_atomic": row[2],
+                "spent_atomic": row[3],
+                "evaluation_count": row[4],
+                "expires_at": row[5],
+                "policy_hash": self._hex(row[6]),
+                "revoked": row[7],
+            }
+        except Exception as exc:
+            log.warning("get_mandate failed: %s", exc)
+            return {"error": str(exc)}
+
+    def get_receipt(self, receipt_id: str) -> dict:
+        """Read one policy-screened payment receipt from the registry."""
+        if not self._ensure_init() or not self._sentinel_contract:
+            return {"error": "SapphireSentinelRegistry unavailable"}
+        try:
+            row = self._sentinel_contract.functions.receipts(receipt_id).call()
+            return {
+                "mandate_id": self._hex(row[0]),
+                "payer": row[1],
+                "amount_atomic": row[2],
+                "resource_hash": self._hex(row[3]),
+                "result_hash": self._hex(row[4]),
+                "risk_hash": self._hex(row[5]),
+                "privacy_commitment": self._hex(row[6]),
+                "timestamp": row[7],
+                "decision_nonce": row[8],
+                "approved": row[9],
+            }
+        except Exception as exc:
+            log.warning("get_receipt failed: %s", exc)
+            return {"error": str(exc)}
+
+    def remaining_spend(self, mandate_id: str) -> int | None:
+        """Return the unused mandate budget without signing or sending a transaction."""
+        if not self._ensure_init() or not self._sentinel_contract:
+            return None
+        try:
+            return int(self._sentinel_contract.functions.remainingSpend(mandate_id).call())
+        except Exception as exc:
+            log.warning("remaining_spend failed: %s", exc)
+            return None
 
     def check_payment(self, address: str) -> dict:
         """Check if an address has paid for access."""

@@ -1,0 +1,16 @@
+{
+  "robinhood_testnet": {
+    "chain_id": 46630,
+    "rpc_url": "https://rpc.testnet.chain.robinhood.com",
+    "contracts": {
+      "SapphireSentinelRegistry": {
+        "address": "0x2EBB91F7B376cB821d90ac4A7d77B0d06b70B36F",
+        "creator": "0x6D669f4b197Ee634A8744Fcdc55bA4ceFf057c5E",
+        "creation_tx": "0xc53ab8fc8cdab4ce7ef5f09fd56fc564756fd8d5e5b7c0396238878d6cc84975",
+        "verified_at": "2026-04-30T00:27:37.984841Z",
+        "compiler_version": "v0.8.20+commit.a1b79de6",
+        "source_sha256": "f9b26a085184674b6831e1c71917bea8237f92f58345ce05c7f18b11974b3f98"
+      }
+    }
+  }
+}

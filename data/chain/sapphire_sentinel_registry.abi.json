@@ -148,6 +148,18 @@
         "internalType": "bytes32",
         "name": "riskHash",
         "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "privacyCommitment",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "decisionNonce",
+        "type": "uint64"
       }
     ],
     "name": "PaymentEvaluated",
@@ -208,6 +220,11 @@
         "internalType": "uint96",
         "name": "spentAtomic",
         "type": "uint96"
+      },
+      {
+        "internalType": "uint32",
+        "name": "evaluationCount",
+        "type": "uint32"
       },
       {
         "internalType": "uint64",
@@ -295,8 +312,18 @@
         "type": "bytes32"
       },
       {
+        "internalType": "bytes32",
+        "name": "privacyCommitment",
+        "type": "bytes32"
+      },
+      {
         "internalType": "uint64",
         "name": "timestamp",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "decisionNonce",
         "type": "uint64"
       },
       {
@@ -344,6 +371,16 @@
         "internalType": "bytes32",
         "name": "riskHash",
         "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "privacyCommitment",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint64",
+        "name": "decisionNonce",
+        "type": "uint64"
       },
       {
         "internalType": "bool",
@@ -437,6 +474,30 @@
     "name": "transferOperator",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "name": "usedDecisionNonces",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ]
