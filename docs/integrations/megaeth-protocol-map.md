@@ -2,6 +2,10 @@
 
 **Authored:** 2026-04-30 · **Chain ID:** 4326 (`0x10e6`) · **Status:** mainnet live since 2026-02-09
 
+> **Current posture (2026-07-30):** Sapphire's MegaETH integration is read-only.
+> No Sapphire contract is deployed on MegaETH, no writer runtime is active, and
+> the Wave C execution plan below is historical design—not authorization.
+
 ## Table of contents
 
 1. [Live mainnet protocols (ground-truth map)](#1-live-mainnet-protocols-ground-truth-map)
@@ -24,7 +28,7 @@
 
 DefiLlama tracks **26 protocols** with TVL on chain `MegaETH` ([`api.llama.fi/protocols` filtered](https://defillama.com/chain/MegaETH)). The Blockscout verified-contracts feed shows the build is much wider than the DefiLlama tracker — many infra/NFT/gaming dApps don't report TVL but are demonstrably deployed (Aave V3 sub-deployments, GMX V2 130-contract diamond, Silo v2 lending, LayerZero DVN, LiFi escrow, Across V4, Enso Router, Permit2, Uniswap V3 fork canon).
 
-The protocol table below is the **integration target list**. Priority is Sapphire-specific (1=must, 2=should, 3=nice). Categories: DEX-spot, DEX-perps, lending, stable, bridge, yield, oracle, prediction, NFT, gaming.
+The protocol table below is the **read-integration target list**. Priority is Sapphire-specific (1=must, 2=should, 3=nice). Categories: DEX-spot, DEX-perps, lending, stable, bridge, yield, oracle, prediction, NFT, gaming.
 
 | # | Protocol | Category | TVL (MegaETH) | Entry point address | Source / ABI | Priority | Sapphire rationale |
 |---|---|---|---:|---|---|:---:|---|

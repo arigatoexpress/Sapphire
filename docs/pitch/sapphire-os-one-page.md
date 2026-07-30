@@ -66,7 +66,7 @@ The Sentinel gate reads multi-chain state (peg, solvency, oracle, frozen flags) 
 | Ecosystem | Where Sapphire fits | Submission status |
 |---|---|---|
 | **0G Labs** | Verifiable autonomous trading (Track 2) — 0G Storage envelope + 0G Compute TEE inference + 0G Chain anchor on chainId 16661 | PR #525 merged on `feat/0g-integration`; mainnet deploy + demo video pending Ari |
-| **Arbitrum / Robinhood Chain** | Sentinel agent-safety + USDG payment receipts + chain-health primitive on tokenized-stock contracts | Sentinel ready (`SapphireSentinelRegistry`, Forge suite, Slither CI); Robinhood Chain testnet `recordPaymentEvaluation(...)` deploy pending Ari |
+| **Arbitrum / Robinhood Chain** | Sentinel agent-safety + payment-decision receipts + chain-health primitive | `SapphireSentinelRegistry` deployed and verified on Robinhood Chain testnet 46630 on 2026-04-30; one mandate and four evaluation receipts exist. SignalVerifier and PaymentGate remain written-only; no mainnet writer is active. |
 | **MegaETH** | Multi-protocol Python SDK (Aave V3, Kumbaya, USDM, GMX V2) + chain-health primitive + AI-agent operator (Mega Mafia 2.0 thesis) | Mafia 2.0 application drafted; `awesome-megaeth-ai` listing PR pending |
 | **Zama (FHE)** | Privacy-preserving agent payments + AI Agent Skills bounty (`SKILL.md` for fhEVM, dogfoodable on Sentinel basket) | SKILL.md scaffold ready; May 10 bounty submit pending |
 

@@ -219,7 +219,9 @@ Building on the `SENTINEL_DEMO_FORCE_DEPEG` pattern Lane E shipped (deterministi
   - `SENTINEL_DEMO_FORCE_INJECTION=1` → policy evaluator blocks, no x402 issued
   - default → happy path, mandate honored, anchor preview emitted
 - [ ] Each mode must run in **<5 seconds end-to-end** so a judge can see all three in one minute
-- [ ] Real Robinhood Chain testnet `recordPaymentEvaluation(...)` tx must land **live** in the demo (not a screenshot) — judges have learned to spot fake demos
+- [x] Real Robinhood Chain testnet `recordPaymentEvaluation(...)` transactions
+      landed on 2026-04-30: four successful evaluation receipts against the
+      deployed registry, independently readable from Blockscout.
 - [ ] Pre-fund **3 separate operator keys** before demo day (faucet outage insurance)
 - [ ] Pre-record the 90-second demo video AND have a live-demo backup in case the recording fails
 - [ ] Judge-facing dashboard at `/chain/sentinel` should display the **chain explorer link** to the just-landed tx as the closing frame
