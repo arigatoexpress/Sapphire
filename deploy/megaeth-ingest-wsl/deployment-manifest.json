@@ -13,7 +13,14 @@
     "health_url": "http://127.0.0.1:8788/health",
     "install_state": "source_only_not_installed",
     "start_mode": "manual",
-    "operator_gate_required": true
+    "operator_gate_required": true,
+    "windows_anchor": {
+      "task_name": "Sapphire-MegaETH-Observer-Anchor",
+      "registration": "manual_no_trigger",
+      "starts_service": true,
+      "keeps_wsl_alive": true,
+      "automatic_restart": false
+    }
   },
   "capabilities": {
     "rpc_reads": true,
@@ -28,6 +35,7 @@
     "pause_file_required": true,
     "forwarding_environment_value": "0",
     "systemd_enablement_allowed": false,
-    "automatic_restart_allowed": false
+    "automatic_restart_allowed": false,
+    "windows_task_triggers_allowed": false
   }
 }
