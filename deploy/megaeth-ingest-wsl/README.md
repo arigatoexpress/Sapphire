@@ -20,6 +20,21 @@ While paused, the observer still reads the current MegaETH block and exposes
 read health, but the shared forwarder drops every event. Removing the pause
 file is outside this deployment contract.
 
+## WSL lifetime anchor
+
+Microsoft documents that systemd services do not keep a WSL instance alive.
+Consequently, starting the systemd unit from a short-lived `wsl.exe` process
+is not a durable runtime.
+
+`register-observer-anchor.ps1` registers a current-user Windows Scheduled Task
+with no trigger and no restart policy. The task starts the static systemd unit,
+then keeps one ordinary Linux shell alive only while that unit remains active.
+Stopping the systemd unit causes the anchor to exit within 30 seconds.
+
+Registration is inert by default. Supplying `-Start` performs one manual task
+start after successful registration. The script refuses to replace an existing
+task; operators must inspect and remove any old task explicitly.
+
 ## Installation contract
 
 Install an exact, reviewed Git tree at `/opt/sapphire/Sapphire`, create a
@@ -34,8 +49,9 @@ Before any start:
    requirements lock evidence to the release receipt.
 3. Verify `systemd-analyze verify` succeeds.
 4. Confirm the unit is static, inactive, disabled, and has zero restarts.
+5. Register the Windows anchor and confirm it has zero triggers.
 
-The sole runtime action permitted by this package is a manual start followed
-by local observation of `http://127.0.0.1:8788/health`. It must report chain
-ID `4326`, `forwarding_enabled: false`, `paused: true`, and live block data.
-Do not enable the unit.
+The sole runtime action permitted by this package is a manual anchor start
+followed by local observation of `http://127.0.0.1:8788/health`. It must
+report chain ID `4326`, `forwarding_enabled: false`, `paused: true`, and live
+block data. Do not enable the unit or add a Windows task trigger.
