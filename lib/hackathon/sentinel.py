@@ -148,7 +148,7 @@ def default_mandate(now: datetime | None = None) -> AgentMandate:
     ts = now or datetime.now(UTC)
     return AgentMandate(
         mandate_id="sentinel-london-demo-v1",
-        controller="0xA11CE000000000000000000000000000000004026",
+        controller="0xA11CE00000000000000000000000000000004026",
         agent="0xA6E1700000000000000000000000000000000402",
         max_spend_usdc=Decimal("2.00"),
         spent_usdc=Decimal("0.37"),

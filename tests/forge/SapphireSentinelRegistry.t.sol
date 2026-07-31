@@ -2,12 +2,12 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import {SapphireSentinelRegistry} from "../../contracts/SapphireSentinelRegistry.sol";
+import { SapphireSentinelRegistry } from "../../contracts/SapphireSentinelRegistry.sol";
 
 /// @title SapphireSentinelRegistry test suite
 /// @notice Behavioural and security coverage for the non-custodial mandate +
 ///         payment-evaluation registry deployed on Robinhood Chain testnet.
-/// @dev    18 test cases cover happy paths, ACL, replay protection, hash
+/// @dev    19 test cases cover happy paths, ACL, replay protection, hash
 ///         binding, expiry, two-step operator transfer, edge cases, and
 ///         event emissions. Generated as part of the Arbitrum London
 ///         Buildathon smart-contract quality push.
@@ -30,6 +30,8 @@ contract SapphireSentinelRegistryTest is Test {
     bytes32 internal constant RESOURCE_HASH = keccak256("resource:rwa-signal");
     bytes32 internal constant RESULT_HASH = keccak256("result:approved");
     bytes32 internal constant RISK_HASH = keccak256("risk:nominal");
+    bytes32 internal constant PRIVACY_COMMITMENT = keccak256("privacy:sealed");
+    uint64 internal constant DECISION_NONCE = 7;
 
     uint96 internal constant MAX_SPEND = 1_000_000; // 1.0 in 6-decimal atomic units
     // 2_000_000_000 = 2033-05-18, comfortably past the 2026 vm.warp baseline
@@ -58,7 +60,9 @@ contract SapphireSentinelRegistryTest is Test {
         uint96 amountAtomic,
         bytes32 resourceHash,
         bytes32 resultHash,
-        bytes32 riskHash
+        bytes32 riskHash,
+        bytes32 privacyCommitment,
+        uint64 decisionNonce
     );
     event OperatorTransferStarted(address indexed previousOperator, address indexed newOperator);
     event OperatorTransferred(address indexed previousOperator, address indexed newOperator);
@@ -90,6 +94,7 @@ contract SapphireSentinelRegistryTest is Test {
             address storedAgent,
             uint96 storedMax,
             uint96 storedSpent,
+            uint32 evaluationCount,
             uint64 storedExpiry,
             bytes32 storedPolicy,
             bool storedRevoked
@@ -99,6 +104,7 @@ contract SapphireSentinelRegistryTest is Test {
         assertEq(storedAgent, agent, "agent");
         assertEq(storedMax, MAX_SPEND, "max spend");
         assertEq(storedSpent, 0, "spent starts at zero");
+        assertEq(evaluationCount, 0, "evaluation count starts at zero");
         assertEq(storedExpiry, FUTURE_EXPIRY, "expiry");
         assertEq(storedPolicy, POLICY_HASH, "policy hash");
         assertFalse(storedRevoked, "starts unrevoked");
@@ -154,11 +160,29 @@ contract SapphireSentinelRegistryTest is Test {
 
         vm.expectEmit(true, true, true, true);
         emit PaymentEvaluated(
-            RECEIPT_ID, MANDATE_ID, payer, true, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH
+            RECEIPT_ID,
+            MANDATE_ID,
+            payer,
+            true,
+            100,
+            RESOURCE_HASH,
+            RESULT_HASH,
+            RISK_HASH,
+            PRIVACY_COMMITMENT,
+            DECISION_NONCE
         );
 
         registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
+            RECEIPT_ID,
+            MANDATE_ID,
+            payer,
+            100,
+            RESOURCE_HASH,
+            RESULT_HASH,
+            RISK_HASH,
+            PRIVACY_COMMITMENT,
+            DECISION_NONCE,
+            true
         );
 
         (
@@ -168,7 +192,9 @@ contract SapphireSentinelRegistryTest is Test {
             bytes32 resource,
             bytes32 result,
             bytes32 risk,
+            bytes32 privacyCommitment,
             uint64 timestamp,
+            uint64 decisionNonce,
             bool approved
         ) = registry.receipts(RECEIPT_ID);
 
@@ -178,8 +204,13 @@ contract SapphireSentinelRegistryTest is Test {
         assertEq(resource, RESOURCE_HASH, "resource hash");
         assertEq(result, RESULT_HASH, "result hash");
         assertEq(risk, RISK_HASH, "risk hash");
+        assertEq(privacyCommitment, PRIVACY_COMMITMENT, "privacy commitment");
         assertEq(timestamp, uint64(block.timestamp), "timestamp pinned to block");
+        assertEq(decisionNonce, DECISION_NONCE, "decision nonce");
         assertTrue(approved, "approved flag");
+
+        (,,,, uint32 evaluationCount,,,) = registry.mandates(MANDATE_ID);
+        assertEq(evaluationCount, 1, "evaluation count incremented");
 
         // Spend tracking: approved payments decrement remaining spend.
         assertEq(registry.remainingSpend(MANDATE_ID), MAX_SPEND - 100, "remaining spend updated");
@@ -190,103 +221,81 @@ contract SapphireSentinelRegistryTest is Test {
         _registerDefaultMandate();
         vm.prank(stranger);
         vm.expectRevert(bytes("Not operator"));
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(RECEIPT_ID, 100, RESULT_HASH, DECISION_NONCE, true);
     }
 
     /// @notice 08 — Replay protection: the same receiptId is rejected on
     ///         the second attempt regardless of payload mutation.
     function test_RecordPayment_Replay_SameReceiptId_Reverts() public {
         _registerDefaultMandate();
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(RECEIPT_ID, 100, RESULT_HASH, DECISION_NONCE, true);
         // Second call with the same receiptId must revert even if payload differs.
         vm.expectRevert(bytes("Receipt exists"));
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID,
-            MANDATE_ID,
-            payer,
-            200, // different amount — replay still rejected
-            RESOURCE_HASH,
-            RESULT_HASH,
-            RISK_HASH,
-            true
-        );
+        _recordPayment(RECEIPT_ID, 200, RESULT_HASH, DECISION_NONCE + 1, true);
     }
 
-    /// @notice 09 — Hash binding: tampering with a stored receipt requires
+    /// @notice 09 — A decision nonce cannot be reused under a mandate, even
+    ///         with a distinct receipt id.
+    function test_RecordPayment_Replay_SameDecisionNonce_Reverts() public {
+        _registerDefaultMandate();
+        _recordPayment(RECEIPT_ID, 100, RESULT_HASH, DECISION_NONCE, true);
+
+        vm.expectRevert(bytes("Nonce used"));
+        _recordPayment(keccak256("receipt:alpha-2"), 100, RESULT_HASH, DECISION_NONCE, true);
+    }
+
+    /// @notice 10 — Hash binding: tampering with a stored receipt requires
     ///         re-recording with a different receiptId. We assert that an
     ///         attempt to "rewrite history" using the original receiptId
     ///         is impossible (replay guard above), and that distinct
     ///         payloads produce distinct on-chain hashes.
     function test_RecordPayment_HashBinding_TamperingProducesDifferentReceipt() public {
         _registerDefaultMandate();
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(RECEIPT_ID, 100, RESULT_HASH, DECISION_NONCE, true);
 
         bytes32 tamperedReceiptId = keccak256("receipt:alpha-1-tampered");
         bytes32 tamperedResult = keccak256("result:tampered");
-        registry.recordPaymentEvaluation(
-            tamperedReceiptId,
-            MANDATE_ID,
-            payer,
-            100,
-            RESOURCE_HASH,
-            tamperedResult,
-            RISK_HASH,
-            true
-        );
+        _recordPayment(tamperedReceiptId, 100, tamperedResult, DECISION_NONCE + 1, true);
 
-        (, , , , bytes32 originalResult, , , ) = registry.receipts(RECEIPT_ID);
-        (, , , , bytes32 newResult, , , ) = registry.receipts(tamperedReceiptId);
+        (,,,, bytes32 originalResult,,,,,) = registry.receipts(RECEIPT_ID);
+        (,,,, bytes32 newResult,,,,,) = registry.receipts(tamperedReceiptId);
 
         assertEq(originalResult, RESULT_HASH, "original receipt result hash unchanged");
         assertEq(newResult, tamperedResult, "tampered payload anchored under different id");
         assertTrue(originalResult != newResult, "tampering must surface as new receipt");
     }
 
-    /// @notice 10 — Spend cap: cumulative approved amounts cannot exceed
+    /// @notice 11 — Spend cap: cumulative approved amounts cannot exceed
     ///         maxSpendAtomic. Underflow/overflow guard.
     function test_RecordPayment_SpendCap_Exceeded_Reverts() public {
         _registerDefaultMandate();
-        registry.recordPaymentEvaluation(
-            keccak256("r1"), MANDATE_ID, payer, MAX_SPEND - 50, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(keccak256("r1"), MAX_SPEND - 50, RESULT_HASH, DECISION_NONCE, true);
         // Second approved evaluation exceeds the cap.
         vm.expectRevert(bytes("Spend limit exceeded"));
-        registry.recordPaymentEvaluation(
-            keccak256("r2"), MANDATE_ID, payer, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(keccak256("r2"), 100, RESULT_HASH, DECISION_NONCE + 1, true);
     }
 
-    /// @notice 11 — Rejected (non-approved) payments do not consume spend
+    /// @notice 12 — Rejected (non-approved) payments do not consume spend
     ///         budget but still anchor an auditable receipt.
     function test_RecordPayment_Rejected_DoesNotConsumeBudget() public {
         _registerDefaultMandate();
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, 0, RESOURCE_HASH, RESULT_HASH, RISK_HASH, false
-        );
+        _recordPayment(RECEIPT_ID, 0, RESULT_HASH, DECISION_NONCE, false);
         assertEq(registry.remainingSpend(MANDATE_ID), MAX_SPEND, "rejected: budget untouched");
-        (, , , , , , , bool approved) = registry.receipts(RECEIPT_ID);
+        (,,,,,,,,, bool approved) = registry.receipts(RECEIPT_ID);
         assertFalse(approved, "rejected receipt persists with approved=false");
     }
 
-    /// @notice 12 — Cannot record payment against an unknown mandate.
+    /// @notice 13 — Cannot record payment against an unknown mandate.
     function test_RecordPayment_UnknownMandate_Reverts() public {
         vm.expectRevert(bytes("Unknown mandate"));
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(RECEIPT_ID, 100, RESULT_HASH, DECISION_NONCE, true);
     }
 
     // -----------------------------------------------------------------
     // Revocation + expiry
     // -----------------------------------------------------------------
 
-    /// @notice 13 — Revocation flips the active flag and blocks further
+    /// @notice 14 — Revocation flips the active flag and blocks further
     ///         payments; emits MandateRevoked.
     function test_RevokeMandate_BlocksFurtherPayments() public {
         _registerDefaultMandate();
@@ -296,12 +305,10 @@ contract SapphireSentinelRegistryTest is Test {
         assertFalse(registry.isMandateActive(MANDATE_ID), "revoked mandate is not active");
 
         vm.expectRevert(bytes("Mandate revoked"));
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(RECEIPT_ID, 100, RESULT_HASH, DECISION_NONCE, true);
     }
 
-    /// @notice 14 — A mandate that was valid at creation but has since
+    /// @notice 15 — A mandate that was valid at creation but has since
     ///         expired blocks new payment evaluations.
     function test_RecordPayment_ExpiredMandate_Reverts() public {
         _registerDefaultMandate();
@@ -309,28 +316,24 @@ contract SapphireSentinelRegistryTest is Test {
         vm.warp(uint256(FUTURE_EXPIRY) + 1);
         assertFalse(registry.isMandateActive(MANDATE_ID), "expired mandate is inactive");
         vm.expectRevert(bytes("Mandate expired"));
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, 100, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(RECEIPT_ID, 100, RESULT_HASH, DECISION_NONCE, true);
     }
 
     // -----------------------------------------------------------------
     // Read-only views
     // -----------------------------------------------------------------
 
-    /// @notice 15 — `remainingSpend` returns 0 for unknown mandates and
+    /// @notice 16 — `remainingSpend` returns 0 for unknown mandates and
     ///         saturates correctly when fully spent.
     function test_RemainingSpend_UnknownAndSaturated() public {
         assertEq(registry.remainingSpend(keccak256("nope")), 0, "unknown mandate -> 0");
 
         _registerDefaultMandate();
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, MAX_SPEND, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(RECEIPT_ID, MAX_SPEND, RESULT_HASH, DECISION_NONCE, true);
         assertEq(registry.remainingSpend(MANDATE_ID), 0, "fully spent -> 0");
     }
 
-    /// @notice 16 — `isMandateActive` returns false for any not-yet-created
+    /// @notice 17 — `isMandateActive` returns false for any not-yet-created
     ///         id (zero-controller sentinel).
     function test_IsMandateActive_UnknownReturnsFalse() public {
         assertFalse(registry.isMandateActive(keccak256("nope")), "unknown mandate -> inactive");
@@ -340,7 +343,7 @@ contract SapphireSentinelRegistryTest is Test {
     // Two-step operator transfer
     // -----------------------------------------------------------------
 
-    /// @notice 17 — Two-step operator handover: transferOperator sets the
+    /// @notice 18 — Two-step operator handover: transferOperator sets the
     ///         pendingOperator and emits OperatorTransferStarted; only the
     ///         pendingOperator can finalise via acceptOperator(), which
     ///         clears the pending slot and emits OperatorTransferred.
@@ -373,16 +376,14 @@ contract SapphireSentinelRegistryTest is Test {
     // Edge cases / fuzzing
     // -----------------------------------------------------------------
 
-    /// @notice 18 — Fuzz harness: any random uint96 amount that fits inside
+    /// @notice 19 — Fuzz harness: any random uint96 amount that fits inside
     ///         a fresh mandate's budget is accepted exactly once and
     ///         updates remainingSpend by exactly that delta.
     function testFuzz_RecordPayment_AmountWithinBudget(uint96 amount) public {
         amount = uint96(bound(uint256(amount), 1, MAX_SPEND));
         _registerDefaultMandate();
 
-        registry.recordPaymentEvaluation(
-            RECEIPT_ID, MANDATE_ID, payer, amount, RESOURCE_HASH, RESULT_HASH, RISK_HASH, true
-        );
+        _recordPayment(RECEIPT_ID, amount, RESULT_HASH, DECISION_NONCE, true);
         assertEq(
             registry.remainingSpend(MANDATE_ID),
             MAX_SPEND - amount,
@@ -397,6 +398,27 @@ contract SapphireSentinelRegistryTest is Test {
     function _registerDefaultMandate() internal {
         registry.registerMandate(
             MANDATE_ID, controller, agent, MAX_SPEND, FUTURE_EXPIRY, POLICY_HASH
+        );
+    }
+
+    function _recordPayment(
+        bytes32 receiptId,
+        uint96 amount,
+        bytes32 resultHash,
+        uint64 decisionNonce,
+        bool approved
+    ) internal {
+        registry.recordPaymentEvaluation(
+            receiptId,
+            MANDATE_ID,
+            payer,
+            amount,
+            RESOURCE_HASH,
+            resultHash,
+            RISK_HASH,
+            PRIVACY_COMMITMENT,
+            decisionNonce,
+            approved
         );
     }
 }

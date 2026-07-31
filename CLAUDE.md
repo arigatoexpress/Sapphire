@@ -124,7 +124,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/pm_bot/` | service | PM bot webhook and reviewed Telegram draft queue [Mac:18082]. Built, not deployed. |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
 | `plugins/claw-sapphire/` | plugin | 118 tool scripts on disk (64 at top level + 52 in `internal/` + 2 in `_deprecated/`), 10 libs, 604 collected tests. |
-| `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor — first live mandate minted 2026-07-25: BRODIE token @ $0.38, all four safety boundaries proved). Deployed on Robinhood Chain **testnet (chain 46630)** via `scripts/deploy_robinhood_chain.py`; **mainnet (chain 4663, live since 2026-07-01)** deployment is a follow-up. |
+| `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (written, not deployed), **`SapphirePaymentGate.sol`** (written, not deployed), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor; deployed and Blockscout-verified on 2026-04-30 at `0x2EBB91F7B376cB821d90ac4A7d77B0d06b70B36F` on Robinhood Chain **testnet 46630**). BRODIE is a separate rug-detector PASS fixture, not an on-chain mandate. Robinhood Chain **mainnet 4663** is read-only through the ops-state poller; Sapphire's web3 client remains testnet-only. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
 | `data/content/` | data | Content engine drafts + ready/ queue. |

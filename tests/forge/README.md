@@ -70,5 +70,5 @@ PaymentGate is the deliberate `.call{value:}` migration in `withdraw()` (see
 
 | File | Purpose |
 |---|---|
-| `SapphireSentinelRegistry.t.sol` | 18 cases: ACL, replay protection, hash binding, spend cap, expiry, two-step operator transfer, view sentinels, fuzz harness. |
+| `SapphireSentinelRegistry.t.sol` | 19 cases: ACL, receipt-ID and decision-nonce replay protection, privacy/hash binding, spend cap, expiry, two-step operator transfer, view sentinels, fuzz harness. |
 | `SapphirePaymentGate.t.sol` | 8 cases: `.call{value:}` happy path, gas-hungry contract treasury, reentrancy guard against malicious treasury, setter events, ACL, zero-balance + zero-price guards. |

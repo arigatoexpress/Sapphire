@@ -13,6 +13,7 @@ behaviour stays in one place.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -38,8 +39,11 @@ def pytest_collection_modifyitems(config, items):
     skip_marker = pytest.mark.skip(
         reason=f"set {INTEGRATION_FLAG}=1 to run MegaETH integration tests",
     )
+    suite_dir = Path(__file__).resolve().parent
     for item in items:
-        item.add_marker(skip_marker)
+        item_path = Path(str(item.path)).resolve()
+        if item_path == suite_dir or suite_dir in item_path.parents:
+            item.add_marker(skip_marker)
 
 
 @pytest.fixture(scope="session")

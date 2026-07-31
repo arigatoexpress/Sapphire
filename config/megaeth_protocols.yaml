@@ -3,7 +3,9 @@
 # All addresses cross-checked against the canonical Aave address book
 # (https://github.com/aave-dao/aave-address-book/blob/main/src/AaveV3MegaEth.sol)
 # AND live-verified to have non-zero `eth_getCode` against
-# https://mainnet.megaeth.com/rpc on 2026-04-30.
+# https://mainnet.megaeth.com/rpc on 2026-07-30. The opt-in live test
+# tests/integration/megaeth/test_registry_code_live.py checks every active
+# address for non-empty bytecode.
 #
 # Schema:
 #   <protocol_key>:
@@ -35,7 +37,10 @@ aave_v3:
     ui_pool_data_provider: "aave_v3/ui_pool_data_provider.json"
     protocol_data_provider: "aave_v3/protocol_data_provider.json"
   notes: >
-    80% of MegaETH chain TVL ($392.4M of $490.1M as of 2026-04-30 TGE).
+    Aave V3 held $28.83M of MegaETH's $46.85M chain TVL on 2026-07-30
+    (61.5%, DefiLlama API). MegaETH chain TVL was 80.9% below its
+    2026-05-12 peak; treat this integration as a read-only venue, not a
+    production capital-allocation endorsement.
     Pool (proxy 0x7e32…) has impl 0xc74c…44da4D which is NOT verified on
     Blockscout, so pool_min.json is a hand-curated subset of read methods
     sourced from aave-dao/aave-v3-origin/src/contracts/interfaces/IPool.sol.
@@ -58,7 +63,9 @@ kumbaya:
     swap_router: "kumbaya/swap_router.json"
     pool: "kumbaya/pool.json"
   notes: >
-    Second-largest spot venue on MegaETH ($74.8M TVL as of 2026-04-30).
+    Canonical spot venue in Sapphire's MegaETH read surface. DefiLlama did
+    not expose a separately attributable Kumbaya TVL row on 2026-07-30, so
+    the former $74.8M launch-day annotation is intentionally not repeated.
     Factory, QuoterV2, SwapRouter02 are all VERIFIED on Blockscout
     (cross-checked 2026-04-30). Pool contracts are CREATE2-deployed
     clones and NOT verified — pool.json is the canonical UniswapV3Pool

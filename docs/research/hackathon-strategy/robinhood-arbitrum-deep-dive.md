@@ -155,7 +155,12 @@ The reserved-slot wording is per **prize bucket** — read literally, it likely 
 
 "Your project must be deployed on an Arbitrum chain to qualify. For example: Arbitrum Sepolia, Arbitrum One, Robinhood Chain, or others."
 
-This is a hard gate. Our `scripts/deploy_robinhood_chain.py` path must produce a verifiable testnet deployment of `SapphireSentinelRegistry.sol` BEFORE the 2026-06-14 submission. Currently we have a `--dry-run` mode but no funded testnet deploy on record (per `docs/hackathon/sapphire-sentinel-london-2026.md` "Next Buildathon Steps" item 1-2).
+This gate is satisfied. `SapphireSentinelRegistry.sol` was deployed to Robinhood Chain testnet
+46630 on 2026-04-30 at
+[`0x2EBB91F7B376cB821d90ac4A7d77B0d06b70B36F`](https://explorer.testnet.chain.robinhood.com/address/0x2EBB91F7B376cB821d90ac4A7d77B0d06b70B36F)
+and is Blockscout-verified. The creation transaction is
+`0xc53ab8fc8cdab4ce7ef5f09fd56fc564756fd8d5e5b7c0396238878d6cc84975`.
+The source-controlled deployment record lives in `data/chain/deployments.known.json`.
 
 ### 3.4 What Sentinel already satisfies vs gaps
 
@@ -214,7 +219,9 @@ Building on the `SENTINEL_DEMO_FORCE_DEPEG` pattern Lane E shipped (deterministi
   - `SENTINEL_DEMO_FORCE_INJECTION=1` → policy evaluator blocks, no x402 issued
   - default → happy path, mandate honored, anchor preview emitted
 - [ ] Each mode must run in **<5 seconds end-to-end** so a judge can see all three in one minute
-- [ ] Real Robinhood Chain testnet `recordPaymentEvaluation(...)` tx must land **live** in the demo (not a screenshot) — judges have learned to spot fake demos
+- [x] Real Robinhood Chain testnet `recordPaymentEvaluation(...)` transactions
+      landed on 2026-04-30: four successful evaluation receipts against the
+      deployed registry, independently readable from Blockscout.
 - [ ] Pre-fund **3 separate operator keys** before demo day (faucet outage insurance)
 - [ ] Pre-record the 90-second demo video AND have a live-demo backup in case the recording fails
 - [ ] Judge-facing dashboard at `/chain/sentinel` should display the **chain explorer link** to the just-landed tx as the closing frame
