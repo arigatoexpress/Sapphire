@@ -1,0 +1,33 @@
+{
+  "schema": "sapphire/megaeth-wsl-observer-deployment/v1",
+  "chain": {
+    "name": "MegaETH mainnet",
+    "chain_id": 4326,
+    "rpc_url": "https://mainnet.megaeth.com/rpc",
+    "transport": "http_polling"
+  },
+  "runtime": {
+    "target": "Windows WSL",
+    "install_root": "/opt/sapphire/Sapphire",
+    "unit": "sapphire-megaeth-ingest.service",
+    "health_url": "http://127.0.0.1:8788/health",
+    "install_state": "source_only_not_installed",
+    "start_mode": "manual",
+    "operator_gate_required": true
+  },
+  "capabilities": {
+    "rpc_reads": true,
+    "transaction_signing": false,
+    "wallets_loaded": 0,
+    "signal_forwarding": false,
+    "trade_execution": false,
+    "outward_messaging": false
+  },
+  "safety": {
+    "pause_file": "/var/lib/sapphire/megaeth-ingest/pause",
+    "pause_file_required": true,
+    "forwarding_environment_value": "0",
+    "systemd_enablement_allowed": false,
+    "automatic_restart_allowed": false
+  }
+}
