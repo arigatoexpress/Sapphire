@@ -1,0 +1,36 @@
+[Unit]
+Description=Sapphire MegaETH read-only observer
+Documentation=file:/opt/sapphire/Sapphire/deploy/megaeth-ingest-wsl/README.md
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/var/lib/sapphire/megaeth-ingest/pause
+
+[Service]
+Type=simple
+User=sapphire
+Group=sapphire
+WorkingDirectory=/opt/sapphire/Sapphire
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/opt/sapphire/Sapphire/services/megaeth-ingest/src:/opt/sapphire/Sapphire
+Environment=SAPPHIRE_MEGAETH_RPC_URL=https://mainnet.megaeth.com/rpc
+Environment=SAPPHIRE_MEGAETH_CHAIN_ID=4326
+Environment=SAPPHIRE_MEGAETH_WSS_REQUIRED=0
+Environment=SAPPHIRE_MEGAETH_HEALTH_PORT=8788
+Environment=SAPPHIRE_MEGAETH_POLL_INTERVAL_SEC=1
+Environment=SAPPHIRE_MEGAETH_INGEST_ENABLED=0
+Environment=SAPPHIRE_MEGAETH_KILLSWITCH=/var/lib/sapphire/megaeth-ingest/pause
+ExecStart=/opt/sapphire/Sapphire/.venv/bin/python -m megaeth_ingest.main
+Restart=no
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+UMask=0077
