@@ -103,8 +103,14 @@ except Exception as e:
 
 # ─── Endpoints (overridable via env vars for network changes) ────────────────
 WINDOWS_GPU = os.getenv("WINDOWS_GPU_URL", "http://192.168.1.61:11434")
-PI_RARI1 = os.getenv("PI_RARI1_URL", "http://100.x.x.x:11434")
-PI_RARI2 = os.getenv("PI_RARI2_URL", "http://100.x.x.y:11434")
+# Deliberately EMPTY, not a plausible-looking address. The 2026-05-30 sanitizer
+# left "http://100.x.x.x:11434" here, which reads as a real endpoint to every
+# layer downstream and then fails as an opaque DNS error (see
+# _is_placeholder_host). An explicit blank surfaces as "misconfigured" instead.
+# Set PI_RARI1_URL / PI_RARI2_URL to the real tailnet addresses when the boards
+# are re-admitted; both tiers ship enabled=0 until then.
+PI_RARI1 = os.getenv("PI_RARI1_URL", "")
+PI_RARI2 = os.getenv("PI_RARI2_URL", "")
 MAC_LOCAL = os.getenv("MAC_LOCAL_URL", "http://127.0.0.1:11434")
 
 # Kimi Cloud — permanent API keys only (no expiring CLI tokens)
@@ -270,10 +276,83 @@ def _endpoint_enabled(name: str) -> bool:
     return True
 
 
+_PLACEHOLDER_TOKENS = ("placeholder", "changeme", "example.com", "todo", "x.x.x")
+
+
+def _host_of(url: str) -> str:
+    """Extract the bare host from a tier URL, tolerating a missing scheme."""
+    parsed = urllib.parse.urlparse(url if "//" in url else f"//{url}")
+    return parsed.hostname or ""
+
+
+def _is_redacted_address(host: str) -> bool:
+    """True when a host is a fake that *masquerades* as a real address.
+
+    This is the dangerous subclass, and it is kept separate from "blank" on
+    purpose. A blank endpoint is honest -- it reports ``misconfigured`` and an
+    operator supplies a value. A disguised one like ``100.x.x.z`` is trusted by
+    every layer downstream and only fails several hops away, as DNS. Committed
+    defaults are allowed to be blank; they must never be disguised.
+    """
+    h = host.strip().lower()
+    if not h:
+        return False
+    if any(token in h for token in _PLACEHOLDER_TOKENS):
+        return True
+    labels = h.split(".")
+    if len(labels) == 4 and any(label.isdigit() for label in labels):
+        return any(len(label) <= 2 and not label.isdigit() for label in labels)
+    return False
+
+
+def _is_placeholder_host(host: str) -> bool:
+    """True when a host can never resolve, whether blank or redacted.
+
+    On 2026-05-30, commit 2533b12a ("sanitize Tailscale IPs across 95 files")
+    rewrote an *executable* default from ``100.71.10.48`` to ``100.x.x.z``.
+    Crucially, ``100.x.x.z`` is a syntactically legal hostname, so it does not
+    fail fast -- it reaches getaddrinfo and surfaces as
+    ``[Errno 8] nodename nor servname provided``. That message names DNS, so it
+    sends an operator to the network instead of to the constant, and the Windows
+    GPU tier consequently sat on the ~90s CPU fallback for 2d23h.
+
+    Detection is therefore shape-based rather than syntactic: a dotted-quad with
+    at least one numeric octet and at least one short non-numeric octet is a
+    redacted address, not a hostname anyone meant to dial.
+    """
+    return not host.strip() or _is_redacted_address(host)
+
+
+def _endpoint_misconfigured(name: str) -> bool:
+    """True when a tier's configured URL is unusable by construction."""
+    url = {
+        "windows-gpu": WINDOWS_GPU,
+        "pi-rari1": PI_RARI1,
+        "pi-rari2": PI_RARI2,
+        "mac-local": MAC_LOCAL,
+        "kimi-cloud": MOONSHOT_BASE,
+    }.get(name)
+    return False if url is None else _is_placeholder_host(_host_of(url))
+
+
 def _endpoint_status(name: str) -> str:
-    """Return a health status that distinguishes disabled tiers from failures."""
+    """Return a health status that distinguishes disabled tiers from failures.
+
+    Precedence is ``disabled`` -> ``misconfigured`` -> health, and the order is
+    deliberate. A deliberately-off tier is operator *intent*, not a fault, so
+    surfacing it as broken would leave two tiers permanently red on /health and
+    train everyone to ignore the field -- the same dismissal failure this
+    codebase has already been bitten by.
+
+    But ``misconfigured`` must outrank ``failed``: the instant someone flips
+    ``PI_RARI1_ENABLED=1`` without a URL, ``failed`` would blame the network and
+    reproduce the exact 2d23h misdiagnosis. So the trap is closed at the moment
+    of enabling, without nagging about tiers nobody asked to run.
+    """
     if not _endpoint_enabled(name):
         return "disabled"
+    if _endpoint_misconfigured(name):
+        return "misconfigured"
     return "healthy" if _is_healthy(name) else "failed"
 
 
