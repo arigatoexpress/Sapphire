@@ -70,7 +70,7 @@ cryptography==48.0.1
 certifi==2026.7.22
 
 # webauthn admin scaffold (services/analytics_dashboard/auth)
-webauthn==2.7.1
+webauthn==3.0.0
 itsdangerous==2.2.0
 
 # --- security-hardened transitive floors (2026-07-25 CVE triage) -------------
