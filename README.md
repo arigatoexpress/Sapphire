@@ -11,79 +11,141 @@
 [![Tests](https://img.shields.io/badge/tests-7%2C836%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
 [![License](https://img.shields.io/badge/license-proprietary-0A2540)](LICENSE)
 
-**A self-sovereign operating system for capital intelligence, autonomous operations, and acquisition-grade diligence.**
+**Self-sovereign capital intelligence OS** — trading, research, threat intel, and operator surfaces on a local-first plant (Mac + optional Windows desk), with a privacy-preserving public face.
 
-It runs trading, on-chain analytics, threat intel, regulatory monitoring, and content ops as one event-bus-mediated system on a four-node Tailscale mesh.
+> **Not financial advice.** Designated test/agentic wallets only for live automation. Fail-closed killswitches. Paper first.
 
-## What this does
+---
 
-Sapphire connects market data, on-chain signals, threat intelligence, and macro regimes into a single brain that publishes a live health score and narrative. It includes a 52-page dashboard, autonomous trading with fail-closed kill switches, an inference proxy with 4-tier failover, and a content engine with a 7-check quality rubric.
+## What ships in this monorepo
 
-## What's new (2026-07)
+| Surface | Purpose |
+|---|---|
+| **Plant deck** | Local command UI — prefer ops-state deck `http://127.0.0.1:8100/` (API `:8099`) |
+| **Grok web bridge** | `data/grok-web-exports/` — markdown knowledge plane for Grok web ↔ local densify/Ralph |
+| **Services** | Alpha, dashboard, control-plane, inference proxy, content, security pipelines |
+| **Trading adapters** | Paper · RH crypto client · confirmation firewall · auto-executor paper lane |
+| **Agent charter** | [AGENTS.md](AGENTS.md) — safety boundaries for multi-agent collaborators |
 
-- **Auto-executor paper lane** — autonomous trading executor bridging confirmation-firewall approvals to paper execution, with exactly-once execution, a single-instance lock, and Telegram-gated approvals (`services/alpha/auto_executor.py`, `com.sapphire.auto-executor` LaunchAgent).
-- **TradingView durable webhook pipeline** — Mac-side webhook receiver + Cloudflare Quick Tunnel ingress, durable alert log, idempotent dedup, live dashboard probe, and auto-sync of the Cloud Run `TV_WEBHOOK_URL`.
-- **Sovereign research authority** — Ari's thesis owns conviction; Cowen leads the
-  current cycle view, while Hayes, Bankless, Limitless, and Nadeau remain bounded,
-  attributed advisory lenses with evidence-share caps and falsifiers.
-- **Robinhood Crypto client** — Ed25519-signed REST client (`lib/portfolio/robinhood.py`): accounts, holdings, best bid/ask, order history, reconstructed cost basis.
-- **Fleet status monitor** — unified aggregator (`services/pipeline/fleet_status.py`) probing services, LaunchAgents, and the L2 wallet; feeds the daily brief.
-- **pm-bot Telegram gate** — PM bot owns Telegram (polling mode with shared-token safety); producer alerts become reviewed local drafts.
-- **Brave CDP adapter** — browser automation adapter + auth probes (`lib/sources/brave_browser.py`) for authenticated source capture.
-- **Public face** — [sapphire-alpha-dashboard](https://github.com/arigatoexpress/sapphire-alpha-dashboard) is the public, privacy-preserving Mission Control at sapphirealpha.xyz.
+Related public Mission Control: [sapphire-alpha-dashboard](https://github.com/arigatoexpress/sapphire-alpha-dashboard) · [sapphirealpha.xyz](https://sapphirealpha.xyz)
 
-## Quick start
+---
+
+## Live plant (Ari desk — ops-state)
+
+The **day-to-day trading plant** (free-reign, RH Agentic MCP, RH Chain L2, MOSS/MegaETH, Telegram Central Terminal, overnight loops) lives primarily under:
+
+```text
+~/ops-state/          # state, finish-line scripts, telegram-bot, rh-chain, moss
+~/Knowledge/          # local vault + 0-Inbox/grok-web
+```
+
+| Component | Location / note |
+|---|---|
+| Free-reign policy | `ops-state/telegram-bot/free-reign.json` (+ mirrors) |
+| Agentic trade plan | `ops-state/sovereign-desk/state/AGENTIC-TRADE-PLAN-LATEST.json` |
+| Overnight / Ralph / densify | LaunchAgents `com.ari.*` / `com.sapphire.*` |
+| Master agent handoff | `ops-state/agent-reports/MASTER-HANDOFF-CLAUDE-OPUS-LATEST.md` |
+| Alpha learnings (AXTI) | `ops-state/finish-line/reports/ALPHA-LEARNINGS-AXTI-L2-LATEST.md` |
+
+**Designated rails only:** RH Agentic ••••8144 · L2 `0xc2B5…c9EB` · MOSS MegaETH grant · paper.  
+**Never auto:** THO/client money · Hermes messaging outward · DNS/prod without human gate.
+
+---
+
+## Grok web ↔ local bridge
+
+```text
+data/grok-web-exports/*.md
+        ↓  sync_grok_web_exports.sh  (densify / Ralph / overnight)
+~/Knowledge/0-Inbox/grok-web/
+        ↓  publish_operator_feeds.py
+http://127.0.0.1:8100/   plant deck
+```
+
+| Convention | Rule |
+|---|---|
+| Filename | `YYYY-MM-DD_topic-slug.md` |
+| Web → plant commit | `web-export: <desc> [YYYY-MM-DD]` |
+| Plant → web commit | `local-export: <desc> [YYYY-MM-DD]` |
 
 ```bash
-# Requirements: Python 3.11+, Redis, Ollama
+bash ~/ops-state/finish-line/scripts/sync_grok_web_exports.sh
+```
+
+---
+
+## Quick start (monorepo services)
+
+```bash
+# Requirements: Python 3.11+, Redis (optional), Ollama (optional)
 pip install -r services/alpha/requirements.txt
 pip install -r services/dashboard/requirements.txt
 
 cp env.example .env
 cp .env.integrations.example .env.integrations
 
-# Start core services
-python3 services/inference-proxy/app.py &                 # :11435
+# Core services (example)
+python3 services/inference-proxy/app.py &
 (cd services/alpha && python3 -m uvicorn src.signal_logger:app --port 18081) &
-(cd services/dashboard && python3 app.py) &               # :8080
-(cd services/control-plane && uvicorn app.main:app --port 8082) &
+(cd services/dashboard && python3 app.py) &
 
-# Health checks
 curl -s http://127.0.0.1:11435/health | python3 -m json.tool
-curl -s http://127.0.0.1:18081/health
 ```
 
-## Architecture
+For the **operator plant** (trading desk), follow `ops-state` handoffs and LaunchAgents — not only this monorepo’s service ports.
 
-Six concerns share one event bus (Redis Streams + JSONL fallback):
+---
 
-- **Trading**: TradingView Pine → Signal Logger → Risk Kernel → Confirmation Firewall → Paper / Robinhood Crypto / Hyperliquid
-- **Intelligence**: On-chain, macro, counter-party, threat, regime, and forecast silos
-- **Synthesis**: Brain (`/api/brain/synthesis`) collapses all silos into one health score
-- **Content**: 17-module research-to-publish pipeline with rubric gating
-- **Security**: SBOM, model SHA-256 verification, network mapper, global kill switch
-- **Control**: Telegram PM bot, dashboard, inference proxy
+## Architecture (monorepo)
 
-## Key features
+Event-bus-mediated concerns (Redis Streams + JSONL fallback):
 
-- 5 quant strategies + 5 Pine strategies with CPCV backtesting
-- Fail-closed trading: $5/order cap, $25/day loss limit, global kill switch
-- 4-tier inference mesh (GPU → Pi ×2 → Mac CPU → Kimi Cloud)
-- Live public Mission Control at `sapphirealpha.xyz` (`/api/v1/status`, `/api/v1/live`, `/api/v1/transparency`, `/api/v1/widgets`, `/api/fleet`)
-- 7,836+ passing tests across 469 files
-- 3 Solidity contracts on Robinhood Chain testnet
+- **Trading** — TradingView / signals → risk kernel → confirmation firewall → paper or broker adapters  
+- **Intelligence** — on-chain, macro, threat, regime silos  
+- **Synthesis** — brain health score + narrative  
+- **Content** — research-to-publish with quality rubric  
+- **Security** — SBOM, model verify, network mapper, global kill switch  
+- **Control** — Telegram, dashboards, inference proxy  
+
+### Operator plant (2026-08)
+
+- Free-reign multi-rail on designated wallets (caps + dens)  
+- Options-first alpha (AXTI-class: open defined-risk, scale out on gamma, never hold to worthless)  
+- Overnight agentic coding + plant heal loops  
+- Telegram as **away-from-home Central Terminal**  
+
+---
 
 ## Tech stack
 
 Python · FastAPI · Flask · Redis · Ollama · DuckDB · Solidity · Tailscale · GCP · Playwright
 
-## Safety & disclaimers
+---
 
-- **Research/prototype software.** Not financial advice.
-- **Paper trading first.** Live trading is capped, kill-switched, and explicitly gated.
-- **Fail-closed by default.** If a service, check, or gate fails, the system stops rather than proceeds.
-- **No warranty.** See [LICENSE](LICENSE).
+## Safety
+
+- Research/prototype software. **Not financial advice.**  
+- Paper trading first. Live automation is **capped**, dens-listed, and kill-switched.  
+- Fail-closed: gate/killswitch failure stops trading rather than proceeding.  
+- See [LICENSE](LICENSE).
+
+---
 
 ## Agent collaborators
 
-See [AGENTS.md](AGENTS.md) for the full agent charter, safety boundaries, and common commands.
+See **[AGENTS.md](AGENTS.md)** for multi-agent charter and commands.  
+Resume after Claude/Codex credit gaps:  
+`ops-state/agent-reports/MASTER-HANDOFF-CLAUDE-OPUS-LATEST.md` (also mirrored under `data/grok-web-exports/`).
+
+---
+
+## Repo map (do not re-fork)
+
+| Keep canonical | Avoid forking into Sapphire |
+|---|---|
+| This monorepo + `ops-state` plant | `ops-server-task*`, `fleet-lease-task*`, `quant-perps-*` clones |
+| `sapphire-alpha-dashboard` (public) | One-off deploy-candidates without ≥2 call-sites |
+| `Project-Go-Forward` (THO — **separate fence**) | Bulk automation into THO main |
+
+Debt inventory: `ops-state/agent-reports/REPO-CONSOLIDATION-2026-08-05.md`

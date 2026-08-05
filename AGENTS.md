@@ -1,3 +1,13 @@
+# Agent resume (2026-08)
+
+After Claude/Codex credit gaps, start at:
+
+- `ops-state/agent-reports/MASTER-HANDOFF-CLAUDE-OPUS-LATEST.md`
+- `data/grok-web-exports/2026-08-05_master-handoff-claude-opus.md` (git mirror)
+- Live plant: free-reign multi-rail · EXITS_QUEUED dust sells · options-first (AXTI)
+
+---
+
 # Sapphire — Agent Charter
 
 Read this first before editing code, docs, or configuration.
