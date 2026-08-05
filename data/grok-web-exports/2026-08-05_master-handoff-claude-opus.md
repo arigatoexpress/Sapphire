@@ -220,3 +220,11 @@ Live Mac bot tree was **misnamed** `telegram-bot.RETIRED-20260728-MAC` with
 
 **Canonical now:** real directory `~/ops-state/telegram-bot/` (not a symlink, not RETIRED).
 Never archive paths named RETIRED without checking `readlink` / LaunchAgent WorkingDirectory.
+
+
+## 12) Dual-surface Telegram + OSS mine (post handoff)
+
+- **Trade Terminal** (`menu:trade`) vs **Command Center** (`menu:cc`) — BonkBot/Pengu UX clarity.
+- Research: `finish-line/reports/TG-TERMINAL-OSS-MINE-LATEST.md` (PenguBot, BonkBot, OctoBot, Freqtrade patterns).
+- Mine: paste-CA speed UX + position TP/SL cards + dual control (TG trade / web telemetry).
+- Reject: custody of keys in chat; dens-free snipes.
