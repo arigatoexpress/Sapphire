@@ -306,3 +306,15 @@ Do **not** scrape Grok web UI for plant truth.
 ---
 
 *End master handoff. Ship receipt: Grok restored free-reign asymmetric harden at generation time because densify had regressed L2=$10.*
+
+
+---
+
+## 13) Post-handoff durable fix (Grok wrap 23:10Z)
+
+`desk/easy_mode.py` **`free_reign_payload`** now reads sticky plan mandate:
+- if `mandate=asymmetric_only` or exit_orders or `l2_memes_banned` → L2 cap **$0**, `allow_on_chain=false`, max_open **0**, dust denylist.
+- Desk cycle can no longer wipe the pivot every ~few minutes.
+- `ship_health` accepts max_open≤1 (0 is OK).
+
+Verify after densify: `rg allow_on_chain ~/ops-state/rh-chain/free-reign.json` → false.
