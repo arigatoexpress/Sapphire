@@ -1,62 +1,37 @@
-# Grok web ↔ local plant bridge
+# Grok Web ↔ Local CLI Knowledge Bridge
 
-**Canonical shared knowledge plane** for high-value trade ideas, research
-distillations, chat summaries, and architecture notes between:
+This folder is the **shared store** that lets Grok web (chat, research, trade ideas, architecture notes) and the local Grok CLI / densify / Ralph loop exchange knowledge without manual copy-paste.
 
-- **Grok web** (browser chats / research)
-- **Grok CLI / densify / Ralph** (local plant on Ari's Mac)
+## Purpose
 
-## Path
-
-```
-data/grok-web-exports/     ← this folder (git-tracked reference data)
-        ↓  sync_grok_web_exports.sh (densify + Ralph)
-~/Knowledge/0-Inbox/grok-web/
-        ↓  publish_operator_feeds.py
-http://127.0.0.1:8100/     ← plant command deck
-```
+- **Web → Local**: High-value outputs from Grok web sessions are pushed here as timestamped Markdown files.
+- **Local → Web** (optional, phase 2): Local densified plant reports, new research notes, or operator summaries can be pushed back under the same path (or a `local-exports/` sibling) so the web agents stay current with plant state.
 
 ## Conventions
 
 | Item | Rule |
-|---|---|
-| Filename | `YYYY-MM-DD_topic-slug.md` or `YYYY-MM-DD_HHMM_topic-slug.md` |
-| Commit (web→local) | `web-export: <short desc> [YYYY-MM-DD]` |
-| Commit (local→web) | `local-export: <short desc> [YYYY-MM-DD]` |
-| Content | Clean structured Markdown — not raw chat dumps |
-| Frontmatter | Optional YAML: `source`, `date`, `topics`, `type` |
+|------|------|
+| Filename | `YYYY-MM-DD_HHMM_topic-slug.md` or `YYYY-MM-DD_topic-slug.md` |
+| Commit message | `web-export: <short description> [YYYY-MM-DD]` or `local-export: ...` |
+| Frontmatter | Optional YAML with `source`, `date`, `topics`, `type` (trade-idea, research, architecture, chat-summary, etc.) |
+| Content | Clean Markdown. Prefer structured sections over raw chat dumps. |
 
-## Flow v1 (live — unidirectional web→local)
+## Local Consumption
 
-1. Web (or any agent with write) adds timestamped `.md` here.
-2. Local loop: `git pull` → copy new/changed `*.md` → `~/Knowledge/0-Inbox/grok-web/` (copy, never delete remote).
-3. `publish_operator_feeds.py` mines inbox into operator-feeds → plant deck.
+Recommended local flow (implemented by a free-reign / Ralph loop):
 
-Script: `~/ops-state/finish-line/scripts/sync_grok_web_exports.sh`  
-Hooked from: `densify_dream_plant.sh`, `ralph_plant_loop.sh`
+1. `git pull` (or sparse-checkout of `data/grok-web-exports/`) inside the Sapphire clone.
+2. Copy new or changed `.md` files into `~/Knowledge/0-Inbox/grok-web/`.
+3. Trigger densify / plant / Ralph processing on the inbox folder.
+4. (Optional) After densify, push any new local knowledge back here.
 
-## Flow v2 (optional — local→web)
+## Why this path?
 
-Local densified outputs may land here with `local-export:` prefix commits so web
-agents can read plant state. Enable when GitHub write path is authorized.
+Per `STRUCTURE.md`, `data/` is the correct home for tracked reference data. Hot runtime state stays gitignored. This keeps the bridge inside the existing monorepo instead of a separate private repo.
 
-## Complementary
+## Complementary stores
 
-- Google Drive — external news ingest / large media
-- Notion — optional structured trade DB
-- Local session mines — `~/.grok/sessions`, `~/.codex` (prefer over web scrape)
+- **Google Drive**: External news ingest, long-form reports, media assets (via daily-holistic-ingest skill).
+- **Notion** (optional): Structured trade idea DB, status boards.
 
-## Operator
-
-```bash
-bash ~/ops-state/finish-line/scripts/sync_grok_web_exports.sh
-open http://127.0.0.1:8100/
-```
-
-Do **not** use :8098 / :8085. Canonical UI is :8100; API is :8099.
-
-## Status (2026-08-05)
-
-- Folder + sync loop **live on Mac** (densify / Ralph / overnight hooks).
-- GitHub **MCP write** may still be 403 until connector re-auth (`contents:write`).
-- Local `git push` from this machine is the fallback publish path.
+Git remains the zero-manual, versioned, bidirectional bridge for knowledge that both sides need.
