@@ -56,3 +56,12 @@ mkdir -p ~/Code/_Archive_2026-08
 # mv ~/Code/desk-orchestrator-directive.RETIRED-20260728 ~/Code/_Archive_2026-08/
 # mv ~/Code/ops-server-task083-* ~/Code/_Archive_2026-08/  # if unused
 ```
+
+
+## CRITICAL: telegram-bot path (2026-08-05)
+
+Live Mac bot tree was **misnamed** `telegram-bot.RETIRED-20260728-MAC` with
+`ops-state/telegram-bot` as a **symlink** to it. Archive-by-name would break the plant.
+
+**Canonical now:** real directory `~/ops-state/telegram-bot/` (not a symlink, not RETIRED).
+Never archive paths named RETIRED without checking `readlink` / LaunchAgent WorkingDirectory.

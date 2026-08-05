@@ -211,3 +211,12 @@ THO deploy/DNS · Hermes messaging send · revive TG trade approval cards · bli
 ---
 
 *Grok multi-agent arc complete enough for Opus takeover. Plant on free-reign multi-rail + exit-armed dust.*
+
+
+## CRITICAL: telegram-bot path (2026-08-05)
+
+Live Mac bot tree was **misnamed** `telegram-bot.RETIRED-20260728-MAC` with
+`ops-state/telegram-bot` as a **symlink** to it. Archive-by-name would break the plant.
+
+**Canonical now:** real directory `~/ops-state/telegram-bot/` (not a symlink, not RETIRED).
+Never archive paths named RETIRED without checking `readlink` / LaunchAgent WorkingDirectory.
