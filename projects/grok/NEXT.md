@@ -1,22 +1,19 @@
-# What next (2026-08-06 17:40Z)
+# What next (2026-08-06 — Mac stable)
 
-## Plant bridge — DONE
+## Claude Code dispatch (NOW)
 
-Claude greened: mac-bridge :19998, densify 30m LA, GROK_BRIDGE_URL, local-export receipt.  
-Monorepo client: `lib/grok/bridge_client.py`.
+**Ultimate handoff:**  
+`docs/handoffs/CLAUDE-CODE-ULTIMATE-DISPATCH-2026-08-06.md`
 
-## Parallel now
+1. P0-A free-reign `gate_order`  
+2. P0-B `record_closed_trade`  
+3. Bridge already green — do not rebuild  
+4. Gemini still owns website deploy  
+
+## Other seats
 
 | Seat | Job |
 |---|---|
-| **Gemini** | Still cooking → deploy dashboard SPA + GCP cost |
-| **Claude** | When Mac calm → **Prompt A** free-reign `gate_order` (+ new GateRequest fields) |
-| **Claude optional** | load `com.sapphire.grok-bridge` LaunchAgent so :19998 survives reboot |
-| **You / Win** | P0 when at desk |
-| **You** | MOSS grant renew if you want that rail |
-
-## Do not
-
-- Re-wire bridge tools Claude already finished  
-- ARM L2  
-- Kill plant processes mid-cleanup  
+| Gemini | Dashboard SPA deploy + GCP cost |
+| You / Win | P0 when at desk |
+| You | MOSS grant if desired |
