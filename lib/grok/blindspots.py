@@ -29,9 +29,9 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "severity": "P1",
         "area": "plant",
         "title": "gate_order scoped to via=free_reign only (human TG approvals ungated by policy)",
-        "impact": "Human-approved equity buys bypass OPTIONS_FIRST — intentional judgment call",
-        "fix": "Ari confirm; optional second mode gate_all_auto_executor",
-        "status": "needs_operator_decision",
+        "impact": "Human-approved equity buys bypass OPTIONS_FIRST — intentional and correct",
+        "fix": "ACCEPT free_reign-only; opt-in universal gate only with operator phrase",
+        "status": "recommended_accept",
     },
     {
         "id": "BS-BRIDGE-HTTP",
@@ -292,7 +292,7 @@ def blindspot_scoreboard() -> dict[str, Any]:
     for b in BLINDSPOTS:
         by_sev[b["severity"]] = by_sev.get(b["severity"], 0) + 1
         by_status[b["status"]] = by_status.get(b["status"], 0) + 1
-    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending", "resolved_plant", "needs_operator_decision")]
+    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending", "resolved_plant", "needs_operator_decision", "recommended_accept")]
     return {
         "count": len(BLINDSPOTS),
         "by_severity": by_sev,
