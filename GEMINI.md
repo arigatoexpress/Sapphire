@@ -12,6 +12,7 @@ Read and implement toward:
 ```text
 docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md
 docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md
+docs/handoffs/GEMINI-CLOUDSHELL-WEBSITE-GCP-MASTER-PROMPT-2026-08-06.md  # site + cost-efficient GCP
 ```
 
 Bootstrap on Cloud Shell:

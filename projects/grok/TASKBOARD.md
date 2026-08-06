@@ -1,6 +1,6 @@
 # Grok project taskboard
 
-_Updated: 2026-08-06T16:09:15Z_
+_Updated: 2026-08-06T16:13:40Z_
 
 ## Next actions
 
@@ -28,5 +28,5 @@ _Updated: 2026-08-06T16:09:15Z_
 ## Stats
 
 ```json
-{'static_done': 8, 'static_open': 0, 'dynamic_open': 3, 'signals': {'monorepo_bridge_tools_ok': True, 'policy_tests_ok': True, 'genome_seeded': True, 'windows_module_ok': True, 'research_validator_ok': True, 'automations_catalog_ok': True, 'bridge_local_export_seen': True}}
+{'static_done': 8, 'static_open': 0, 'dynamic_open': 3, 'signals': {'monorepo_bridge_tools_ok': True, 'policy_tests_ok': True, 'genome_seeded': True, 'windows_module_ok': True, 'research_validator_ok': True, 'automations_catalog_ok': True, 'bridge_local_export_seen': False}}
 ```

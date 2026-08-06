@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-08-06T16:09:15Z",
+  "updated_at": "2026-08-06T16:13:40Z",
   "tasks": [
     {
       "id": "T-bridge-plant",
@@ -109,7 +109,7 @@
       "windows_module_ok": true,
       "research_validator_ok": true,
       "automations_catalog_ok": true,
-      "bridge_local_export_seen": true
+      "bridge_local_export_seen": false
     }
   },
   "next_actions": [

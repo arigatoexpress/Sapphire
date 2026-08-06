@@ -51,6 +51,12 @@ data/grok-web-exports/  git knowledge plane
 - Live orders, THO money, Hermes send, secret dumps: **never from this project alone**
 - Plant wires `evaluate_proposal` before sole writer; models still only propose
 
+## Website + GCP (Gemini Cloud Shell)
+
+When professionalizing **sapphirealpha.xyz** and cost-efficient GCP:
+
+- [`docs/handoffs/GEMINI-CLOUDSHELL-WEBSITE-GCP-MASTER-PROMPT-2026-08-06.md`](../../docs/handoffs/GEMINI-CLOUDSHELL-WEBSITE-GCP-MASTER-PROMPT-2026-08-06.md)
+
 ## Related mission docs
 
 - `docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md`

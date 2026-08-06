@@ -36,3 +36,10 @@ This is the **recurring loop** for Grok chat turns (and optional plant cron).
 # every 30m — status only
 */30 * * * * cd ~/Code/Sapphire && python3 scripts/ops/grok_loop_tick.py --write >>~/ops-state/logs/grok-loop.log 2>&1
 ```
+
+## Parallel program: website + GCP
+
+When board plant wires are waiting on human/Win:
+
+1. Run Gemini prompt: `docs/handoffs/GEMINI-CLOUDSHELL-WEBSITE-GCP-MASTER-PROMPT-2026-08-06.md`
+2. Fix `/dashboard` empty shell first; then elevate `/`; then cost posture.
