@@ -8,7 +8,7 @@ title: Sapphire system brief (alpha + policy + bridge)
 
 # Sapphire × Grok — System Brief
 
-_Generated: 2026-08-06T17:57:56Z_
+_Generated: 2026-08-06T19:08:42Z_
 
 **Streamline score:** 6/6 (1.0)
 
@@ -40,18 +40,18 @@ _Generated: 2026-08-06T17:57:56Z_
 
 ```json
 {
-  "export_count": 28,
+  "export_count": 31,
   "by_day": {
     "2026-08-04": 1,
     "2026-08-05": 12,
-    "2026-08-06": 15
+    "2026-08-06": 18
   },
   "latest": [
-    "2026-08-06_gemini-website-gcp-master-prompt.md",
-    "2026-08-06_grok-bridge-lane-tools.md",
     "2026-08-06_grok-mac-bridge-live.md",
     "2026-08-06_grok-project-bootstrap.md",
     "2026-08-06_holistic-blindspots-leverage.md",
+    "2026-08-06_local-export_free-reign-gate-wired.md",
+    "2026-08-06_local-export_genome-closes-wired.md",
     "2026-08-06_plant-wire-receipt.md",
     "2026-08-06_system-brief.md",
     "2026-08-06_windows-datacenter-masterplan.md"
@@ -121,7 +121,7 @@ _Generated: 2026-08-06T17:57:56Z_
 
 ## Blindspots
 
-- scoreboard: `{'count': 22, 'by_severity': {'P1': 10, 'P2': 7, 'P0': 5}, 'by_status': {'resolved_plant': 1, 'encoded': 3, 'open': 11, 'code_fixed_deploy_pending': 1, 'in_progress': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-GATE-WIRE', 'BS-GENOME-CLOSES', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
+- scoreboard: `{'count': 25, 'by_severity': {'P0': 6, 'P1': 12, 'P2': 7}, 'by_status': {'open': 11, 'needs_operator_decision': 1, 'resolved_plant': 3, 'encoded': 3, 'code_fixed_deploy_pending': 1, 'in_progress': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-EXECUTOR-DEPLOY', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
 
 ## Playbooks
 

@@ -1,6 +1,33 @@
 {
   "blindspots": [
     {
+      "id": "BS-EXECUTOR-DEPLOY",
+      "severity": "P0",
+      "area": "plant",
+      "title": "gate_order wired in Mac source \u2014 live rh-executor schtask may still run old code",
+      "impact": "Free-reign denials not enforced until executor process reloads new executor.py",
+      "fix": "Restart/redeploy rh-executor on Mac/Win after ops-state/telegram-bot/executor.py wire",
+      "status": "open"
+    },
+    {
+      "id": "BS-GENOME-BROKER-PX",
+      "severity": "P1",
+      "area": "learning",
+      "title": "Genome closes use auto_estimate PnL not broker-reconciled prices",
+      "impact": "Lesson PnL may slip vs true fill",
+      "fix": "Thread RH/on-chain fill prices into record_closed_trade source=broker",
+      "status": "open"
+    },
+    {
+      "id": "BS-GATE-SCOPE-HUMAN",
+      "severity": "P1",
+      "area": "plant",
+      "title": "gate_order scoped to via=free_reign only (human TG approvals ungated by policy)",
+      "impact": "Human-approved equity buys bypass OPTIONS_FIRST \u2014 intentional judgment call",
+      "fix": "Ari confirm; optional second mode gate_all_auto_executor",
+      "status": "needs_operator_decision"
+    },
+    {
       "id": "BS-BRIDGE-HTTP",
       "severity": "P1",
       "area": "bridge",
@@ -25,7 +52,7 @@
       "title": "free-reign sole writer not calling gate_order yet",
       "impact": "Dens/AXTI/L2 caps may only exist in monorepo, not plant path",
       "fix": "Claude Prompt A \u2014 lib.grok.free_reign_gate.gate_order",
-      "status": "open"
+      "status": "resolved_plant"
     },
     {
       "id": "BS-GENOME-CLOSES",
@@ -34,7 +61,7 @@
       "title": "Closed trades not appending LessonBook",
       "impact": "Self-improve stuck at wins=0/losses=0 without seeds",
       "fix": "record_closed_trade on broker-reconciled closes",
-      "status": "open"
+      "status": "resolved_plant"
     },
     {
       "id": "BS-WIN-P0",
@@ -250,16 +277,17 @@
     }
   ],
   "scoreboard": {
-    "count": 22,
+    "count": 25,
     "by_severity": {
-      "P1": 10,
-      "P2": 7,
-      "P0": 5
+      "P0": 6,
+      "P1": 12,
+      "P2": 7
     },
     "by_status": {
-      "resolved_plant": 1,
-      "encoded": 3,
       "open": 11,
+      "needs_operator_decision": 1,
+      "resolved_plant": 3,
+      "encoded": 3,
       "code_fixed_deploy_pending": 1,
       "in_progress": 1,
       "partial": 1,
@@ -269,8 +297,7 @@
       "research": 1
     },
     "open_p0": [
-      "BS-GATE-WIRE",
-      "BS-GENOME-CLOSES",
+      "BS-EXECUTOR-DEPLOY",
       "BS-WIN-P0",
       "BS-MOSS-GRANT"
     ],

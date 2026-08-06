@@ -7,6 +7,33 @@ from typing import Any
 # Severity: P0 blocks earn/safety · P1 blocks learning/ops · P2 polish
 BLINDSPOTS: list[dict[str, Any]] = [
     {
+        "id": "BS-EXECUTOR-DEPLOY",
+        "severity": "P0",
+        "area": "plant",
+        "title": "gate_order wired in Mac source — live rh-executor schtask may still run old code",
+        "impact": "Free-reign denials not enforced until executor process reloads new executor.py",
+        "fix": "Restart/redeploy rh-executor on Mac/Win after ops-state/telegram-bot/executor.py wire",
+        "status": "open",
+    },
+    {
+        "id": "BS-GENOME-BROKER-PX",
+        "severity": "P1",
+        "area": "learning",
+        "title": "Genome closes use auto_estimate PnL not broker-reconciled prices",
+        "impact": "Lesson PnL may slip vs true fill",
+        "fix": "Thread RH/on-chain fill prices into record_closed_trade source=broker",
+        "status": "open",
+    },
+    {
+        "id": "BS-GATE-SCOPE-HUMAN",
+        "severity": "P1",
+        "area": "plant",
+        "title": "gate_order scoped to via=free_reign only (human TG approvals ungated by policy)",
+        "impact": "Human-approved equity buys bypass OPTIONS_FIRST — intentional judgment call",
+        "fix": "Ari confirm; optional second mode gate_all_auto_executor",
+        "status": "needs_operator_decision",
+    },
+    {
         "id": "BS-BRIDGE-HTTP",
         "severity": "P1",
         "area": "bridge",
@@ -31,7 +58,7 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "title": "free-reign sole writer not calling gate_order yet",
         "impact": "Dens/AXTI/L2 caps may only exist in monorepo, not plant path",
         "fix": "Claude Prompt A — lib.grok.free_reign_gate.gate_order",
-        "status": "open",
+        "status": "resolved_plant",
     },
     {
         "id": "BS-GENOME-CLOSES",
@@ -40,7 +67,7 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "title": "Closed trades not appending LessonBook",
         "impact": "Self-improve stuck at wins=0/losses=0 without seeds",
         "fix": "record_closed_trade on broker-reconciled closes",
-        "status": "open",
+        "status": "resolved_plant",
     },
     {
         "id": "BS-WIN-P0",
@@ -265,7 +292,7 @@ def blindspot_scoreboard() -> dict[str, Any]:
     for b in BLINDSPOTS:
         by_sev[b["severity"]] = by_sev.get(b["severity"], 0) + 1
         by_status[b["status"]] = by_status.get(b["status"], 0) + 1
-    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending")]
+    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending", "resolved_plant", "needs_operator_decision")]
     return {
         "count": len(BLINDSPOTS),
         "by_severity": by_sev,

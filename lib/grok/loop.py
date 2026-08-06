@@ -153,7 +153,7 @@ def tick(
     if signals.get("bridge_local_export_seen"):
         complete("T-bridge-plant")
 
-    # dynamic follow-ups
+    # dynamic follow-ups (create before completion marks)
     extras: list[dict[str, Any]] = list(board.get("dynamic_tasks") or [])
     existing_ids = set(by_id) | {e["id"] for e in extras}
 
@@ -161,24 +161,54 @@ def tick(
         extras.append(
             {
                 "id": "T-wire-policy-plant",
-                "title": "Plant: import lib.grok.policy into free-reign decision path",
+                "title": "Plant: free-reign sole-writer calls gate_order",
                 "lane": "plant",
                 "priority": 1,
                 "status": "todo",
-                "done_when": "plant free-reign calls evaluate_proposal",
+                "done_when": "local-export free-reign gate_order wired",
             }
         )
+        existing_ids.add("T-wire-policy-plant")
     if signals.get("genome_seeded") and "T-wire-genome-closes" not in existing_ids:
         extras.append(
             {
                 "id": "T-wire-genome-closes",
-                "title": "Plant: append LessonBook on broker-reconciled closes",
+                "title": "Plant: append LessonBook on full closes",
                 "lane": "plant",
                 "priority": 1,
                 "status": "todo",
-                "done_when": "outcomes wins/losses non-zero from real closes",
+                "done_when": "local-export genome closes wired",
             }
         )
+        existing_ids.add("T-wire-genome-closes")
+
+    # plant wire completions (static or dynamic)
+    if signals.get("gate_wired"):
+        if "T-wire-policy-plant" in by_id:
+            complete("T-wire-policy-plant")
+        for dyn in extras:
+            if dyn.get("id") == "T-wire-policy-plant":
+                dyn["status"] = "done"
+                dyn["completed_at"] = _utc()
+        if "T-executor-reload" not in existing_ids:
+            extras.append(
+                {
+                    "id": "T-executor-reload",
+                    "title": "Plant: reload rh-executor so gate_order is live in process",
+                    "lane": "plant",
+                    "priority": 1,
+                    "status": "todo",
+                    "done_when": "executor process running wired executor.py",
+                }
+            )
+            existing_ids.add("T-executor-reload")
+    if signals.get("genome_wired"):
+        if "T-wire-genome-closes" in by_id:
+            complete("T-wire-genome-closes")
+        for dyn in extras:
+            if dyn.get("id") == "T-wire-genome-closes":
+                dyn["status"] = "done"
+                dyn["completed_at"] = _utc()
     if by_id.get("T-win-dc", {}).get("status") == "done" and "T-win-post-boot" not in existing_ids:
         extras.append(
             {

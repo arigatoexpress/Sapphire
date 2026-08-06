@@ -1,19 +1,22 @@
-# What next (2026-08-06 — Mac stable)
+# What next (2026-08-06 — post P0-A/B, lunch autonomous)
 
-## Claude Code dispatch (NOW)
+## DONE (Claude plant)
 
-**Ultimate handoff:**  
-`docs/handoffs/CLAUDE-CODE-ULTIMATE-DISPATCH-2026-08-06.md`
+- free-reign `gate_order` in `executor.py` (`via=free_reign` only) — `43f1cc9`
+- genome closes on full lots (`auto_estimate`) — `7a2dea1`
+- Bridge green earlier
 
-1. P0-A free-reign `gate_order`  
-2. P0-B `record_closed_trade`  
-3. Bridge already green — do not rebuild  
-4. Gemini still owns website deploy  
+## NOW
 
-## Other seats
+| Priority | Job | Owner |
+|---|---|---|
+| **1** | Reload `rh-executor` so wired code is live | Claude · [prompt](../../docs/handoffs/CLAUDE-EXECUTOR-RELOAD-PROMPT-2026-08-06.md) |
+| **2** | Deploy dashboard SPA fix | Gemini Cloud Shell |
+| **3** | Ari: confirm gate scope (free_reign only vs all auto) | Operator |
+| **4** | Win P0 | Desk |
+| **5** | MOSS grant if wanted | Operator |
 
-| Seat | Job |
-|---|---|
-| Gemini | Dashboard SPA deploy + GCP cost |
-| You / Win | P0 when at desk |
-| You | MOSS grant if desired |
+## Operator decisions pending
+
+1. **Gate scope:** human Telegram approvals intentionally bypass monorepo policy — OK?
+2. **Executor host:** is `rh-executor` Mac, Win, or both?

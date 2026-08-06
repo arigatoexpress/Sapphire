@@ -84,6 +84,12 @@ def _detect_signals() -> dict:
     if marker.is_file():
         signals["bridge_local_export_seen"] = True
 
+    exp = ROOT / "data/grok-web-exports"
+    signals["gate_wired"] = any(exp.glob("*free-reign-gate-wired*")) or any(
+        exp.glob("*gate_order*wired*")
+    )
+    signals["genome_wired"] = any(exp.glob("*genome-closes-wired*"))
+
     return signals
 
 
