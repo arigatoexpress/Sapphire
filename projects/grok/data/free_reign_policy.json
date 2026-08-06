@@ -19,13 +19,19 @@
     },
     "paper": {
       "enabled": true
+    },
+    "hyperliquid": {
+      "enabled": true
     }
   },
   "axti": {
     "scale_out_multiple": 2.0,
     "hard_sl_fraction": -0.4,
     "never_hold_to_worthless": true,
-    "defined_risk_only": true
+    "defined_risk_only": true,
+    "max_dte_days": 21,
+    "min_dte_days": 2,
+    "require_catalyst_tag": false
   },
   "dens_symbols": [
     "BINGBONG",
@@ -42,5 +48,27 @@
   ],
   "dens_addr_prefixes": [
     "0x9763"
-  ]
+  ],
+  "capital_preservation": {
+    "enabled": true,
+    "block_meme_l2_in_crisis": true,
+    "max_options_premium_usd_per_day": 150.0,
+    "max_realized_loss_usd_per_day": 75.0,
+    "prefer_defined_risk": true
+  },
+  "hyperliquid": {
+    "enabled": true,
+    "max_notional_usd": 25.0,
+    "require_signing_gate": true,
+    "signing_gate_armed": false
+  },
+  "signal_spine": {
+    "require_min_sources": 1,
+    "sources_hint": [
+      "tv",
+      "ohlcv",
+      "chain",
+      "regime"
+    ]
+  }
 }

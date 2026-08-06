@@ -73,3 +73,19 @@ python3 scripts/ops/grok_system_streamline.py --write --export --check
 ## Fences
 
 Designated rails only · dens permanent · dust no re-buy · MOSS grant-gated · models propose only.
+
+## Extended GateRequest fields (2026-08-06 holistic)
+
+Pass these when plant has the data (defaults are safe):
+
+| Field | Purpose |
+|---|---|
+| `dte_days` | AXTI DTE band [2, 21] |
+| `regime` | `crisis`/`risk_off` blocks L2 buys |
+| `day_options_premium_usd` | OPTIONS_DAY_CAP |
+| `day_realized_pnl_usd` | DAY_LOSS_HALT |
+| `signal_source_count` | SIGNAL_SPINE min sources |
+| `hyperliquid_signing_gate_armed` | HL_SIGNING_GATE |
+| `has_catalyst_tag` | optional AXTI catalyst |
+
+See `docs/strategy/HOLISTIC-BLINDSPOTS-AND-LEVERAGE-2026-08-06.md`.

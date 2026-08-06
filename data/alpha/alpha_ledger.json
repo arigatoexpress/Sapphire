@@ -1,5 +1,5 @@
 {
-  "scouredAt": "2026-08-06T14:30:00Z",
+  "scouredAt": "2026-08-06T16:45:17Z",
   "invariants": [
     "Designated rails only: RH Agentic \u2022\u2022\u2022\u20228144, RH L2, MOSS/MegaETH (grant-gated), paper",
     "Models propose only \u2014 coordinator + first-party receipts authorize; no ambient spend/trade authority",
@@ -710,6 +710,61 @@
       "sources": [
         "2026-07-23-rebuild-session"
       ]
+    },
+    {
+      "id": "BS-01",
+      "domain": "architecture",
+      "recency": "2026-08-06",
+      "title": "Holistic blindspot registry + playbooks encoded",
+      "body": "lib/grok/blindspots.py + playbooks.py + policy capital preservation/DTE/HL/regime",
+      "severity": "high",
+      "status": "verified",
+      "sapphirePaths": [
+        "lib/grok/blindspots.py",
+        "lib/grok/playbooks.py",
+        "docs/strategy/HOLISTIC-BLINDSPOTS-AND-LEVERAGE-2026-08-06.md"
+      ],
+      "tags": [
+        "blindspots",
+        "playbooks",
+        "policy"
+      ],
+      "action": "Claude wire gate; Gemini deploy; operator Win P0"
+    },
+    {
+      "id": "TR-PRESERVE",
+      "domain": "trading",
+      "recency": "2026-08-06",
+      "title": "Late-cycle day loss halt + options premium day cap",
+      "body": "DAY_LOSS_HALT and OPTIONS_DAY_CAP in evaluate_proposal; thesis-aligned",
+      "severity": "critical",
+      "status": "accepted",
+      "sapphirePaths": [
+        "lib/grok/policy.py"
+      ],
+      "tags": [
+        "axti",
+        "capital-preservation",
+        "thesis"
+      ],
+      "action": "Plant pass day_realized_pnl_usd and day_options_premium_usd into GateRequest"
+    },
+    {
+      "id": "TR-HL",
+      "domain": "trading",
+      "recency": "2026-08-06",
+      "title": "Hyperliquid signing gate default disarmed in monorepo policy",
+      "body": "HL_SIGNING_GATE until hyperliquid_signing_gate_armed",
+      "severity": "critical",
+      "status": "accepted",
+      "sapphirePaths": [
+        "lib/grok/policy.py"
+      ],
+      "tags": [
+        "hyperliquid",
+        "au-05"
+      ],
+      "action": "Never ambient-arm HL from agents"
     }
   ],
   "mergeMap": [
@@ -746,6 +801,6 @@
       "path": "docs/trading-strategy-lab.md"
     }
   ],
-  "itemCount": 32,
+  "itemCount": 35,
   "note": "Includes Windows DC master plan + Gemini Cloud Shell handoff"
 }

@@ -30,6 +30,13 @@ class GateRequest:
     contract_address: str | None = None
     moss_grant_hours_left: float | None = None
     is_defined_risk_option: bool = False
+    dte_days: float | None = None
+    regime: str | None = None
+    day_options_premium_usd: float = 0.0
+    day_realized_pnl_usd: float = 0.0
+    signal_source_count: int = 1
+    hyperliquid_signing_gate_armed: bool | None = None
+    has_catalyst_tag: bool = False
     meta: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -61,6 +68,13 @@ def gate_order(
             contract_address=req.contract_address,
             moss_grant_hours_left=req.moss_grant_hours_left,
             is_defined_risk_option=req.is_defined_risk_option,
+            dte_days=req.dte_days,
+            regime=req.regime,
+            day_options_premium_usd=req.day_options_premium_usd,
+            day_realized_pnl_usd=req.day_realized_pnl_usd,
+            signal_source_count=req.signal_source_count,
+            hyperliquid_signing_gate_armed=req.hyperliquid_signing_gate_armed,
+            has_catalyst_tag=req.has_catalyst_tag,
             meta=req.meta,
         ),
         policy=policy,

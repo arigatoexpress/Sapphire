@@ -21,6 +21,8 @@ from lib.grok.policy import (
     evaluate_scale_out,
 )
 from lib.grok.windows import evaluate_windows_acceptance
+from lib.grok.blindspots import blindspot_scoreboard
+from lib.grok.playbooks import playbook_summary
 
 ROOT = Path(__file__).resolve().parents[2]
 ALPHA_PATH = ROOT / "data" / "alpha" / "alpha_ledger.json"
@@ -258,6 +260,8 @@ def build_system_brief() -> dict[str, Any]:
         "alpha_critical": links,
         "alpha_item_count": alpha.get("itemCount") or len(alpha.get("items") or []),
         "next_actions": next_actions,
+        "blindspots": blindspot_scoreboard(),
+        "playbooks": playbook_summary(),
     }
 
 
@@ -308,6 +312,10 @@ def render_brief_markdown(brief: Mapping[str, Any]) -> str:
         ex = row.get("exists_in_repo")
         mark = "✓" if ex is True else ("·" if ex is None else "✗")
         lines.append(f"- {mark} `{row.get('id')}` `{row.get('status')}` — {row.get('path')}")
+    bs = brief.get("blindspots") or {}
+    lines += ["", "## Blindspots", "", f"- scoreboard: `{bs}`", ""]
+    pb = brief.get("playbooks") or {}
+    lines += ["## Playbooks", "", f"- {pb}", ""]
     lines += ["", "## Invariants", ""]
     for inv in brief.get("invariants") or []:
         lines.append(f"- {inv}")

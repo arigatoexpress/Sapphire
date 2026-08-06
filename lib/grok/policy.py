@@ -57,16 +57,40 @@ FREE_REIGN_DEFAULTS: dict[str, Any] = {
         "paper": {
             "enabled": True,
         },
+        "hyperliquid": {
+            "enabled": True,
+        },
     },
     "axti": {
         "scale_out_multiple": 2.0,
         "hard_sl_fraction": -0.40,
         "never_hold_to_worthless": True,
         "defined_risk_only": True,
+        "max_dte_days": 21,
+        "min_dte_days": 2,
+        "require_catalyst_tag": False,
     },
     "dens_symbols": sorted(DEFAULT_DENS_SYMBOLS),
     "dust_no_rebuy": sorted(DEFAULT_DUST_NO_REBUY),
     "dens_addr_prefixes": list(DEFAULT_DENS_ADDR_PREFIXES),
+    # Late-cycle / capital preservation (thesis-aligned; paper-safe defaults)
+    "capital_preservation": {
+        "enabled": True,
+        "block_meme_l2_in_crisis": True,
+        "max_options_premium_usd_per_day": 150.0,
+        "max_realized_loss_usd_per_day": 75.0,
+        "prefer_defined_risk": True,
+    },
+    "hyperliquid": {
+        "enabled": True,
+        "max_notional_usd": 25.0,
+        "require_signing_gate": True,
+        "signing_gate_armed": False,  # plant must arm explicitly
+    },
+    "signal_spine": {
+        "require_min_sources": 1,
+        "sources_hint": ["tv", "ohlcv", "chain", "regime"],
+    },
 }
 
 
@@ -76,13 +100,21 @@ class OrderProposal:
 
     symbol: str
     side: str  # buy | sell
-    rail: str  # rh_agentic | rh_l2 | moss | paper
-    asset_class: str  # equity | option | l2_token
+    rail: str  # rh_agentic | rh_l2 | moss | paper | hyperliquid
+    asset_class: str  # equity | option | l2_token | perp
     notional_usd: float
     open_positions_on_rail: int = 0
     contract_address: str | None = None
     moss_grant_hours_left: float | None = None
     is_defined_risk_option: bool = False
+    # Optional context for capital-preservation / AXTI / signal spine
+    dte_days: float | None = None
+    regime: str | None = None  # trend | mean_reverting | crisis | risk_on | risk_off | unknown
+    day_options_premium_usd: float = 0.0
+    day_realized_pnl_usd: float = 0.0
+    signal_source_count: int = 1
+    hyperliquid_signing_gate_armed: bool | None = None
+    has_catalyst_tag: bool = False
     meta: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -169,7 +201,7 @@ def evaluate_proposal(
     dens_prefs = pol.get("dens_addr_prefixes") or list(DEFAULT_DENS_ADDR_PREFIXES)
     dust = {_norm_sym(s) for s in (pol.get("dust_no_rebuy") or DEFAULT_DUST_NO_REBUY)}
 
-    if rail not in ("rh_agentic", "rh_l2", "moss", "paper"):
+    if rail not in ("rh_agentic", "rh_l2", "moss", "paper", "hyperliquid"):
         return Decision(False, f"unknown rail {rail}", "UNKNOWN_RAIL", "NO_TRADE")
 
     rails = pol.get("rails") or {}
@@ -249,6 +281,93 @@ def evaluate_proposal(
 
     if proposal.notional_usd < 0:
         return Decision(False, "negative notional", "BAD_NOTIONAL", "NO_TRADE")
+
+    # --- capital preservation (late-cycle thesis) ---
+    cap = pol.get("capital_preservation") or {}
+    if cap.get("enabled", True) and side == "buy":
+        if proposal.day_realized_pnl_usd <= -abs(float(cap.get("max_realized_loss_usd_per_day", 75.0))):
+            return Decision(
+                False,
+                f"daily loss halt ({proposal.day_realized_pnl_usd})",
+                "DAY_LOSS_HALT",
+                "NO_TRADE",
+            )
+        if proposal.asset_class == "option":
+            max_prem = float(cap.get("max_options_premium_usd_per_day", 150.0))
+            if proposal.day_options_premium_usd + proposal.notional_usd > max_prem + 1e-9:
+                return Decision(
+                    False,
+                    f"options premium day cap {max_prem}",
+                    "OPTIONS_DAY_CAP",
+                    "NO_TRADE",
+                    {"max_options_premium_usd_per_day": max_prem},
+                )
+        regime = (proposal.regime or "").strip().lower()
+        if (
+            cap.get("block_meme_l2_in_crisis", True)
+            and rail == "rh_l2"
+            and regime in {"crisis", "risk_off"}
+        ):
+            return Decision(
+                False,
+                f"L2 buys blocked in regime={regime}",
+                "REGIME_BLOCK_L2",
+                "NO_TRADE",
+                {"regime": regime},
+            )
+
+    # --- AXTI DTE band ---
+    if rail == "rh_agentic" and side == "buy" and proposal.asset_class == "option":
+        axti = pol.get("axti") or {}
+        dte = proposal.dte_days
+        if dte is not None:
+            mn = float(axti.get("min_dte_days", 2))
+            mx = float(axti.get("max_dte_days", 21))
+            if dte < mn or dte > mx:
+                return Decision(
+                    False,
+                    f"AXTI DTE {dte} outside [{mn}, {mx}]",
+                    "AXTI_DTE",
+                    "NO_TRADE",
+                    {"dte_days": dte, "min": mn, "max": mx},
+                )
+        if axti.get("require_catalyst_tag") and not proposal.has_catalyst_tag:
+            return Decision(False, "AXTI requires catalyst tag", "AXTI_CATALYST", "NO_TRADE")
+
+    # --- Hyperliquid hard caps (AU-05) ---
+    if rail == "hyperliquid":
+        hl = pol.get("hyperliquid") or {}
+        if not hl.get("enabled", True):
+            return Decision(False, "hyperliquid rail disabled", "HL_DISABLED", "NO_TRADE")
+        max_n = float(hl.get("max_notional_usd", 25.0))
+        if proposal.notional_usd > max_n + 1e-9:
+            return Decision(
+                False,
+                f"HL notional {proposal.notional_usd} > cap {max_n}",
+                "HL_NOTIONAL_CAP",
+                "NO_TRADE",
+            )
+        armed = proposal.hyperliquid_signing_gate_armed
+        if armed is None:
+            armed = bool(hl.get("signing_gate_armed", False))
+        if hl.get("require_signing_gate", True) and not armed:
+            return Decision(
+                False,
+                "Hyperliquid signing gate not armed",
+                "HL_SIGNING_GATE",
+                "NO_TRADE",
+            )
+
+    # --- signal spine minimum sources (TR-01) ---
+    spine = pol.get("signal_spine") or {}
+    min_src = int(spine.get("require_min_sources", 1))
+    if side == "buy" and proposal.signal_source_count < min_src:
+        return Decision(
+            False,
+            f"signal spine needs >= {min_src} sources (got {proposal.signal_source_count})",
+            "SIGNAL_SPINE",
+            "NO_TRADE",
+        )
 
     # sells of dens/dust always allowed (exits)
     return Decision(

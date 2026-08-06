@@ -20,3 +20,7 @@
 | [SYSTEM_BRIEF.md](./SYSTEM_BRIEF.md) | Unified alpha+policy+bridge brief |
 | [PLANT_WIRE_POLICY.md](./PLANT_WIRE_POLICY.md) | Claude free-reign wire recipe |
 | [NEXT.md](./NEXT.md) | What next |
+
+| [data/blindspots.json](./data/blindspots.json) | Blindspot scoreboard |
+| [data/playbooks.json](./data/playbooks.json) | Trading playbooks |
+| [../../docs/strategy/HOLISTIC-BLINDSPOTS-AND-LEVERAGE-2026-08-06.md](../../docs/strategy/HOLISTIC-BLINDSPOTS-AND-LEVERAGE-2026-08-06.md) | Holistic strategy |

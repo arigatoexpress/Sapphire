@@ -1,0 +1,257 @@
+"""System blindspot registry — operator scoreboard (static research snapshot)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+# Severity: P0 blocks earn/safety · P1 blocks learning/ops · P2 polish
+BLINDSPOTS: list[dict[str, Any]] = [
+    {
+        "id": "BS-GATE-WIRE",
+        "severity": "P0",
+        "area": "plant",
+        "title": "free-reign sole writer not calling gate_order yet",
+        "impact": "Dens/AXTI/L2 caps may only exist in monorepo, not plant path",
+        "fix": "Claude Prompt A — lib.grok.free_reign_gate.gate_order",
+        "status": "open",
+    },
+    {
+        "id": "BS-GENOME-CLOSES",
+        "severity": "P0",
+        "area": "learning",
+        "title": "Closed trades not appending LessonBook",
+        "impact": "Self-improve stuck at wins=0/losses=0 without seeds",
+        "fix": "record_closed_trade on broker-reconciled closes",
+        "status": "open",
+    },
+    {
+        "id": "BS-WIN-P0",
+        "severity": "P0",
+        "area": "windows_dc",
+        "title": "Windows P0 acceptance not green",
+        "impact": "Cannot arm L2 / overnight workers safely",
+        "fix": "WIN-POST-BOOT + evaluate_windows_acceptance",
+        "status": "open",
+    },
+    {
+        "id": "BS-MOSS-GRANT",
+        "severity": "P0",
+        "area": "trading",
+        "title": "MOSS grant expired (OP-01)",
+        "impact": "Moss rail correctly denied; alpha path dark",
+        "fix": "Renew passkey/grant; do not bypass MOSS_GRANT",
+        "status": "open",
+    },
+    {
+        "id": "BS-DASHBOARD-SPA",
+        "severity": "P0",
+        "area": "public",
+        "title": "Mission Control SPA assets 404 until deploy",
+        "impact": "Public/operator face looks broken",
+        "fix": "Deploy sapphire-alpha-dashboard 5ed4058+ with no-traffic first",
+        "status": "code_fixed_deploy_pending",
+    },
+    {
+        "id": "BS-MAC-WIN-SYNC",
+        "severity": "P1",
+        "area": "fleet",
+        "title": "Mac→Win decisions sync unverified (OP-03)",
+        "impact": "Assumed fills may not have happened",
+        "fix": "Verify decisions sync before Win fill assumptions",
+        "status": "open",
+    },
+    {
+        "id": "BS-MAC-PROCESS-BLOAT",
+        "severity": "P1",
+        "area": "plant",
+        "title": "Mac process bloat / runaway agents",
+        "impact": "Commander unusable; densify fails",
+        "fix": "Claude cleanup; cap concurrent agents; LaunchAgent inventory",
+        "status": "in_progress",
+    },
+    {
+        "id": "BS-TA-NOT-GATED",
+        "severity": "P1",
+        "area": "trading",
+        "title": "TV TA machine not coupled to free-reign gate",
+        "impact": "Watchlists generate work orders without spine min sources",
+        "fix": "Pass signal_source_count + regime into GateRequest",
+        "status": "partial",
+    },
+    {
+        "id": "BS-ONCHAIN-DRY",
+        "severity": "P1",
+        "area": "onchain",
+        "title": "Onchain intel mostly status/dry-run",
+        "impact": "Chain truth not in sole-writer path",
+        "fix": "Snapshot → advisory feature; never raw wallet in public",
+        "status": "open",
+    },
+    {
+        "id": "BS-REGIME-NOT-LIVE",
+        "severity": "P1",
+        "area": "ta",
+        "title": "GMM regime detector not feeding free-reign",
+        "impact": "Crisis L2 snipes possible without REGIME_BLOCK",
+        "fix": "Plant sets proposal.regime from lib.analytics.regime",
+        "status": "policy_ready_plant_pending",
+    },
+    {
+        "id": "BS-HL-CAPS",
+        "severity": "P1",
+        "area": "trading",
+        "title": "Hyperliquid signing gate must stay disarmed by default",
+        "impact": "AU-05 — agent signing without attended arm",
+        "fix": "gate_order HL_SIGNING_GATE until plant arms",
+        "status": "encoded",
+    },
+    {
+        "id": "BS-THESIS-ENFORCE",
+        "severity": "P1",
+        "area": "thesis",
+        "title": "Late-cycle preservation only partially enforced",
+        "impact": "Oversize options / ignore day loss",
+        "fix": "DAY_LOSS_HALT + OPTIONS_DAY_CAP now in policy",
+        "status": "encoded",
+    },
+    {
+        "id": "BS-KNOW-EMBED",
+        "severity": "P1",
+        "area": "knowledge",
+        "title": "Knowledge embed integrity blockers (AU-KNOW)",
+        "impact": "RAG/densify quality degrades",
+        "fix": "Task 050 plant — separate from trading rails",
+        "status": "blocked",
+    },
+    {
+        "id": "BS-SCHTASKS-SPARSE",
+        "severity": "P1",
+        "area": "windows_dc",
+        "title": "Few scheduled tasks actually installed (AU-02)",
+        "impact": "Win DC not harness-dense",
+        "fix": "Inventory then install research_worker only after P0",
+        "status": "open",
+    },
+    {
+        "id": "BS-CHAMPION",
+        "severity": "P2",
+        "area": "learning",
+        "title": "Champion/challenger promotion ladder incomplete",
+        "impact": "Strategies promote by vibe",
+        "fix": "Paper shadow → evidence → promote; genome lessons feed",
+        "status": "open",
+    },
+    {
+        "id": "BS-GCP-COST",
+        "severity": "P2",
+        "area": "gcp",
+        "title": "GCP idle spend / min-instances / Vertex surprise",
+        "impact": "Bill without earn",
+        "fix": "cost_posture_report; min-instances 0; batch Vertex only",
+        "status": "open",
+    },
+    {
+        "id": "BS-DNS-ORPHAN",
+        "severity": "P2",
+        "area": "gcp",
+        "title": "Orphan DNS zone on tho-ai-agent",
+        "impact": "Silent no-op DNS edits",
+        "fix": "Only sapphire-479610 for sapphirealpha.xyz",
+        "status": "documented",
+    },
+    {
+        "id": "BS-DENS-ADDR-THIN",
+        "severity": "P2",
+        "area": "trading",
+        "title": "Dens 0x prefix list thin (single example prefix)",
+        "impact": "New honeypots slip until symbol dens hits",
+        "fix": "Plant appends full 0x from losses to dens_permanent.json",
+        "status": "open",
+    },
+    {
+        "id": "BS-PUBLISH-LOOP",
+        "severity": "P2",
+        "area": "research",
+        "title": "Publish loop not closed (research → review → post)",
+        "impact": "M2 publish outcome weak",
+        "fix": "Content engine + public evidence observatory",
+        "status": "open",
+    },
+    {
+        "id": "BS-HYPE-LIT",
+        "severity": "P2",
+        "area": "thesis",
+        "title": "HYPE unlock / LIT Dec cliffs under-researched",
+        "impact": "Narrative size-up risk",
+        "fix": "TH-02/TH-03 calendars; no size-up until re-underwrite",
+        "status": "research",
+    },
+]
+
+
+GCP_LEVERAGE: list[dict[str, Any]] = [
+    {
+        "rank": 1,
+        "move": "Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)",
+        "why": "Highest external credibility ROI; code already on main",
+        "cost": "Cloud Build + Cloud Run cents",
+    },
+    {
+        "rank": 2,
+        "move": "Cloud Run min-instances=0 + right-size memory",
+        "why": "Stop idle burn on public face",
+        "cost": "Saves money",
+    },
+    {
+        "rank": 3,
+        "move": "BQ warehouse for paper outcomes + regime digests (batch SQL)",
+        "why": "Learning/analytics without live order brain on GCP",
+        "cost": "Query $ only",
+    },
+    {
+        "rank": 4,
+        "move": "GCS lifecycle on sapphire-data-lake",
+        "why": "Cold storage hygiene",
+        "cost": "Saves storage $",
+    },
+    {
+        "rank": 5,
+        "move": "Vertex batch eval only (no always-on endpoints)",
+        "why": "Complement plant Ollama; avoid idle GPU bill",
+        "cost": "Job-scoped",
+    },
+    {
+        "rank": 6,
+        "move": "Weekly cost_posture_report + gcp_ai_inventory in densify",
+        "why": "Catch surprise spend",
+        "cost": "Free scripts",
+    },
+    {
+        "rank": 7,
+        "move": "Public evidence cards from sanitized projections only",
+        "why": "Professional site without wallet leak",
+        "cost": "Existing Firestore/API",
+    },
+    {
+        "rank": 8,
+        "move": "Never put free-reign sole writer on Cloud Functions",
+        "why": "Authority stays local",
+        "cost": "N/A",
+    },
+]
+
+
+def blindspot_scoreboard() -> dict[str, Any]:
+    by_sev: dict[str, int] = {}
+    by_status: dict[str, int] = {}
+    for b in BLINDSPOTS:
+        by_sev[b["severity"]] = by_sev.get(b["severity"], 0) + 1
+        by_status[b["status"]] = by_status.get(b["status"], 0) + 1
+    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending")]
+    return {
+        "count": len(BLINDSPOTS),
+        "by_severity": by_sev,
+        "by_status": by_status,
+        "open_p0": [b["id"] for b in open_p0],
+        "gcp_leverage_top": [g["move"] for g in GCP_LEVERAGE[:3]],
+    }

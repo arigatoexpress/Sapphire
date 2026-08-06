@@ -1,6 +1,6 @@
 # Sapphire × Grok — System Brief
 
-_Generated: 2026-08-06T16:21:56Z_
+_Generated: 2026-08-06T16:45:17Z_
 
 **Streamline score:** 6/6 (1.0)
 
@@ -32,18 +32,18 @@ _Generated: 2026-08-06T16:21:56Z_
 
 ```json
 {
-  "export_count": 23,
+  "export_count": 26,
   "by_day": {
     "2026-08-04": 1,
     "2026-08-05": 12,
-    "2026-08-06": 10
+    "2026-08-06": 13
   },
   "latest": [
-    "2026-08-06_gcp-cloudshell-ultimate-handoff.md",
     "2026-08-06_gemini-website-gcp-master-prompt.md",
     "2026-08-06_grok-bridge-lane-tools.md",
     "2026-08-06_grok-mac-bridge-live.md",
     "2026-08-06_grok-project-bootstrap.md",
+    "2026-08-06_holistic-blindspots-leverage.md",
     "2026-08-06_plant-wire-receipt.md",
     "2026-08-06_system-brief.md",
     "2026-08-06_windows-datacenter-masterplan.md"
@@ -83,12 +83,14 @@ _Generated: 2026-08-06T16:21:56Z_
 - `OP-01` **critical** — Operator feed: free-reign L2 $10; MOSS grant expired
   - fences: policy.is_dens_blocked / DENS_BLOCK, policy.evaluate_proposal rails rh_l2/rh_agentic, policy MOSS_GRANT, policy DUST_NO_REBUY
   - action: Renew MOSS passkey grant; do not cancel dust exit sells
+- `TR-PRESERVE` **critical** — Late-cycle day loss halt + options premium day cap
+  - fences: policy.evaluate_scale_out / AXTI
+  - action: Plant pass day_realized_pnl_usd and day_options_premium_usd into GateRequest
+- `TR-HL` **critical** — Hyperliquid signing gate default disarmed in monorepo policy
+  - fences: review_manually
+  - action: Never ambient-arm HL from agents
 - `SV-SP0` **high** — Keep chassis; rebuild trading brain
   - fences: policy.is_dens_blocked / DENS_BLOCK, policy.evaluate_proposal rails rh_l2/rh_agentic, policy MOSS_GRANT
-- `TR-01` **high** — Signal spine: TV/OHLCV/chain → bus → surfaces
-  - fences: review_manually
-- `AU-02` **high** — Few scheduled tasks actually installed
-  - fences: review_manually
 
 ## Automations
 
@@ -106,6 +108,15 @@ _Generated: 2026-08-06T16:21:56Z_
 - ✓ `win-tv-agent` `read_only` — scripts/windows_setup/start_tv_agent.ps1
 - ✓ `gemini-ooda-daily` `dry_run_default` — infra/launchagents/com.sapphire.gemini-ooda-daily.plist
 - · `ralph-densify` `plant` — ops-state densify/Ralph loops
+
+## Blindspots
+
+- scoreboard: `{'count': 20, 'by_severity': {'P0': 5, 'P1': 9, 'P2': 6}, 'by_status': {'open': 11, 'code_fixed_deploy_pending': 1, 'in_progress': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'encoded': 2, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-GATE-WIRE', 'BS-GENOME-CLOSES', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
+
+## Playbooks
+
+- {'count': 7, 'ids': ['axti_options', 'hyperliquid_capped', 'l2_dust_experimental', 'late_cycle_preservation', 'moss_session', 'regime_aware_rsi_paper', 'tv_signal_spine'], 'ta_stack': ['ema_trend', 'rsi_14', 'macd', 'bollinger', 'volume']}
+
 
 ## Invariants
 
