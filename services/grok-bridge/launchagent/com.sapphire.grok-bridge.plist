@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.grok-bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/aribs/Code/Sapphire/services/grok-bridge/start.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>GROK_BRIDGE_HOST</key>
+        <string>127.0.0.1</string>
+        <key>GROK_BRIDGE_PORT</key>
+        <string>19998</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/autonomy-status/logs/grok_bridge.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/autonomy-status/logs/grok_bridge.err</string>
+</dict>
+</plist>
