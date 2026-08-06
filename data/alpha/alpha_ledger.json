@@ -1,0 +1,260 @@
+{
+  "schema_version": "alpha-ledger-v1",
+  "generated_at": "2026-08-06T13:45:00Z",
+  "source": "grok-chat-scour + Drive + Notion + Sapphire CLAUDE.md",
+  "ordering": "most_recent_first",
+  "invariants": [
+    "killswitch_holds",
+    "models_propose_only",
+    "no_telegram_live_trade",
+    "no_secrets_in_ledger"
+  ],
+  "items": [
+    {
+      "id": "BR-01",
+      "domain": "bridge",
+      "recency": "2026-08-06",
+      "title": "SuperGrok OIDC transport live",
+      "severity": "high",
+      "status": "verified",
+      "sapphire_paths": [
+        "lib/intel/grok_bridge_client.py"
+      ],
+      "tags": [
+        "grok",
+        "oidc",
+        "agents"
+      ]
+    },
+    {
+      "id": "BR-02",
+      "domain": "bridge",
+      "recency": "2026-08-06",
+      "title": "Transport priority mac\u2192oidc\u2192xai\u2192sim",
+      "severity": "high",
+      "status": "verified",
+      "sapphire_paths": [
+        "docs/alpha/BRIDGE-INTEGRATION.md"
+      ],
+      "tags": [
+        "failover"
+      ]
+    },
+    {
+      "id": "BR-03",
+      "domain": "bridge",
+      "recency": "2026-08-06",
+      "title": "Diagnostics suite 11/11 on OIDC",
+      "severity": "medium",
+      "status": "verified",
+      "sapphire_paths": [
+        "docs/alpha/BRIDGE-INTEGRATION.md"
+      ],
+      "tags": [
+        "qa"
+      ]
+    },
+    {
+      "id": "BR-04",
+      "domain": "bridge",
+      "recency": "2026-08-06",
+      "title": "Mac Safari bridge unreachable remotely",
+      "severity": "medium",
+      "status": "known",
+      "sapphire_paths": [
+        "docs/alpha/BRIDGE-INTEGRATION.md"
+      ],
+      "tags": [
+        "ops",
+        "tunnel"
+      ]
+    },
+    {
+      "id": "SV-01",
+      "domain": "architecture",
+      "recency": "2026-07-29",
+      "title": "Local-first authority boundary",
+      "severity": "critical",
+      "status": "accepted",
+      "sapphire_paths": [
+        "docs/architecture-overview.md",
+        "lib/core/"
+      ],
+      "tags": [
+        "sovereign"
+      ]
+    },
+    {
+      "id": "SV-04",
+      "domain": "trading",
+      "recency": "2026-07-29",
+      "title": "Trading paused; $0 new-risk caps",
+      "severity": "critical",
+      "status": "active",
+      "sapphire_paths": [
+        "lib/core/kill_switch.py"
+      ],
+      "tags": [
+        "killswitch"
+      ]
+    },
+    {
+      "id": "TR-01",
+      "domain": "trading",
+      "recency": "2026-07-25",
+      "title": "Signal pipeline spine TV\u2192bus\u2192surfaces",
+      "severity": "high",
+      "status": "accepted",
+      "sapphire_paths": [
+        "lib/analytics/",
+        "lib/core/event_bus.py",
+        "services/alpha/"
+      ],
+      "tags": [
+        "pipeline"
+      ]
+    },
+    {
+      "id": "TR-04",
+      "domain": "trading",
+      "recency": "2026-07-25",
+      "title": "Signal stream + paper portfolio stale",
+      "severity": "high",
+      "status": "ops_debt",
+      "sapphire_paths": [
+        "data/signals/",
+        "data/paper_portfolio.json",
+        "scripts/ops/staleness_monitor.py"
+      ],
+      "tags": [
+        "staleness"
+      ]
+    },
+    {
+      "id": "TR-08",
+      "domain": "trading",
+      "recency": "2026-07-25",
+      "title": "Sentiment fake-neutral on provider fail",
+      "severity": "medium",
+      "status": "bug_memory",
+      "sapphire_paths": [
+        "lib/analytics/"
+      ],
+      "tags": [
+        "gotcha"
+      ]
+    },
+    {
+      "id": "TH-02",
+      "domain": "thesis",
+      "recency": "2026-07-26",
+      "title": "HYPE unlock drift + unstaking overhang",
+      "severity": "high",
+      "status": "research",
+      "sapphire_paths": [
+        "docs/alpha/"
+      ],
+      "tags": [
+        "HYPE",
+        "cluster-a"
+      ]
+    },
+    {
+      "id": "TH-03",
+      "domain": "thesis",
+      "recency": "2026-07-26",
+      "title": "LIT Dec cliff multi-source",
+      "severity": "high",
+      "status": "research",
+      "sapphire_paths": [
+        "docs/alpha/"
+      ],
+      "tags": [
+        "LIT"
+      ]
+    },
+    {
+      "id": "TH-04",
+      "domain": "thesis",
+      "recency": "2026-07-26",
+      "title": "BMNR mNAV discount deepened",
+      "severity": "medium",
+      "status": "research",
+      "sapphire_paths": [
+        "docs/alpha/"
+      ],
+      "tags": [
+        "BMNR"
+      ]
+    },
+    {
+      "id": "TH-05",
+      "domain": "thesis",
+      "recency": "2026-07-25",
+      "title": "SPCX longer-dated debit EV (theo)",
+      "severity": "medium",
+      "status": "research",
+      "sapphire_paths": [
+        "docs/alpha/"
+      ],
+      "tags": [
+        "SPCX",
+        "options"
+      ]
+    },
+    {
+      "id": "AU-01",
+      "domain": "automation",
+      "recency": "2026-07-25",
+      "title": "Fund factory loops under killswitch no-op correctly",
+      "severity": "medium",
+      "status": "verified",
+      "sapphire_paths": [],
+      "tags": [
+        "fund-factory"
+      ]
+    },
+    {
+      "id": "AU-02",
+      "domain": "automation",
+      "recency": "2026-07-25",
+      "title": "Few scheduled tasks actually installed",
+      "severity": "high",
+      "status": "ops_debt",
+      "sapphire_paths": [
+        "infra/launchagents/"
+      ],
+      "tags": [
+        "mac"
+      ]
+    },
+    {
+      "id": "AU-03",
+      "domain": "automation",
+      "recency": "2026-07-29",
+      "title": "PM bot built not deployed",
+      "severity": "medium",
+      "status": "blocked",
+      "sapphire_paths": [
+        "services/pm_bot/"
+      ],
+      "tags": [
+        "telegram"
+      ]
+    },
+    {
+      "id": "AU-05",
+      "domain": "trading",
+      "recency": "2026-07",
+      "title": "Hyperliquid hard caps + signing gate",
+      "severity": "critical",
+      "status": "accepted",
+      "sapphire_paths": [
+        "services/hyperliquid/"
+      ],
+      "tags": [
+        "live-policy"
+      ]
+    }
+  ]
+}
