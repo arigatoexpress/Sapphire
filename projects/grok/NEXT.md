@@ -1,35 +1,29 @@
-# What next (2026-08-06 — post streamline)
+# What next (2026-08-06 — post free-reign gate + dashboard fix)
 
-## Streamline status
+## Just completed (monorepo + dashboard code)
 
-**Score 6/6** monorepo composition green (`make grok-streamline`).
+| Item | Status |
+|---|---|
+| Free-reign `gate_order` | **main** Sapphire `570b9e6` |
+| Genome `record_closed_trade` | **main** |
+| Dashboard SPA asset fix | **main** dashboard `5ed4058` — **needs Cloud Run deploy** |
+| System streamline 6/6 | green |
 
-Alpha ledger ↔ policy fences ↔ genome seeds ↔ automations catalog ↔ bridge exports are **one brief**:
+## Immediate parallel
 
-- `projects/grok/SYSTEM_BRIEF.md`
-- `data/grok-web-exports/YYYY-MM-DD_system-brief.md`
+1. **Gemini Cloud Shell** — pull dashboard `5ed4058`, build, **`--no-traffic` tag deploy**, verify `/dashboard/assets/*.js` is `application/javascript`, then owner traffic shift.  
+2. **Claude plant** — import `gate_order` in free-reign sole-writer path per `PLANT_WIRE_POLICY.md`; `record_closed_trade` on closes.  
+3. **Win P0** — post-boot acceptance before ARM.  
+4. **GCP cost** — still do min-instances / Vertex idle inventory when free.
 
-## Parallel tracks (do not block each other)
-
-| # | Track | Seat | Action |
-|---|---|---|---|
-| 1 | **Website** | Gemini Cloud Shell | Fix `/dashboard` ~700B shell (prompt already sent) |
-| 2 | **Plant policy wire** | Claude / Mac | Follow `PLANT_WIRE_POLICY.md` — `evaluate_proposal` before sole writer |
-| 3 | **Genome closes** | Claude / Mac | `LessonBook.append` on broker-reconciled closes |
-| 4 | **Win P0** | Desk / Win | Post-boot acceptance before ARM L2 |
-| 5 | **GCP cost** | Gemini Cloud Shell | min-instances 0, Vertex idle, BQ freshness |
-
-## Grok chat loop (every turn)
+## Commands
 
 ```bash
-git pull --ff-only
-make grok-streamline    # or python3 scripts/ops/grok_system_streamline.py --write --export --check
-make grok-loop
-# read projects/grok/SYSTEM_BRIEF.md + TASKBOARD.md
+# Sapphire
+make grok-streamline && make grok-loop
+python3 scripts/ops/grok_paper_proposal_smoke.py
+
+# Dashboard (Cloud Shell)
+cd ~/sapphire-alpha-dashboard && git pull
+# follow deploy.sh / cloudbuild with --no-traffic first
 ```
-
-## Do not
-
-- Live orders from Cloud Shell / this sandbox  
-- ARM L2 before Win P0  
-- Thrash Gemini’s website PR surface without need  
