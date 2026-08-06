@@ -1,21 +1,18 @@
-# What next (Claude usage limit)
+# What next (Gemini Phase 3 ready)
 
-## Blocked on Claude quota
+## Gemini — PASTE NOW
 
-Executor reload mid-flight: Win reachable, **no restart done yet** (safe).
+`docs/handoffs/GEMINI-PHASE3-WEBSITE-GCP-MASTERPLAN-2026-08-06.md`
 
-**When Claude resets:** paste  
+1. Prove `/dashboard` paints Mission Control  
+2. Elevate Evidence Observatory  
+3. Cost: min-instances 0  
+4. Optional paper BQ warehouse  
+
+## Claude — when quota resets
+
 `docs/handoffs/CLAUDE-RESUME-EXECUTOR-RELOAD-2026-08-06.md`
 
-## Other seats (unblocked)
+## Do not mix lanes
 
-| Seat | Job |
-|---|---|
-| Gemini | Deploy dashboard SPA (independent of Claude) |
-| You | Optional manual probe only if you know the executor host |
-| Grok monorepo | Streamline 8/8; waiting plant reload export |
-
-## Do not
-
-- ARM L2 while guessing  
-- Re-wire free-reign (done)  
+Gemini ≠ plant executor. Claude ≠ Cloud Run.
