@@ -169,5 +169,5 @@
       }
     }
   },
-  "architecture_note": "Pi-less since 2026-04-03. All services run on Mac (commander) with GPU inference on Windows PC over Tailscale. Trading execution (Aster DEX, Hyperliquid) paused until Pis are re-provisioned with ethernet access or compatible WiFi setup."
+  "architecture_note": "Pi-less since 2026-04-03. Mac acts as commander, while Windows is the always-on private datacenter running agent harnesses over Tailscale. Trading execution (Aster DEX, Hyperliquid) paused until Pis are re-provisioned with ethernet access or compatible WiFi setup."
 }

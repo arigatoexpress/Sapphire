@@ -51,3 +51,10 @@ def test_options_day_cap():
         )
     )
     assert d.code == "OPTIONS_DAY_CAP"
+
+
+def test_no_trade_arm_on_rejection():
+    d = evaluate_proposal(OrderProposal("SONNY", "buy", "rh_l2", "l2_token", 5.0))
+    assert d.allow is False
+    assert d.arm == "NO_TRADE"
+    assert d.code == "DENS_BLOCK"
