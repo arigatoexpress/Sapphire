@@ -24,3 +24,7 @@
 | [data/blindspots.json](./data/blindspots.json) | Blindspot scoreboard |
 | [data/playbooks.json](./data/playbooks.json) | Trading playbooks |
 | [../../docs/strategy/HOLISTIC-BLINDSPOTS-AND-LEVERAGE-2026-08-06.md](../../docs/strategy/HOLISTIC-BLINDSPOTS-AND-LEVERAGE-2026-08-06.md) | Holistic strategy |
+
+| [data/drive_bridge_folders.json](./data/drive_bridge_folders.json) | Google Drive Grok Bridge folder IDs |
+| [../../docs/handoffs/GROK-DRIVE-BRIDGE-2026-08-06.md](../../docs/handoffs/GROK-DRIVE-BRIDGE-2026-08-06.md) | Drive densify bridge |
+| [../../data/grok-drive-pack/](../../data/grok-drive-pack/) | Generated Drive pack (sanitized) |

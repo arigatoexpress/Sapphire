@@ -7,6 +7,15 @@ from typing import Any
 
 AUTOMATIONS: list[dict[str, Any]] = [
     {
+        "id": "grok-drive-pack",
+        "surface": "monorepo+drive",
+        "path": "scripts/ops/grok_drive_pack.py",
+        "cadence": "on densify or hourly (plant optional)",
+        "owner": "grok-web",
+        "status": "live",
+        "action": "Build sanitized Drive pack → Sapphire/Grok Bridge folders",
+    },
+    {
         "id": "grok-system-streamline",
         "surface": "script",
         "path": "scripts/ops/grok_system_streamline.py",

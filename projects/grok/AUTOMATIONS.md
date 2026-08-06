@@ -1,9 +1,10 @@
 # Grok-related automations
 
-_Count: 13 · by_status: {'live': 7, 'monorepo_ready_plant_pending': 1, 'paper_only_not_armed_until_p0': 1, 'read_only': 1, 'dry_run_default': 1, 'plant': 1, 'policy_in_monorepo': 1}_
+_Count: 14 · by_status: {'live': 8, 'monorepo_ready_plant_pending': 1, 'paper_only_not_armed_until_p0': 1, 'read_only': 1, 'dry_run_default': 1, 'plant': 1, 'policy_in_monorepo': 1}_
 
 | id | surface | status | action |
 |---|---|---|---|
+| `grok-drive-pack` | monorepo+drive | live | Build sanitized Drive pack → Sapphire/Grok Bridge folders |
 | `grok-system-streamline` | script | live | compose alpha+policy+bridge brief; --write --export |
 | `grok-mac-bridge-http` | mac-service | live | LaunchAgent optional; ensure start.sh + GROK_BRIDGE_URL in zshrc |
 | `grok-web-bridge-launchagent` | mac-launchagent | live | keep; wraps scripts/ops/sync_grok_web_exports.sh |

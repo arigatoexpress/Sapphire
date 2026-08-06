@@ -144,3 +144,6 @@ services/alpha/data/
 pine/generated/
 .build/
 coverage.xml
+
+# Generated Drive densify pack (rebuild with scripts/ops/grok_drive_pack.py)
+data/grok-drive-pack/

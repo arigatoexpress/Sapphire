@@ -1,0 +1,52 @@
+{
+  "schema": "sapphire-grok-drive-bridge/v1",
+  "updated": "2026-08-06",
+  "root": {
+    "name": "Sapphire",
+    "folder_id": "1IJkfjix11qVoLK9_1yzBysoRkoljd-n8",
+    "url": "https://drive.google.com/drive/folders/1IJkfjix11qVoLK9_1yzBysoRkoljd-n8"
+  },
+  "grok_bridge": {
+    "name": "Grok Bridge",
+    "folder_id": "1CQiAUpKC5tbK166XOKEF2SgvbDHbheoz",
+    "url": "https://drive.google.com/drive/folders/1CQiAUpKC5tbK166XOKEF2SgvbDHbheoz"
+  },
+  "lanes": {
+    "01-exports": {
+      "folder_id": "1Nvur3-eqk2O5Na0fNcrppeY2PH_xrBzV",
+      "url": "https://drive.google.com/drive/folders/1Nvur3-eqk2O5Na0fNcrppeY2PH_xrBzV",
+      "source_glob": "data/grok-web-exports/*.md",
+      "purpose": "Densify markdown exports (sanitized)"
+    },
+    "02-handoffs": {
+      "folder_id": "1Q3OH-A1TQd5QyPZJECeJDfdNQ99fdGnG",
+      "url": "https://drive.google.com/drive/folders/1Q3OH-A1TQd5QyPZJECeJDfdNQ99fdGnG",
+      "source_glob": "docs/handoffs/*GROK* docs/handoffs/*GEMINI* docs/handoffs/*CLAUDE*",
+      "purpose": "Cross-seat handoff prompts"
+    },
+    "03-briefs-and-rules": {
+      "folder_id": "1ZWli8VFsG6llqVEn3eJFaQOIPV3iuBpn",
+      "url": "https://drive.google.com/drive/folders/1ZWli8VFsG6llqVEn3eJFaQOIPV3iuBpn",
+      "source_glob": "projects/grok/SYSTEM_BRIEF.md projects/grok/data/public_operating_rules.json projects/grok/data/free_reign_policy.json",
+      "purpose": "System brief + public operating rules (no secrets)"
+    },
+    "04-audits": {
+      "folder_id": "1y5TFsgBwpDGPrnYJtSxCzuKw8dWHW620",
+      "url": "https://drive.google.com/drive/folders/1y5TFsgBwpDGPrnYJtSxCzuKw8dWHW620",
+      "source_glob": "projects/grok/data/public_surface_audit.json projects/grok/data/desk_projection_example.json",
+      "purpose": "Public surface audits + desk projection examples"
+    },
+    "05-operator-index": {
+      "folder_id": "1fIk69OhUDSNDf8Jd8W2V9Apri2Ae4QdR",
+      "url": "https://drive.google.com/drive/folders/1fIk69OhUDSNDf8Jd8W2V9Apri2Ae4QdR",
+      "source_glob": "data/grok-drive-pack/INDEX.md",
+      "purpose": "Operator index + how to use this bridge"
+    }
+  },
+  "fences": [
+    "Never upload secrets, SA JSON, tokens, wallets, balances, positions",
+    "Public-safe + operator process docs only",
+    "Grok web connector: list/search/read; plant/rclone for bulk upload",
+    "Does not place trades"
+  ]
+}
