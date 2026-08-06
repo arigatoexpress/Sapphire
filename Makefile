@@ -192,3 +192,6 @@ grok-streamline:
 
 grok-test:
 	python3 -m pytest tests/unit/test_grok_policy.py tests/unit/test_grok_genome.py tests/unit/test_grok_research_worker.py tests/unit/test_grok_windows.py tests/unit/test_grok_loop.py tests/unit/test_grok_bridge_status.py tests/unit/test_grok_system_brief.py -q
+
+grok-paper-smoke:
+	python3 scripts/ops/grok_paper_proposal_smoke.py

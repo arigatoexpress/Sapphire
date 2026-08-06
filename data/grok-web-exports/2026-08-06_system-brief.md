@@ -8,7 +8,7 @@ title: Sapphire system brief (alpha + policy + bridge)
 
 # Sapphire × Grok — System Brief
 
-_Generated: 2026-08-06T16:17:12Z_
+_Generated: 2026-08-06T16:21:56Z_
 
 **Streamline score:** 6/6 (1.0)
 
@@ -40,20 +40,20 @@ _Generated: 2026-08-06T16:17:12Z_
 
 ```json
 {
-  "export_count": 21,
+  "export_count": 23,
   "by_day": {
     "2026-08-04": 1,
     "2026-08-05": 12,
-    "2026-08-06": 8
+    "2026-08-06": 10
   },
   "latest": [
-    "2026-08-06_alpha-scour-merge.md",
     "2026-08-06_gcp-cloudshell-ultimate-handoff.md",
     "2026-08-06_gemini-website-gcp-master-prompt.md",
     "2026-08-06_grok-bridge-lane-tools.md",
     "2026-08-06_grok-mac-bridge-live.md",
     "2026-08-06_grok-project-bootstrap.md",
     "2026-08-06_plant-wire-receipt.md",
+    "2026-08-06_system-brief.md",
     "2026-08-06_windows-datacenter-masterplan.md"
   ],
   "plant_wired": true,
