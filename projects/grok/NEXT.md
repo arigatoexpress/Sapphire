@@ -1,19 +1,21 @@
-# What next (after Claude P0-A/B report)
+# What next (Claude usage limit)
 
-## Claude report — ACCEPTED
+## Blocked on Claude quota
 
-| Item | Verdict |
+Executor reload mid-flight: Win reachable, **no restart done yet** (safe).
+
+**When Claude resets:** paste  
+`docs/handoffs/CLAUDE-RESUME-EXECUTOR-RELOAD-2026-08-06.md`
+
+## Other seats (unblocked)
+
+| Seat | Job |
 |---|---|
-| Sole-writer = `telegram-bot/executor.py` | Correct (traced, not guessed) |
-| Gate scope `via=free_reign` only | **ACCEPT** (human TG stays attended) |
-| Genome `source=auto_estimate` | **ACCEPT** (honest) |
-| Bridge still mac-bridge | Green |
-| No L2 ARM / no live orders | Good |
+| Gemini | Deploy dashboard SPA (independent of Claude) |
+| You | Optional manual probe only if you know the executor host |
+| Grok monorepo | Streamline 8/8; waiting plant reload export |
 
-Canonical decision: `docs/handoffs/OPERATOR-DECISION-GATE-SCOPE-2026-08-06.md`
+## Do not
 
-## Immediate next
-
-1. **Reload rh-executor** → `docs/handoffs/CLAUDE-EXECUTOR-RELOAD-PROMPT-2026-08-06.md`
-2. Gemini: deploy dashboard SPA
-3. Win P0 when at desk
+- ARM L2 while guessing  
+- Re-wire free-reign (done)  
