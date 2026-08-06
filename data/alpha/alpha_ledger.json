@@ -1,5 +1,5 @@
 {
-  "scouredAt": "2026-08-06T16:45:17Z",
+  "scouredAt": "2026-08-06T19:11:31Z",
   "invariants": [
     "Designated rails only: RH Agentic \u2022\u2022\u2022\u20228144, RH L2, MOSS/MegaETH (grant-gated), paper",
     "Models propose only \u2014 coordinator + first-party receipts authorize; no ambient spend/trade authority",
@@ -270,7 +270,7 @@
       "title": "Mandate free_reign_multi_rail (sticky)",
       "body": "Free-reign ON designated rails: RH Agentic easy + options-first + no dust placer; RH L2 ON \u2264$10 max 1 open + dens; MOSS trade=true when grant hours_left > 0. Desk cycle must not wipe free-reign (easy_mode.free_reign_payload sticky). Per-trade Telegram approval cards stay dead.",
       "severity": "high",
-      "status": "accepted",
+      "status": "partial",
       "sapphirePaths": [
         "lib/autonomy/",
         "data/agent_runtime_policy.json"
@@ -283,7 +283,8 @@
       "sources": [
         "master-handoff",
         "plant-alpha"
-      ]
+      ],
+      "action": " | plant gate wired free_reign-only; reload executor"
     },
     {
       "id": "AU-TG",
@@ -765,6 +766,43 @@
         "au-05"
       ],
       "action": "Never ambient-arm HL from agents"
+    },
+    {
+      "id": "PL-GATE",
+      "domain": "automation",
+      "recency": "2026-08-06",
+      "title": "Plant free-reign gate_order wired in telegram-bot executor (via=free_reign)",
+      "body": "Claude 43f1cc9; operator accepted free_reign-only scope; reload rh-executor still open",
+      "severity": "critical",
+      "status": "verified",
+      "sapphirePaths": [
+        "lib/grok/free_reign_gate.py",
+        "data/grok-web-exports/2026-08-06_local-export_free-reign-gate-wired.md"
+      ],
+      "tags": [
+        "plant",
+        "free-reign",
+        "gate"
+      ],
+      "action": "Reload rh-executor process; monitor GATE DENIED logs"
+    },
+    {
+      "id": "PL-GENOME",
+      "domain": "automation",
+      "recency": "2026-08-06",
+      "title": "Plant genome closes wired (auto_estimate on full lots)",
+      "body": "Claude 7a2dea1; lessons.json seeded count=2",
+      "severity": "high",
+      "status": "verified",
+      "sapphirePaths": [
+        "lib/grok/plant_outcomes.py",
+        "data/grok-web-exports/2026-08-06_local-export_genome-closes-wired.md"
+      ],
+      "tags": [
+        "genome",
+        "plant"
+      ],
+      "action": "Upgrade to broker fill prices when available"
     }
   ],
   "mergeMap": [
@@ -801,6 +839,6 @@
       "path": "docs/trading-strategy-lab.md"
     }
   ],
-  "itemCount": 35,
+  "itemCount": 37,
   "note": "Includes Windows DC master plan + Gemini Cloud Shell handoff"
 }

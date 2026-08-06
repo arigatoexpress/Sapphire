@@ -1,19 +1,28 @@
-# Autonomous lunch status — 2026-08-06 ~19:00Z
+# Autonomous lunch status — 2026-08-06 ~19:15Z
 
-## Scoreboard
+## Plant (Claude)
 
-| Lane | State |
+| Step | State |
 |---|---|
-| Bridge HTTP + densify | green (plant) |
-| free-reign gate_order source wire | green (`via=free_reign`) |
-| genome closes wire | green (`auto_estimate`) |
-| rh-executor process reload | **OPEN** — code may not be live yet |
-| Dashboard SPA deploy | **OPEN** — Gemini; live still 404 assets |
-| Win P0 / L2 ARM | blocked / not armed |
-| Money paths | untouched |
+| Bridge :19998 mac-bridge | green |
+| gate_order source wire | green · free_reign-only · **ACCEPTED** |
+| genome closes | green · auto_estimate |
+| rh-executor reload | **in flight / waiting Claude** |
 
-## Next human actions after lunch
+## Monorepo (Grok this lunch)
 
-1. Paste executor reload prompt to Claude if Mac free  
-2. Check Gemini dashboard deploy  
-3. Decide free_reign-only gate scope  
+- Streamline **8/8** (gate + genome exports count)
+- Brief next_actions dynamic (no stale "wire gate")
+- Operator decision recorded
+- Alpha PL-GATE / PL-GENOME
+
+## Public / GCP
+
+- Dashboard assets still need Gemini deploy
+- Cost posture still open
+
+## When Ari returns
+
+1. Check Claude for executor-reloaded export  
+2. Check Gemini for SPA deploy  
+3. Win P0 only at desk  

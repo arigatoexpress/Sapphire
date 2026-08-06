@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-08-06T19:08:42Z",
+  "updated_at": "2026-08-06T19:11:15Z",
   "tasks": [
     {
       "id": "T-bridge-plant",
@@ -113,7 +113,7 @@
       "priority": 1,
       "status": "done",
       "done_when": "plant free-reign calls evaluate_proposal",
-      "completed_at": "2026-08-06T19:08:42Z"
+      "completed_at": "2026-08-06T19:11:15Z"
     },
     {
       "id": "T-wire-genome-closes",
@@ -122,7 +122,7 @@
       "priority": 1,
       "status": "done",
       "done_when": "outcomes wins/losses non-zero from real closes",
-      "completed_at": "2026-08-06T19:08:42Z"
+      "completed_at": "2026-08-06T19:11:15Z"
     },
     {
       "id": "T-win-post-boot",

@@ -89,3 +89,10 @@ Pass these when plant has the data (defaults are safe):
 | `has_catalyst_tag` | optional AXTI catalyst |
 
 See `docs/strategy/HOLISTIC-BLINDSPOTS-AND-LEVERAGE-2026-08-06.md`.
+
+## Scope: free_reign only (operator accepted 2026-08-06)
+
+Wire applies when proposal `via == "free_reign"` (auto). Human Telegram Approve
+is attended and is **not** re-blocked by OPTIONS_FIRST.
+
+Live process: after source edit, **reload rh-executor** or denials stay offline.

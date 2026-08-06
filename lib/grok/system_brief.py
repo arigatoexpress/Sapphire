@@ -128,6 +128,10 @@ def bridge_inventory(export_dir: Path = EXPORT_DIR) -> dict[str, Any]:
         "mac_bridge_note": (export_dir / "2026-08-06_grok-mac-bridge-live.md").is_file(),
         "mac_bridge_service": (ROOT / "services/grok-bridge/app.py").is_file(),
         "plant_wire_receipt": (export_dir / "2026-08-06_plant-wire-receipt.md").is_file(),
+        "gate_wired": any(export_dir.glob("*free-reign-gate-wired*")),
+        "genome_wired": any(export_dir.glob("*genome-closes-wired*")),
+        "executor_reloaded": any(export_dir.glob("*executor-reload*")),
+        "gate_scope_accepted": (export_dir / "2026-08-06_operator-accept-gate-scope.md").is_file(),
     }
 
 
@@ -215,18 +219,22 @@ def build_system_brief() -> dict[str, Any]:
     links = alpha_policy_links(crit)
 
     streamline_score = 0
-    streamline_max = 6
+    streamline_max = 8
     if policy["ok"]:
         streamline_score += 1
     if bridge["plant_wired"]:
         streamline_score += 1
-    if bridge["mac_bridge_note"]:
+    if bridge.get("mac_bridge_service") or bridge.get("mac_bridge_note"):
         streamline_score += 1
     if book.summary()["count"] >= 2:
         streamline_score += 1
     if autos["resolved_in_repo"] >= 5:
         streamline_score += 1
     if len(crit) >= 5:
+        streamline_score += 1
+    if bridge.get("gate_wired"):
+        streamline_score += 1
+    if bridge.get("genome_wired"):
         streamline_score += 1
 
     next_actions = []
@@ -236,10 +244,21 @@ def build_system_brief() -> dict[str, Any]:
         next_actions.append("Plant: land plant-wire-receipt for densify beat")
     else:
         next_actions.append("Plant: keep 30m grok-web-bridge LaunchAgent green")
-    next_actions.append("Plant: wire evaluate_proposal into free-reign sole-writer path")
-    next_actions.append("Plant: append LessonBook on broker-reconciled closes")
+    if not bridge.get("gate_wired"):
+        next_actions.append("Plant: wire gate_order into free-reign sole-writer (via=free_reign)")
+    elif not bridge.get("executor_reloaded"):
+        next_actions.append("Plant: reload rh-executor so gate_order is live in process")
+    else:
+        next_actions.append("Plant: free-reign gate live — monitor denials in executor logs")
+    if not bridge.get("genome_wired"):
+        next_actions.append("Plant: wire record_closed_trade on full lot closes")
+    else:
+        next_actions.append("Plant: upgrade genome to source=broker when fill prices available")
+    if not bridge.get("gate_scope_accepted"):
+        next_actions.append("Operator: accept free_reign-only gate scope")
     next_actions.append("Win: run P0 acceptance before ARM L2")
-    next_actions.append("Gemini Cloud Shell: fix /dashboard empty SPA (~700B)")
+    next_actions.append("Gemini Cloud Shell: deploy dashboard SPA fix (assets JS MIME)")
+    next_actions.append("GCP: cost posture min-instances=0 + Vertex idle skim")
 
     return {
         "generated_at": _utc(),

@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-08-06T19:08:42Z",
+  "generated_at": "2026-08-06T19:11:15Z",
   "streamline": {
-    "score": 6,
-    "max": 6,
+    "score": 8,
+    "max": 8,
     "ratio": 1.0
   },
   "mission": {
@@ -160,18 +160,18 @@
     ]
   },
   "bridge": {
-    "export_count": 31,
+    "export_count": 33,
     "by_day": {
       "2026-08-04": 1,
       "2026-08-05": 12,
-      "2026-08-06": 18
+      "2026-08-06": 20
     },
     "latest": [
-      "2026-08-06_grok-mac-bridge-live.md",
-      "2026-08-06_grok-project-bootstrap.md",
       "2026-08-06_holistic-blindspots-leverage.md",
       "2026-08-06_local-export_free-reign-gate-wired.md",
       "2026-08-06_local-export_genome-closes-wired.md",
+      "2026-08-06_lunch-autonomous-progress.md",
+      "2026-08-06_operator-accept-gate-scope.md",
       "2026-08-06_plant-wire-receipt.md",
       "2026-08-06_system-brief.md",
       "2026-08-06_windows-datacenter-masterplan.md"
@@ -179,7 +179,11 @@
     "plant_wired": true,
     "mac_bridge_note": true,
     "mac_bridge_service": true,
-    "plant_wire_receipt": true
+    "plant_wire_receipt": true,
+    "gate_wired": true,
+    "genome_wired": true,
+    "executor_reloaded": false,
+    "gate_scope_accepted": true
   },
   "automations": {
     "summary": {
@@ -415,10 +419,11 @@
   "alpha_item_count": 35,
   "next_actions": [
     "Plant: keep 30m grok-web-bridge LaunchAgent green",
-    "Plant: wire evaluate_proposal into free-reign sole-writer path",
-    "Plant: append LessonBook on broker-reconciled closes",
+    "Plant: reload rh-executor so gate_order is live in process",
+    "Plant: upgrade genome to source=broker when fill prices available",
     "Win: run P0 acceptance before ARM L2",
-    "Gemini Cloud Shell: fix /dashboard empty SPA (~700B)"
+    "Gemini Cloud Shell: deploy dashboard SPA fix (assets JS MIME)",
+    "GCP: cost posture min-instances=0 + Vertex idle skim"
   ],
   "blindspots": {
     "count": 25,
@@ -429,7 +434,7 @@
     },
     "by_status": {
       "open": 11,
-      "needs_operator_decision": 1,
+      "recommended_accept": 1,
       "resolved_plant": 3,
       "encoded": 3,
       "code_fixed_deploy_pending": 1,
