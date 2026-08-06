@@ -20,6 +20,7 @@ from lib.grok.windows import evaluate_windows_acceptance
 from lib.grok.system_brief import build_system_brief, write_brief
 from lib.grok.free_reign_gate import GateRequest, GateResult, gate_order
 from lib.grok.plant_outcomes import record_closed_trade
+from lib.grok.bridge_client import pick_transport, smart_query, bridge_url_from_env
 
 __all__ = [
     "FREE_REIGN_DEFAULTS",
@@ -39,6 +40,9 @@ __all__ = [
     "GateResult",
     "gate_order",
     "record_closed_trade",
+    "pick_transport",
+    "smart_query",
+    "bridge_url_from_env",
 ]
 
 __version__ = "0.1.0"

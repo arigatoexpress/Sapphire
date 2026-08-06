@@ -126,6 +126,8 @@ def bridge_inventory(export_dir: Path = EXPORT_DIR) -> dict[str, Any]:
         "latest": latest,
         "plant_wired": (export_dir / "2026-08-06_plant-wire-receipt.md").is_file(),
         "mac_bridge_note": (export_dir / "2026-08-06_grok-mac-bridge-live.md").is_file(),
+        "mac_bridge_service": (ROOT / "services/grok-bridge/app.py").is_file(),
+        "plant_wire_receipt": (export_dir / "2026-08-06_plant-wire-receipt.md").is_file(),
     }
 
 

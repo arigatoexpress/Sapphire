@@ -8,7 +8,7 @@ title: Sapphire system brief (alpha + policy + bridge)
 
 # Sapphire × Grok — System Brief
 
-_Generated: 2026-08-06T16:45:17Z_
+_Generated: 2026-08-06T17:42:53Z_
 
 **Streamline score:** 6/6 (1.0)
 
@@ -40,11 +40,11 @@ _Generated: 2026-08-06T16:45:17Z_
 
 ```json
 {
-  "export_count": 26,
+  "export_count": 27,
   "by_day": {
     "2026-08-04": 1,
     "2026-08-05": 12,
-    "2026-08-06": 13
+    "2026-08-06": 14
   },
   "latest": [
     "2026-08-06_gemini-website-gcp-master-prompt.md",
@@ -57,7 +57,9 @@ _Generated: 2026-08-06T16:45:17Z_
     "2026-08-06_windows-datacenter-masterplan.md"
   ],
   "plant_wired": true,
-  "mac_bridge_note": true
+  "mac_bridge_note": true,
+  "mac_bridge_service": true,
+  "plant_wire_receipt": true
 }
 ```
 
@@ -119,7 +121,7 @@ _Generated: 2026-08-06T16:45:17Z_
 
 ## Blindspots
 
-- scoreboard: `{'count': 20, 'by_severity': {'P0': 5, 'P1': 9, 'P2': 6}, 'by_status': {'open': 11, 'code_fixed_deploy_pending': 1, 'in_progress': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'encoded': 2, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-GATE-WIRE', 'BS-GENOME-CLOSES', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
+- scoreboard: `{'count': 22, 'by_severity': {'P1': 10, 'P2': 7, 'P0': 5}, 'by_status': {'resolved_plant': 1, 'encoded': 3, 'open': 11, 'code_fixed_deploy_pending': 1, 'in_progress': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-GATE-WIRE', 'BS-GENOME-CLOSES', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
 
 ## Playbooks
 

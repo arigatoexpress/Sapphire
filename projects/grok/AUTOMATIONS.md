@@ -5,7 +5,7 @@ _Count: 13 · by_status: {'live': 7, 'monorepo_ready_plant_pending': 1, 'paper_o
 | id | surface | status | action |
 |---|---|---|---|
 | `grok-system-streamline` | script | live | compose alpha+policy+bridge brief; --write --export |
-| `grok-mac-bridge-http` | mac-service | live | keep :19998 mac-bridge; no money paths |
+| `grok-mac-bridge-http` | mac-service | live | LaunchAgent optional; ensure start.sh + GROK_BRIDGE_URL in zshrc |
 | `grok-web-bridge-launchagent` | mac-launchagent | live | keep; wraps scripts/ops/sync_grok_web_exports.sh |
 | `grok-web-export-store` | git | live | keep; enforce frontmatter via grok_bridge_status |
 | `sync-grok-web-exports` | script | monorepo_ready_plant_pending | Claude: wrap in ops-state finish-line + LaunchAgent |

@@ -1,17 +1,22 @@
-## Holistic research (this turn)
+# What next (2026-08-06 17:40Z)
 
-- Strategy: `docs/strategy/HOLISTIC-BLINDSPOTS-AND-LEVERAGE-2026-08-06.md`
-- Blindspots: `projects/grok/data/blindspots.json` (20 items)
-- Playbooks: `projects/grok/data/playbooks.json` (7)
-- New gates: DAY_LOSS_HALT · OPTIONS_DAY_CAP · AXTI_DTE · HL_SIGNING_GATE · REGIME_BLOCK_L2
+## Plant bridge — DONE
 
-## Claude prompts (while Gemini deploys)
+Claude greened: mac-bridge :19998, densify 30m LA, GROK_BRIDGE_URL, local-export receipt.  
+Monorepo client: `lib/grok/bridge_client.py`.
 
-Paste-ready: `docs/handoffs/CLAUDE-PLANT-PROMPTS-2026-08-06.md`
+## Parallel now
 
-## Parallel tracks
+| Seat | Job |
+|---|---|
+| **Gemini** | Still cooking → deploy dashboard SPA + GCP cost |
+| **Claude** | When Mac calm → **Prompt A** free-reign `gate_order` (+ new GateRequest fields) |
+| **Claude optional** | load `com.sapphire.grok-bridge` LaunchAgent so :19998 survives reboot |
+| **You / Win** | P0 when at desk |
+| **You** | MOSS grant renew if you want that rail |
 
-1. Gemini: deploy dashboard SPA fix
-2. Claude: Mac clean → Prompt A gate_order (pass new GateRequest fields)
-3. Win P0 when at desk
-4. MOSS grant renew if desired
+## Do not
+
+- Re-wire bridge tools Claude already finished  
+- ARM L2  
+- Kill plant processes mid-cleanup  

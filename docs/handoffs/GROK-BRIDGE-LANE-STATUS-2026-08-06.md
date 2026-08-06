@@ -110,3 +110,6 @@ curl -sf http://127.0.0.1:8099/healthz || true
 | CI inventory bullet | restored this turn |
 
 *Update this file when plant side reports green or when Claude lands the local-export receipt.*
+
+## Update 2026-08-06 later — PLANT GREEN
+Claude: mac-bridge live + densify LA + local-export receipt. Grok: bridge_client + ACK export.

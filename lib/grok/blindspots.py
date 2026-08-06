@@ -7,6 +7,24 @@ from typing import Any
 # Severity: P0 blocks earn/safety · P1 blocks learning/ops · P2 polish
 BLINDSPOTS: list[dict[str, Any]] = [
     {
+        "id": "BS-BRIDGE-HTTP",
+        "severity": "P1",
+        "area": "bridge",
+        "title": "Mac grok-bridge HTTP :19998 + plant densify LaunchAgent",
+        "impact": "Was only aspirational BR-04; now live on plant",
+        "fix": "services/grok-bridge + GROK_BRIDGE_URL + com.sapphire.grok-web-bridge",
+        "status": "resolved_plant",
+    },
+    {
+        "id": "BS-BRIDGE-CLIENT",
+        "severity": "P2",
+        "area": "bridge",
+        "title": "Monorepo client for transport fallback chain",
+        "impact": "Remote seats need pick_transport + smart_query",
+        "fix": "lib/grok/bridge_client.py",
+        "status": "encoded",
+    },
+    {
         "id": "BS-GATE-WIRE",
         "severity": "P0",
         "area": "plant",

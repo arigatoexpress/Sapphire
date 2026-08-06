@@ -22,7 +22,7 @@ AUTOMATIONS: list[dict[str, Any]] = [
         "cadence": "always (LaunchAgent)",
         "owner": "claude-plant",
         "status": "live",
-        "action": "keep :19998 mac-bridge; no money paths",
+        "action": "LaunchAgent optional; ensure start.sh + GROK_BRIDGE_URL in zshrc",
     },
     {
         "id": "grok-web-bridge-launchagent",

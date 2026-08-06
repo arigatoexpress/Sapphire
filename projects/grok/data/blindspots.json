@@ -1,6 +1,24 @@
 {
   "blindspots": [
     {
+      "id": "BS-BRIDGE-HTTP",
+      "severity": "P1",
+      "area": "bridge",
+      "title": "Mac grok-bridge HTTP :19998 + plant densify LaunchAgent",
+      "impact": "Was only aspirational BR-04; now live on plant",
+      "fix": "services/grok-bridge + GROK_BRIDGE_URL + com.sapphire.grok-web-bridge",
+      "status": "resolved_plant"
+    },
+    {
+      "id": "BS-BRIDGE-CLIENT",
+      "severity": "P2",
+      "area": "bridge",
+      "title": "Monorepo client for transport fallback chain",
+      "impact": "Remote seats need pick_transport + smart_query",
+      "fix": "lib/grok/bridge_client.py",
+      "status": "encoded"
+    },
+    {
       "id": "BS-GATE-WIRE",
       "severity": "P0",
       "area": "plant",
@@ -232,19 +250,20 @@
     }
   ],
   "scoreboard": {
-    "count": 20,
+    "count": 22,
     "by_severity": {
-      "P0": 5,
-      "P1": 9,
-      "P2": 6
+      "P1": 10,
+      "P2": 7,
+      "P0": 5
     },
     "by_status": {
+      "resolved_plant": 1,
+      "encoded": 3,
       "open": 11,
       "code_fixed_deploy_pending": 1,
       "in_progress": 1,
       "partial": 1,
       "policy_ready_plant_pending": 1,
-      "encoded": 2,
       "blocked": 1,
       "documented": 1,
       "research": 1
