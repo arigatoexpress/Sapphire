@@ -1,13 +1,13 @@
 {
-  "generated_at": "2026-08-06T17:43:01Z",
+  "generated_at": "2026-08-06T18:15:48Z",
   "export_dir": "data/grok-web-exports",
-  "count": 27,
+  "count": 30,
   "issue_count": 3,
   "by_source": {
-    "grok-web": 15,
+    "grok-web": 16,
     "unknown": 1,
     "grok-cli": 2,
-    "local-export": 9
+    "local-export": 11
   },
   "by_type": {
     "architecture": 3,
@@ -15,8 +15,8 @@
     "ops": 7,
     "status": 2,
     "catalog": 2,
-    "plant-status": 3,
-    "handoff": 4,
+    "plant-status": 5,
+    "handoff": 5,
     "research": 2,
     "alpha-scour": 1,
     "system-brief": 1,
@@ -25,44 +25,9 @@
   "missing_required_hints": [],
   "latest": [
     {
-      "name": "2026-08-06_claude-plant-prompts.md",
-      "size": 433,
-      "mtime_utc": "2026-08-06T17:41:48Z",
-      "has_frontmatter": true,
-      "source": "grok-web",
-      "date": "2026-08-06",
-      "type": "handoff",
-      "title": "Claude plant prompts while Gemini cooks website",
-      "topics": [
-        "claude",
-        "plant",
-        "free-reign",
-        "genome",
-        "bridge"
-      ],
-      "issues": []
-    },
-    {
-      "name": "2026-08-06_dashboard-spa-asset-fix.md",
-      "size": 989,
-      "mtime_utc": "2026-08-06T17:41:48Z",
-      "has_frontmatter": true,
-      "source": "grok-web",
-      "date": "2026-08-06",
-      "type": "ops",
-      "title": "Dashboard SPA asset fix landed (needs Cloud Run deploy)",
-      "topics": [
-        "website",
-        "dashboard",
-        "gemini",
-        "cloud-run"
-      ],
-      "issues": []
-    },
-    {
       "name": "2026-08-06_free-reign-gate-ready.md",
       "size": 909,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:35:53Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -79,7 +44,7 @@
     {
       "name": "2026-08-06_gcp-cloudshell-ultimate-handoff.md",
       "size": 2284,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T14:33:34Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -98,7 +63,7 @@
     {
       "name": "2026-08-06_gemini-website-gcp-master-prompt.md",
       "size": 1181,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:35:53Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -117,7 +82,7 @@
     {
       "name": "2026-08-06_grok-bridge-lane-tools.md",
       "size": 1151,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:51Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -134,7 +99,7 @@
     {
       "name": "2026-08-06_grok-mac-bridge-live.md",
       "size": 2269,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:22Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -151,7 +116,7 @@
     {
       "name": "2026-08-06_grok-project-bootstrap.md",
       "size": 932,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:35:53Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -170,7 +135,7 @@
     {
       "name": "2026-08-06_holistic-blindspots-leverage.md",
       "size": 802,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T17:05:55Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -187,9 +152,45 @@
       "issues": []
     },
     {
+      "name": "2026-08-06_local-export_free-reign-gate-wired.md",
+      "size": 6248,
+      "mtime_utc": "2026-08-06T18:14:42Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-06",
+      "type": "plant-status",
+      "title": "local-export: free-reign gate_order wired",
+      "topics": [
+        "free-reign",
+        "gate_order",
+        "policy",
+        "plant-wire",
+        "P0-A"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_local-export_genome-closes-wired.md",
+      "size": 2858,
+      "mtime_utc": "2026-08-06T18:14:58Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-06",
+      "type": "plant-status",
+      "title": "local-export: genome closes wired [2026-08-06]",
+      "topics": [
+        "genome",
+        "lessons",
+        "plant-outcomes",
+        "plant-wire",
+        "P0-B"
+      ],
+      "issues": []
+    },
+    {
       "name": "2026-08-06_plant-wire-receipt.md",
       "size": 1969,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:06:15Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -206,7 +207,7 @@
     {
       "name": "2026-08-06_system-brief.md",
       "size": 6638,
-      "mtime_utc": "2026-08-06T17:42:53Z",
+      "mtime_utc": "2026-08-06T17:57:56Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -224,7 +225,7 @@
     {
       "name": "2026-08-06_windows-datacenter-masterplan.md",
       "size": 2318,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T14:33:34Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -246,7 +247,7 @@
     {
       "name": "2026-08-04_bridge-setup.md",
       "size": 1182,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-05T02:17:49Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-04",
@@ -264,7 +265,7 @@
     {
       "name": "2026-08-05_alpha-learnings-axti-l2.md",
       "size": 2904,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-05T23:12:00Z",
       "has_frontmatter": false,
       "source": null,
       "date": null,
@@ -280,7 +281,7 @@
     {
       "name": "2026-08-05_bridge-setup.md",
       "size": 1328,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-05T22:58:42Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-05",
@@ -297,7 +298,7 @@
     {
       "name": "2026-08-05_connector-write-ok.md",
       "size": 668,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-05T22:59:00Z",
       "has_frontmatter": true,
       "source": "grok-cli",
       "date": "2026-08-05",
@@ -313,7 +314,7 @@
     {
       "name": "2026-08-05_fleet-win-recovery-handoff.md",
       "size": 10722,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T00:19:42Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-05",
@@ -333,7 +334,7 @@
     {
       "name": "2026-08-05_local-export_grok-all-queries.md",
       "size": 33914,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-05T02:26:39Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -345,7 +346,7 @@
     {
       "name": "2026-08-05_local-export_grok-chat-catalog.md",
       "size": 11032,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-05T02:26:13Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -357,7 +358,7 @@
     {
       "name": "2026-08-05_local-export_plant-alpha.md",
       "size": 1590,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-05T02:17:49Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -375,7 +376,7 @@
     {
       "name": "2026-08-05_master-handoff-claude-opus.md",
       "size": 9909,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:51Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -391,7 +392,7 @@
     {
       "name": "2026-08-05_megaeth-moss-status.md",
       "size": 517,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:51Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -406,7 +407,7 @@
     {
       "name": "2026-08-05_repo-consolidation.md",
       "size": 3012,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:51Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -421,7 +422,7 @@
     {
       "name": "2026-08-05_session-wrap-grok.md",
       "size": 2076,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:51Z",
       "has_frontmatter": true,
       "source": "grok-cli",
       "date": "2026-08-05",
@@ -436,7 +437,7 @@
     {
       "name": "2026-08-05_tg-terminal-oss-mine.md",
       "size": 4532,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:51Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -451,7 +452,7 @@
     {
       "name": "2026-08-06_ack-plant-bridge-green.md",
       "size": 1279,
-      "mtime_utc": "2026-08-06T17:42:53Z",
+      "mtime_utc": "2026-08-06T17:56:47Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -468,7 +469,7 @@
     {
       "name": "2026-08-06_alpha-scour-merge.md",
       "size": 15167,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T14:03:12Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -483,9 +484,26 @@
       "issues": []
     },
     {
+      "name": "2026-08-06_claude-code-ultimate-dispatch.md",
+      "size": 467,
+      "mtime_utc": "2026-08-06T17:56:47Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "handoff",
+      "title": "Claude Code ultimate plant dispatch (Mac stable)",
+      "topics": [
+        "claude",
+        "plant",
+        "free-reign",
+        "dispatch"
+      ],
+      "issues": []
+    },
+    {
       "name": "2026-08-06_claude-plant-prompts.md",
       "size": 433,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:35:53Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -503,7 +521,7 @@
     {
       "name": "2026-08-06_dashboard-spa-asset-fix.md",
       "size": 989,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:35:53Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -520,7 +538,7 @@
     {
       "name": "2026-08-06_free-reign-gate-ready.md",
       "size": 909,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:35:53Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -537,7 +555,7 @@
     {
       "name": "2026-08-06_gcp-cloudshell-ultimate-handoff.md",
       "size": 2284,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T14:33:34Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -556,7 +574,7 @@
     {
       "name": "2026-08-06_gemini-website-gcp-master-prompt.md",
       "size": 1181,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:35:53Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -575,7 +593,7 @@
     {
       "name": "2026-08-06_grok-bridge-lane-tools.md",
       "size": 1151,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:51Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -592,7 +610,7 @@
     {
       "name": "2026-08-06_grok-mac-bridge-live.md",
       "size": 2269,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:03:22Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -609,7 +627,7 @@
     {
       "name": "2026-08-06_grok-project-bootstrap.md",
       "size": 932,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:35:53Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -628,7 +646,7 @@
     {
       "name": "2026-08-06_holistic-blindspots-leverage.md",
       "size": 802,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T17:05:55Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -645,9 +663,45 @@
       "issues": []
     },
     {
+      "name": "2026-08-06_local-export_free-reign-gate-wired.md",
+      "size": 6248,
+      "mtime_utc": "2026-08-06T18:14:42Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-06",
+      "type": "plant-status",
+      "title": "local-export: free-reign gate_order wired",
+      "topics": [
+        "free-reign",
+        "gate_order",
+        "policy",
+        "plant-wire",
+        "P0-A"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_local-export_genome-closes-wired.md",
+      "size": 2858,
+      "mtime_utc": "2026-08-06T18:14:58Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-06",
+      "type": "plant-status",
+      "title": "local-export: genome closes wired [2026-08-06]",
+      "topics": [
+        "genome",
+        "lessons",
+        "plant-outcomes",
+        "plant-wire",
+        "P0-B"
+      ],
+      "issues": []
+    },
+    {
       "name": "2026-08-06_plant-wire-receipt.md",
       "size": 1969,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T16:06:15Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -664,7 +718,7 @@
     {
       "name": "2026-08-06_system-brief.md",
       "size": 6638,
-      "mtime_utc": "2026-08-06T17:42:53Z",
+      "mtime_utc": "2026-08-06T17:57:56Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -682,7 +736,7 @@
     {
       "name": "2026-08-06_windows-datacenter-masterplan.md",
       "size": 2318,
-      "mtime_utc": "2026-08-06T17:41:48Z",
+      "mtime_utc": "2026-08-06T14:33:34Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
