@@ -7,6 +7,24 @@ from typing import Any
 # Severity: P0 blocks earn/safety · P1 blocks learning/ops · P2 polish
 BLINDSPOTS: list[dict[str, Any]] = [
     {
+        "id": "BS-PUBLIC-DESK-STALE",
+        "severity": "P0",
+        "area": "public",
+        "title": "Public /api/v1/live desk block stale/unknown — trading UI looks empty",
+        "impact": "Users think system has no trading data; markets epm high while desk null",
+        "fix": "Plant telemetry desk refresh + Gemini UI stale honesty + operating rules",
+        "status": "open",
+    },
+    {
+        "id": "BS-PUBLIC-WIDGETS-GATE",
+        "severity": "P1",
+        "area": "public",
+        "title": "widgets.gate unavailable on Cloud Run (no ops-state files)",
+        "impact": "Gate/pause looks broken on public edge",
+        "fix": "Signed gate projection in live telemetry; UI fail-closed copy",
+        "status": "open",
+    },
+    {
         "id": "BS-EXECUTOR-DEPLOY",
         "severity": "P0",
         "area": "plant",

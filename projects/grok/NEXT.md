@@ -1,18 +1,20 @@
-# What next (Gemini Phase 3 ready)
+# What next — data truth campaign
 
-## Gemini — PASTE NOW
+## Gemini (send NOW with Phase 3)
 
-`docs/handoffs/GEMINI-PHASE3-WEBSITE-GCP-MASTERPLAN-2026-08-06.md`
+1. Phase 3 website masterplan  
+2. **Data truth:** `docs/handoffs/GEMINI-DATA-TRUTH-AND-PUBLIC-SURFACE-2026-08-06.md`
 
-1. Prove `/dashboard` paints Mission Control  
-2. Elevate Evidence Observatory  
-3. Cost: min-instances 0  
-4. Optional paper BQ warehouse  
+## Claude (when quota up)
 
-## Claude — when quota resets
+1. Executor reload  
+2. **Telemetry desk refresh:** `docs/handoffs/CLAUDE-TELEMETRY-DESK-REFRESH-2026-08-06.md`
 
-`docs/handoffs/CLAUDE-RESUME-EXECUTOR-RELOAD-2026-08-06.md`
+## Grok monorepo
 
-## Do not mix lanes
+- `lib/grok/public_surface.py` + `scripts/ops/public_surface_audit.py`  
+- `projects/grok/data/public_operating_rules.json`  
 
-Gemini ≠ plant executor. Claude ≠ Cloud Run.
+## Never
+
+Fake PnL · wallet leak · L2 ARM to “make dashboard look busy”

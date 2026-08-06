@@ -1,0 +1,158 @@
+{
+  "issue_count": 6,
+  "issues": [
+    {
+      "id": "DESK_STALE_EMPTY",
+      "sev": "P0",
+      "msg": "desk posture/execution unknown \u2014 trading intelligence looks empty"
+    },
+    {
+      "id": "MARKETS_GATE_UNKNOWN",
+      "sev": "P1",
+      "msg": "markets.decision_gate/execution unknown despite feed activity"
+    },
+    {
+      "id": "NO_PAPER_STRATEGIES",
+      "sev": "P1",
+      "msg": "paper_strategies null \u2014 research strategies not on wire"
+    },
+    {
+      "id": "GATE_FILE_UNAVAILABLE",
+      "sev": "P1",
+      "msg": "widgets.gate unavailable on Cloud Run (no ops-state files) \u2014 expected unless signed projection"
+    },
+    {
+      "id": "RESEARCH_CLIPS_EMPTY",
+      "sev": "P1",
+      "msg": "research clips empty \u2014 no public research cycle on widgets path"
+    },
+    {
+      "id": "SIGNALS_EMPTY",
+      "sev": "P1",
+      "msg": "recent_signals empty"
+    },
+    {
+      "id": "WALLET_WITHHELD_OK",
+      "sev": "info",
+      "msg": "wallet withheld \u2014 intentional public policy (not a bug)"
+    }
+  ],
+  "live_summary": {
+    "state": "degraded",
+    "active_agents": 5,
+    "events_per_min": null,
+    "verified_today": null,
+    "attention": null
+  },
+  "live_status": "live",
+  "desk_updated_at": "2026-08-06T09:16:15+00:00",
+  "markets_events_per_min": 600.0,
+  "active_agents": 5,
+  "blindspots": {
+    "count": 25,
+    "by_severity": {
+      "P0": 6,
+      "P1": 12,
+      "P2": 7
+    },
+    "by_status": {
+      "open": 11,
+      "recommended_accept": 1,
+      "resolved_plant": 3,
+      "encoded": 3,
+      "code_fixed_deploy_pending": 1,
+      "in_progress": 1,
+      "partial": 1,
+      "policy_ready_plant_pending": 1,
+      "blocked": 1,
+      "documented": 1,
+      "research": 1
+    },
+    "open_p0": [
+      "BS-EXECUTOR-DEPLOY",
+      "BS-WIN-P0",
+      "BS-MOSS-GRANT"
+    ],
+    "gcp_leverage_top": [
+      "Deploy dashboard SPA fix (no-traffic \u2192 verify JS MIME \u2192 traffic)",
+      "Cloud Run min-instances=0 + right-size memory",
+      "BQ warehouse for paper outcomes + regime digests (batch SQL)"
+    ]
+  },
+  "public_rules": {
+    "schema": "sapphire-public-operating-rules/v1",
+    "mandate": "free_reign_multi_rail",
+    "disclosure": {
+      "wallets": "withheld",
+      "balances": "withheld",
+      "exact_positions": "withheld",
+      "order_ids": "withheld",
+      "policy": "Public surfaces show process truth, coarse bands, and operating rules \u2014 never exact capital, wallets, or broker positions."
+    },
+    "rails": {
+      "rh_agentic": "options-first free-reign auto lane (defined-risk preferred)",
+      "rh_l2": "experimental \u2264$10.0 notional, max_open=1",
+      "moss": "session grant required (hours_left > 0)",
+      "paper": "research / shadow",
+      "hyperliquid": "signing gate default disarmed"
+    },
+    "permanent_dens_symbols": [
+      "BINGBONG",
+      "CATE",
+      "HOODSDAY",
+      "NONGWAN",
+      "SONNY"
+    ],
+    "dust_no_rebuy": [
+      "HOOD",
+      "IBIT",
+      "NVDA",
+      "PLTR"
+    ],
+    "axti": {
+      "scale_out_multiple": 2.0,
+      "hard_sl_fraction": -0.4,
+      "defined_risk_only": true,
+      "dte_band_days": [
+        2,
+        21
+      ]
+    },
+    "capital_preservation": {
+      "max_options_premium_usd_per_day": 150.0,
+      "max_realized_loss_usd_per_day": 75.0,
+      "block_meme_l2_in_crisis": true
+    },
+    "ta_stack": [
+      "ema_trend",
+      "rsi_14",
+      "macd",
+      "bollinger",
+      "volume"
+    ],
+    "playbooks": {
+      "count": 7,
+      "ids": [
+        "axti_options",
+        "hyperliquid_capped",
+        "l2_dust_experimental",
+        "late_cycle_preservation",
+        "moss_session",
+        "regime_aware_rsi_paper",
+        "tv_signal_spine"
+      ],
+      "ta_stack": [
+        "ema_trend",
+        "rsi_14",
+        "macd",
+        "bollinger",
+        "volume"
+      ]
+    },
+    "honesty": {
+      "prefer_not_observed_over_zero": true,
+      "stale_desk_is_not_flat_pnl": true,
+      "capability_route_active_is_not_fill": true
+    }
+  }
+}

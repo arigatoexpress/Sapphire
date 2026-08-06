@@ -1,0 +1,76 @@
+{
+  "schema": "sapphire-public-operating-rules/v1",
+  "mandate": "free_reign_multi_rail",
+  "disclosure": {
+    "wallets": "withheld",
+    "balances": "withheld",
+    "exact_positions": "withheld",
+    "order_ids": "withheld",
+    "policy": "Public surfaces show process truth, coarse bands, and operating rules \u2014 never exact capital, wallets, or broker positions."
+  },
+  "rails": {
+    "rh_agentic": "options-first free-reign auto lane (defined-risk preferred)",
+    "rh_l2": "experimental \u2264$10.0 notional, max_open=1",
+    "moss": "session grant required (hours_left > 0)",
+    "paper": "research / shadow",
+    "hyperliquid": "signing gate default disarmed"
+  },
+  "permanent_dens_symbols": [
+    "BINGBONG",
+    "CATE",
+    "HOODSDAY",
+    "NONGWAN",
+    "SONNY"
+  ],
+  "dust_no_rebuy": [
+    "HOOD",
+    "IBIT",
+    "NVDA",
+    "PLTR"
+  ],
+  "axti": {
+    "scale_out_multiple": 2.0,
+    "hard_sl_fraction": -0.4,
+    "defined_risk_only": true,
+    "dte_band_days": [
+      2,
+      21
+    ]
+  },
+  "capital_preservation": {
+    "max_options_premium_usd_per_day": 150.0,
+    "max_realized_loss_usd_per_day": 75.0,
+    "block_meme_l2_in_crisis": true
+  },
+  "ta_stack": [
+    "ema_trend",
+    "rsi_14",
+    "macd",
+    "bollinger",
+    "volume"
+  ],
+  "playbooks": {
+    "count": 7,
+    "ids": [
+      "axti_options",
+      "hyperliquid_capped",
+      "l2_dust_experimental",
+      "late_cycle_preservation",
+      "moss_session",
+      "regime_aware_rsi_paper",
+      "tv_signal_spine"
+    ],
+    "ta_stack": [
+      "ema_trend",
+      "rsi_14",
+      "macd",
+      "bollinger",
+      "volume"
+    ]
+  },
+  "honesty": {
+    "prefer_not_observed_over_zero": true,
+    "stale_desk_is_not_flat_pnl": true,
+    "capability_route_active_is_not_fill": true
+  }
+}

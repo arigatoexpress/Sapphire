@@ -1,6 +1,24 @@
 {
   "blindspots": [
     {
+      "id": "BS-PUBLIC-DESK-STALE",
+      "severity": "P0",
+      "area": "public",
+      "title": "Public /api/v1/live desk block stale/unknown \u2014 trading UI looks empty",
+      "impact": "Users think system has no trading data; markets epm high while desk null",
+      "fix": "Plant telemetry desk refresh + Gemini UI stale honesty + operating rules",
+      "status": "open"
+    },
+    {
+      "id": "BS-PUBLIC-WIDGETS-GATE",
+      "severity": "P1",
+      "area": "public",
+      "title": "widgets.gate unavailable on Cloud Run (no ops-state files)",
+      "impact": "Gate/pause looks broken on public edge",
+      "fix": "Signed gate projection in live telemetry; UI fail-closed copy",
+      "status": "open"
+    },
+    {
       "id": "BS-EXECUTOR-DEPLOY",
       "severity": "P0",
       "area": "plant",
@@ -277,14 +295,14 @@
     }
   ],
   "scoreboard": {
-    "count": 25,
+    "count": 27,
     "by_severity": {
-      "P0": 6,
-      "P1": 12,
+      "P0": 7,
+      "P1": 13,
       "P2": 7
     },
     "by_status": {
-      "open": 11,
+      "open": 13,
       "recommended_accept": 1,
       "resolved_plant": 3,
       "encoded": 3,
@@ -297,6 +315,7 @@
       "research": 1
     },
     "open_p0": [
+      "BS-PUBLIC-DESK-STALE",
       "BS-EXECUTOR-DEPLOY",
       "BS-WIN-P0",
       "BS-MOSS-GRANT"
