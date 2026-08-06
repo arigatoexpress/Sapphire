@@ -16,3 +16,7 @@
 | [../../lib/grok/](../../lib/grok/) | Python package |
 | [../../data/grok-web-exports/](../../data/grok-web-exports/) | Knowledge bridge store |
 | [../../docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md](../../docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md) | Mission |
+
+| [SYSTEM_BRIEF.md](./SYSTEM_BRIEF.md) | Unified alpha+policy+bridge brief |
+| [PLANT_WIRE_POLICY.md](./PLANT_WIRE_POLICY.md) | Claude free-reign wire recipe |
+| [NEXT.md](./NEXT.md) | What next |

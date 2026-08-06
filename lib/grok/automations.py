@@ -7,6 +7,15 @@ from typing import Any
 
 AUTOMATIONS: list[dict[str, Any]] = [
     {
+        "id": "grok-system-streamline",
+        "surface": "script",
+        "path": "scripts/ops/grok_system_streamline.py",
+        "cadence": "each loop tick / densify",
+        "owner": "grok-project",
+        "status": "live",
+        "action": "compose alpha+policy+bridge brief; --write --export",
+    },
+    {
         "id": "grok-mac-bridge-http",
         "surface": "mac-service",
         "path": "services/grok-bridge/",

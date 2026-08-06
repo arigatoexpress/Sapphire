@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-08-06T16:13:52Z",
+  "updated_at": "2026-08-06T16:17:12Z",
   "tasks": [
     {
       "id": "T-bridge-plant",
@@ -27,6 +27,15 @@
       "status": "done",
       "done_when": "lib/grok/policy.py tests green",
       "completed_at": "2026-08-06T16:08:43Z"
+    },
+    {
+      "id": "T-system-streamline",
+      "title": "System brief: link alpha + policy + automations + bridge",
+      "lane": "streamline",
+      "priority": 1,
+      "status": "done",
+      "done_when": "grok_system_streamline --check passes; SYSTEM_BRIEF written",
+      "completed_at": "2026-08-06T16:17:12Z"
     },
     {
       "id": "T-website-dashboard",
@@ -123,7 +132,7 @@
     }
   ],
   "stats": {
-    "static_done": 8,
+    "static_done": 9,
     "static_open": 3,
     "dynamic_open": 3,
     "signals": {
@@ -133,7 +142,8 @@
       "windows_module_ok": true,
       "research_validator_ok": true,
       "automations_catalog_ok": true,
-      "bridge_local_export_seen": false
+      "streamline_ok": true,
+      "bridge_local_export_seen": true
     }
   },
   "next_actions": [

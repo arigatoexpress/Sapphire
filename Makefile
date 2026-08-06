@@ -187,5 +187,8 @@ grok-loop:
 grok-bridge:
 	python3 scripts/ops/grok_bridge_status.py --write-manifest
 
+grok-streamline:
+	python3 scripts/ops/grok_system_streamline.py --write --export --check
+
 grok-test:
-	python3 -m pytest tests/unit/test_grok_policy.py tests/unit/test_grok_genome.py tests/unit/test_grok_research_worker.py tests/unit/test_grok_windows.py tests/unit/test_grok_loop.py tests/unit/test_grok_bridge_status.py -q
+	python3 -m pytest tests/unit/test_grok_policy.py tests/unit/test_grok_genome.py tests/unit/test_grok_research_worker.py tests/unit/test_grok_windows.py tests/unit/test_grok_loop.py tests/unit/test_grok_bridge_status.py tests/unit/test_grok_system_brief.py -q

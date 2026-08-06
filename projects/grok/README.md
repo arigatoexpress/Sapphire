@@ -8,6 +8,8 @@
 | **Code** | [`lib/grok/`](../../lib/grok/) |
 | **Data** | [`data/`](./data/) · fixtures in [`fixtures/`](./fixtures/) |
 | **Bridge store** | [`data/grok-web-exports/`](../../data/grok-web-exports/) |
+| **System brief** | [`SYSTEM_BRIEF.md`](./SYSTEM_BRIEF.md) · `make grok-streamline` |
+| **Plant wire** | [`PLANT_WIRE_POLICY.md`](./PLANT_WIRE_POLICY.md) |
 | **Loop** | [`LOOP.md`](./LOOP.md) · `python3 scripts/ops/grok_loop_tick.py` |
 | **Taskboard** | [`TASKBOARD.md`](./TASKBOARD.md) (generated) · `data/taskboard.json` |
 | **Automations** | [`AUTOMATIONS.md`](./AUTOMATIONS.md) |
@@ -17,6 +19,7 @@
 ```bash
 # Full project status (bridge + policy + win + genome + board)
 python3 scripts/ops/grok_project_status.py
+make grok-streamline   # alpha+policy+bridge+autos brief
 
 # Steering tick — updates TASKBOARD from signals
 python3 scripts/ops/grok_loop_tick.py

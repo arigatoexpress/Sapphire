@@ -1,23 +1,35 @@
-# What next (2026-08-06)
+# What next (2026-08-06 — post streamline)
 
-## Parallel tracks
+## Streamline status
 
-| Track | Owner seat | Action |
-|---|---|---|
-| **A. Website not dogshit** | Gemini @ Cloud Shell | Paste `docs/handoffs/GEMINI-CLOUDSHELL-WEBSITE-GCP-MASTER-PROMPT-2026-08-06.md` — P0 fix `/dashboard` ~700B shell |
-| **B. GCP efficient augment** | Gemini @ Cloud Shell | Same prompt Phase 3 — min-instances, Vertex idle, BQ hygiene |
-| **C. Plant policy wire** | Claude / Mac | `T-wire-policy-plant` · `T-wire-genome-closes` |
-| **D. Win DC P0** | Plant / Win | `T-win-post-boot` before any L2 ARM |
+**Score 6/6** monorepo composition green (`make grok-streamline`).
 
-## Recommended order today
+Alpha ledger ↔ policy fences ↔ genome seeds ↔ automations catalog ↔ bridge exports are **one brief**:
 
-1. **Gemini Cloud Shell** on track A (highest public ROI; no plant thrash).  
-2. Claude continues plant free-reign wire when free.  
-3. Win post-boot only when you’re at the desk.
+- `projects/grok/SYSTEM_BRIEF.md`
+- `data/grok-web-exports/YYYY-MM-DD_system-brief.md`
 
-## Success snapshot
+## Parallel tracks (do not block each other)
 
-- `/dashboard` looks like real Mission Control  
-- `/` sells the system honestly  
-- GCP bill has no idle Vertex / no min-instance burn  
-- Plant still owns money paths  
+| # | Track | Seat | Action |
+|---|---|---|---|
+| 1 | **Website** | Gemini Cloud Shell | Fix `/dashboard` ~700B shell (prompt already sent) |
+| 2 | **Plant policy wire** | Claude / Mac | Follow `PLANT_WIRE_POLICY.md` — `evaluate_proposal` before sole writer |
+| 3 | **Genome closes** | Claude / Mac | `LessonBook.append` on broker-reconciled closes |
+| 4 | **Win P0** | Desk / Win | Post-boot acceptance before ARM L2 |
+| 5 | **GCP cost** | Gemini Cloud Shell | min-instances 0, Vertex idle, BQ freshness |
+
+## Grok chat loop (every turn)
+
+```bash
+git pull --ff-only
+make grok-streamline    # or python3 scripts/ops/grok_system_streamline.py --write --export --check
+make grok-loop
+# read projects/grok/SYSTEM_BRIEF.md + TASKBOARD.md
+```
+
+## Do not
+
+- Live orders from Cloud Shell / this sandbox  
+- ARM L2 before Win P0  
+- Thrash Gemini’s website PR surface without need  

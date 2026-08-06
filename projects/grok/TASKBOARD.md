@@ -1,6 +1,6 @@
 # Grok project taskboard
 
-_Updated: 2026-08-06T16:13:52Z_
+_Updated: 2026-08-06T16:17:12Z_
 
 ## Next actions
 
@@ -15,6 +15,7 @@ _Updated: 2026-08-06T16:13:52Z_
 - [x] `T-bridge-plant` **done** — Claude: wire plant sync_grok_web_exports → Knowledge inbox
 - [x] `T-genome` **done** — Genome lesson schema + AXTI/dens seed
 - [x] `T-policy-kernel` **done** — Ship dens/AXTI/free-reign paper policy + tests
+- [x] `T-system-streamline` **done** — System brief: link alpha + policy + automations + bridge
 - [ ] `T-website-dashboard` **todo** — Fix sapphirealpha.xyz/dashboard empty SPA shell (~700B)
 - [x] `T-win-dc` **done** — Windows DC acceptance pack (P0 blocks ARM)
 - [x] `T-automations-catalog` **done** — Catalog + clean Grok-related automations
@@ -33,5 +34,5 @@ _Updated: 2026-08-06T16:13:52Z_
 ## Stats
 
 ```json
-{'static_done': 8, 'static_open': 3, 'dynamic_open': 3, 'signals': {'monorepo_bridge_tools_ok': True, 'policy_tests_ok': True, 'genome_seeded': True, 'windows_module_ok': True, 'research_validator_ok': True, 'automations_catalog_ok': True, 'bridge_local_export_seen': False}}
+{'static_done': 9, 'static_open': 3, 'dynamic_open': 3, 'signals': {'monorepo_bridge_tools_ok': True, 'policy_tests_ok': True, 'genome_seeded': True, 'windows_module_ok': True, 'research_validator_ok': True, 'automations_catalog_ok': True, 'streamline_ok': True, 'bridge_local_export_seen': True}}
 ```

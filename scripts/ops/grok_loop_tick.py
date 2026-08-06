@@ -17,6 +17,7 @@ from lib.grok.policy import OrderProposal, evaluate_proposal  # noqa: E402
 from lib.grok.genome import LessonBook  # noqa: E402
 from lib.grok.research_worker import validate_research_manifest  # noqa: E402
 from lib.grok.windows import evaluate_windows_acceptance  # noqa: E402
+from lib.grok.system_brief import policy_smoke, bridge_inventory  # noqa: E402
 
 BOARD_JSON = ROOT / "projects/grok/data/taskboard.json"
 BOARD_MD = ROOT / "projects/grok/TASKBOARD.md"
@@ -60,6 +61,10 @@ def _detect_signals() -> dict:
         and not validate_research_manifest(bad)["ok"]
     )
     signals["automations_catalog_ok"] = (ROOT / "lib/grok/automations.py").is_file()
+    try:
+        signals["streamline_ok"] = policy_smoke()["ok"] and bridge_inventory()["export_count"] >= 5
+    except Exception:
+        signals["streamline_ok"] = False
 
     # plant local-export receipt on recent git log (best-effort)
     try:
@@ -68,7 +73,9 @@ def _detect_signals() -> dict:
             text=True,
             stderr=subprocess.DEVNULL,
         )
-        signals["bridge_local_export_seen"] = "local-export:" in log.lower() or "local-export" in log
+        signals["bridge_local_export_seen"] = any(
+            k in log.lower() for k in ("local-export", "plant-wire", "plant wire", "mac-bridge")
+        )
     except Exception:
         signals["bridge_local_export_seen"] = False
 

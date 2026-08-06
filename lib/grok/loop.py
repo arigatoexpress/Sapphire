@@ -68,6 +68,14 @@ DEFAULT_TASKS: list[dict[str, Any]] = [
         "done_when": "test_inventory --check-readme",
     },
     {
+        "id": "T-system-streamline",
+        "title": "System brief: link alpha + policy + automations + bridge",
+        "lane": "streamline",
+        "priority": 1,
+        "status": "todo",
+        "done_when": "grok_system_streamline --check passes; SYSTEM_BRIEF written",
+    },
+    {
         "id": "T-website-dashboard",
         "title": "Fix sapphirealpha.xyz/dashboard empty SPA shell (~700B)",
         "lane": "website",
@@ -138,6 +146,8 @@ def tick(
         complete("T-research-manifest")
     if signals.get("automations_catalog_ok"):
         complete("T-automations-catalog")
+    if signals.get("streamline_ok"):
+        complete("T-system-streamline")
     if signals.get("monorepo_bridge_tools_ok"):
         progress("T-bridge-plant", "blocked_on_plant")
     if signals.get("bridge_local_export_seen"):

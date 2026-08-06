@@ -17,6 +17,7 @@ from lib.grok.policy import (
 )
 from lib.grok.research_worker import validate_research_manifest
 from lib.grok.windows import evaluate_windows_acceptance
+from lib.grok.system_brief import build_system_brief, write_brief
 
 __all__ = [
     "FREE_REIGN_DEFAULTS",
@@ -30,6 +31,8 @@ __all__ = [
     "lesson_from_closed_trade",
     "validate_research_manifest",
     "evaluate_windows_acceptance",
+    "build_system_brief",
+    "write_brief",
 ]
 
 __version__ = "0.1.0"

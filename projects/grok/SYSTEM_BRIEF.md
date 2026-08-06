@@ -1,0 +1,118 @@
+# Sapphire × Grok — System Brief
+
+_Generated: 2026-08-06T16:17:12Z_
+
+**Streamline score:** 6/6 (1.0)
+
+## Next actions
+
+- Plant: keep 30m grok-web-bridge LaunchAgent green
+- Plant: wire evaluate_proposal into free-reign sole-writer path
+- Plant: append LessonBook on broker-reconciled closes
+- Win: run P0 acceptance before ARM L2
+- Gemini Cloud Shell: fix /dashboard empty SPA (~700B)
+
+## Policy smoke
+
+- ok: **True** · mandate: `free_reign_multi_rail`
+
+## Genome
+
+```json
+{
+  "count": 2,
+  "wins": 1,
+  "losses": 0,
+  "blocked": 1,
+  "realized_pnl_usd": 175.0
+}
+```
+
+## Bridge
+
+```json
+{
+  "export_count": 21,
+  "by_day": {
+    "2026-08-04": 1,
+    "2026-08-05": 12,
+    "2026-08-06": 8
+  },
+  "latest": [
+    "2026-08-06_alpha-scour-merge.md",
+    "2026-08-06_gcp-cloudshell-ultimate-handoff.md",
+    "2026-08-06_gemini-website-gcp-master-prompt.md",
+    "2026-08-06_grok-bridge-lane-tools.md",
+    "2026-08-06_grok-mac-bridge-live.md",
+    "2026-08-06_grok-project-bootstrap.md",
+    "2026-08-06_plant-wire-receipt.md",
+    "2026-08-06_windows-datacenter-masterplan.md"
+  ],
+  "plant_wired": true,
+  "mac_bridge_note": true
+}
+```
+
+## Windows DC
+
+- p0_ok: False · arm_l2_allowed: False
+- failed_p0: ['post_boot_report', 'tailscale_up', 'ssh_stable', 'ollama_aliases', 'no_sleep', 'free_reign_parity', 'schtasks_inventory']
+
+## Critical alpha ↔ policy links
+
+- `AU-05` **critical** — Hyperliquid hard caps + signing gate
+  - fences: review_manually
+- `SV-01` **critical** — Local-first authority boundary
+  - fences: review_manually
+- `SV-04` **critical** — Trading / mints / OAuth / prod cutovers at attended gates
+  - fences: policy.evaluate_proposal rails rh_l2/rh_agentic
+- `TR-AXTI` **critical** — AXTI playbook: defined-risk options + gamma scale-out
+  - fences: policy.evaluate_scale_out / AXTI, windows.evaluate_windows_acceptance
+  - action: After dust exits fill, stage 1–2 AXTI-class option probes (defined risk, ≤$35)
+- `TR-DENS` **critical** — L2 dens: SONNY/BINGBONG class permanent
+  - fences: policy.is_dens_blocked / DENS_BLOCK, policy.evaluate_proposal rails rh_l2/rh_agentic
+- `TR-DUST` **critical** — Dust sleeve exits queued — do not re-place
+  - fences: policy DUST_NO_REBUY
+  - action: Confirm fills at RTH; then options-first only
+- `SV-10` **critical** — Windows desktop is the private datacenter
+  - fences: policy.is_dens_blocked / DENS_BLOCK, windows.evaluate_windows_acceptance
+  - action: Implement Win DC ladder P0→P2; do not ARM until post-boot green
+- `AU-10` **critical** — Agent harnesses over chat personas
+  - fences: policy.is_dens_blocked / DENS_BLOCK, policy.evaluate_scale_out / AXTI, policy.evaluate_proposal rails rh_l2/rh_agentic, windows.evaluate_windows_acceptance, bridge exports + sync_grok_web_exports, genome.LessonBook
+  - action: Close genome outcomes loop; daily research worker after smoke
+- `OP-01` **critical** — Operator feed: free-reign L2 $10; MOSS grant expired
+  - fences: policy.is_dens_blocked / DENS_BLOCK, policy.evaluate_proposal rails rh_l2/rh_agentic, policy MOSS_GRANT, policy DUST_NO_REBUY
+  - action: Renew MOSS passkey grant; do not cancel dust exit sells
+- `SV-SP0` **high** — Keep chassis; rebuild trading brain
+  - fences: policy.is_dens_blocked / DENS_BLOCK, policy.evaluate_proposal rails rh_l2/rh_agentic, policy MOSS_GRANT
+- `TR-01` **high** — Signal spine: TV/OHLCV/chain → bus → surfaces
+  - fences: review_manually
+- `AU-02` **high** — Few scheduled tasks actually installed
+  - fences: review_manually
+
+## Automations
+
+- catalog: {'count': 13, 'by_status': {'live': 7, 'monorepo_ready_plant_pending': 1, 'paper_only_not_armed_until_p0': 1, 'read_only': 1, 'dry_run_default': 1, 'plant': 1, 'policy_in_monorepo': 1}} · resolved_in_repo: 11
+
+- ✓ `grok-system-streamline` `live` — scripts/ops/grok_system_streamline.py
+- ✓ `grok-mac-bridge-http` `live` — services/grok-bridge/
+- ✓ `grok-web-bridge-launchagent` `live` — infra/launchagents/com.sapphire.grok-web-bridge.plist
+- ✓ `grok-web-export-store` `live` — data/grok-web-exports/
+- ✓ `sync-grok-web-exports` `monorepo_ready_plant_pending` — scripts/ops/sync_grok_web_exports.sh
+- ✓ `grok-bridge-status` `live` — scripts/ops/grok_bridge_status.py
+- ✓ `grok-loop-tick` `live` — scripts/ops/grok_loop_tick.py
+- ✓ `gcp-cloudshell-bootstrap` `live` — scripts/ops/gcp_cloudshell_bootstrap.sh
+- ✓ `win-research-worker` `paper_only_not_armed_until_p0` — scripts/windows_setup/run_research_worker.ps1
+- ✓ `win-tv-agent` `read_only` — scripts/windows_setup/start_tv_agent.ps1
+- ✓ `gemini-ooda-daily` `dry_run_default` — infra/launchagents/com.sapphire.gemini-ooda-daily.plist
+- · `ralph-densify` `plant` — ops-state densify/Ralph loops
+
+## Invariants
+
+- Designated rails only: RH Agentic ••••8144, RH L2, MOSS/MegaETH (grant-gated), paper
+- Models propose only — coordinator + first-party receipts authorize; no ambient spend/trade authority
+- No THO / Project-Go-Forward money · Hermes messaging send · keys in model/git
+- Dust-sleeve placer refuses; do not re-buy IBIT/HOOD/PLTR/NVDA dust; dens stay (SONNY/BINGBONG class)
+- Paper/research/docs may advance; money paths refuse without exact gate / free-reign mandate
+- Never archive paths named RETIRED without readlink / LaunchAgent WorkingDirectory check
+- Never git add -A; report paths + diffs only
