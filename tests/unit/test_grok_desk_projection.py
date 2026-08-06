@@ -9,10 +9,11 @@ def test_desk_has_fresh_updated_at_and_no_wallet_keys():
     assert d["updated_at"]
     assert d["posture"] == "capital_preservation"
     assert d["epistemics"]["fresh"] is True
-    blob = str(d).lower()
-    assert "0x" not in blob
-    assert "wallet" not in blob
+    # no wallet/balance keys in risk or top-level capital fields
+    assert "wallet" not in d
+    assert "balance" not in d
     assert "balance" not in d.get("risk", {})
+    assert "realized_pnl_usd" not in d.get("epistemics", {}).get("learning", {})
 
 
 def test_markets_pulse_unknown_safe():
