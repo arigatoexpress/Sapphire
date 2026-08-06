@@ -114,6 +114,10 @@ def tick(
     """
     tasks: list[dict[str, Any]] = list(board.get("tasks") or DEFAULT_TASKS)
     by_id = {t["id"]: dict(t) for t in tasks}
+    # merge any new DEFAULT_TASKS ids (forward-compat for loop upgrades)
+    for t in DEFAULT_TASKS:
+        if t["id"] not in by_id:
+            by_id[t["id"]] = dict(t)
 
     def complete(tid: str) -> None:
         if tid in by_id and by_id[tid].get("status") != "done":
