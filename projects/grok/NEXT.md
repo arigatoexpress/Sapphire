@@ -1,3 +1,7 @@
+## Claude prompts (while Gemini deploys)
+
+Paste-ready: [`docs/handoffs/CLAUDE-PLANT-PROMPTS-2026-08-06.md`](../../docs/handoffs/CLAUDE-PLANT-PROMPTS-2026-08-06.md)
+
 # What next (2026-08-06 — post free-reign gate + dashboard fix)
 
 ## Just completed (monorepo + dashboard code)
