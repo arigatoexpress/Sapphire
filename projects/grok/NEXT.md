@@ -1,20 +1,22 @@
-# What next — data truth campaign
+# Parallel now
 
-## Gemini (send NOW with Phase 3)
+## Gemini (in flight)
 
-1. Phase 3 website masterplan  
-2. **Data truth:** `docs/handoffs/GEMINI-DATA-TRUTH-AND-PUBLIC-SURFACE-2026-08-06.md`
+Phase 3 masterplan — **do not compete** on Cloud Run.
 
-## Claude (when quota up)
+When Gemini free for data-truth add-on:  
+`docs/handoffs/GEMINI-DATA-TRUTH-AND-PUBLIC-SURFACE-2026-08-06.md`
+
+Optional BQ: `docs/strategy/PAPER-OUTCOMES-WAREHOUSE-SCHEMA-2026-08-06.md`
+
+## Claude (quota)
 
 1. Executor reload  
-2. **Telemetry desk refresh:** `docs/handoffs/CLAUDE-TELEMETRY-DESK-REFRESH-2026-08-06.md`
+2. Desk refresh using `lib.grok.desk_projection.build_desk_projection`  
+   → `docs/handoffs/CLAUDE-TELEMETRY-DESK-REFRESH-2026-08-06.md`
 
-## Grok monorepo
+## Monorepo ready
 
-- `lib/grok/public_surface.py` + `scripts/ops/public_surface_audit.py`  
-- `projects/grok/data/public_operating_rules.json`  
-
-## Never
-
-Fake PnL · wallet leak · L2 ARM to “make dashboard look busy”
+- desk_projection + example JSON  
+- public_surface audit  
+- paper warehouse schema  

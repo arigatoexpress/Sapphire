@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "updated_at": "2026-08-06T20:12:16Z",
+  "posture": "capital_preservation",
+  "leader": "unknown",
+  "validation": {
+    "oos_pass": null,
+    "oos_total": null,
+    "conflicts": null,
+    "conflict_details": [],
+    "replay_span_hours": null,
+    "replay_data_through": null
+  },
+  "decisions": {
+    "pending": null,
+    "pending_review": null,
+    "approved_awaiting_execution": null,
+    "eligible_execution": null,
+    "blocked": null,
+    "pending_policy_blocked": null
+  },
+  "execution": "gated",
+  "feeds": {
+    "fresh": null,
+    "total": null
+  },
+  "tracks": [],
+  "risk": {
+    "ledger_state": "unknown",
+    "realized_drawdown_pct": null,
+    "drawdown_limit_pct": null,
+    "budget_remaining_pct": null,
+    "new_risk": "restricted"
+  },
+  "experiment": {
+    "status": "unknown",
+    "qualified_days": null,
+    "required_days": null,
+    "last_committed_date": null,
+    "collector": "unknown"
+  },
+  "epistemics": {
+    "updated_ts": "2026-08-06T20:12:16Z",
+    "fresh": true,
+    "thesis": "Late-cycle capital preservation (Cowen-aligned prior)",
+    "regime": {
+      "label": "unknown",
+      "fit": null,
+      "data_quality": null,
+      "drivers": []
+    },
+    "falsifiers": [],
+    "learning": {
+      "status": "unavailable",
+      "lesson_count": 0,
+      "wins": 0,
+      "losses": 0
+    }
+  },
+  "autonomy": {
+    "free_reign_mandate": "free_reign_multi_rail",
+    "gate_scope": "via_free_reign_only",
+    "windows_arm_l2_allowed": false
+  },
+  "safety_floor": {
+    "gate_valid": true,
+    "pause_clear": null,
+    "ledger": "unknown",
+    "bounded_policy": true,
+    "notes": [
+      "policy kernel: free_reign_multi_rail",
+      "l2_cap_usd: 10.0",
+      "public: no wallets/positions on this projection",
+      "moss_grant: expired"
+    ]
+  },
+  "operating_rules_ref": "sapphire-public-operating-rules/v1",
+  "provenance": {
+    "builder": "lib.grok.desk_projection",
+    "note": "plant must overwrite unknowns with local observations; never invent fills"
+  }
+}

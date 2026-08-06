@@ -7,6 +7,12 @@
 MISSION: Make desk + markets decision fields truthful on the signed telemetry
 publisher — not fake, not wallet leaks.
 
+USE monorepo helper after git pull:
+  from lib.grok.desk_projection import build_desk_projection, markets_pulse, publisher_checklist
+  desk = build_desk_projection(... plant facts ...)
+  # merge into telemetry payload each cycle; updated_at must be now
+See projects/grok/data/desk_projection_example.json and telemetry_publisher_checklist.json
+
 1. Find alpha-telemetry-publisher / merged_collector (dashboard repo telemetry/
    + infra/com.sapphire.alpha-telemetry-publisher.plist on Mac).
 2. Ensure each publish cycle fills desk:

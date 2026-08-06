@@ -1,0 +1,12 @@
+{
+  "checklist": [
+    "Load desk from build_desk_projection() each cycle",
+    "Set updated_at to now every publish (never reuse stale desk blob)",
+    "Overwrite safety_floor.pause_clear from real pause files",
+    "Set markets.decision_gate/execution from free-reign + pause truth",
+    "Omit wallets/balances/positions/order_ids always",
+    "If field unknown: explicit unknown \u2014 do not zero-fill PnL",
+    "Verify curl https://sapphirealpha.xyz/api/v1/live desk.updated_at age < 3m"
+  ],
+  "module": "lib.grok.desk_projection"
+}

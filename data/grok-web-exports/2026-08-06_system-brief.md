@@ -8,7 +8,7 @@ title: Sapphire system brief (alpha + policy + bridge)
 
 # Sapphire × Grok — System Brief
 
-_Generated: 2026-08-06T19:11:15Z_
+_Generated: 2026-08-06T20:12:06Z_
 
 **Streamline score:** 8/8 (1.0)
 
@@ -18,7 +18,8 @@ _Generated: 2026-08-06T19:11:15Z_
 - Plant: reload rh-executor so gate_order is live in process
 - Plant: upgrade genome to source=broker when fill prices available
 - Win: run P0 acceptance before ARM L2
-- Gemini Cloud Shell: deploy dashboard SPA fix (assets JS MIME)
+- Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)
+- Plant: telemetry desk refresh via lib.grok.desk_projection each publish cycle
 - GCP: cost posture min-instances=0 + Vertex idle skim
 
 ## Policy smoke
@@ -41,20 +42,20 @@ _Generated: 2026-08-06T19:11:15Z_
 
 ```json
 {
-  "export_count": 33,
+  "export_count": 37,
   "by_day": {
     "2026-08-04": 1,
     "2026-08-05": 12,
-    "2026-08-06": 20
+    "2026-08-06": 24
   },
   "latest": [
-    "2026-08-06_holistic-blindspots-leverage.md",
-    "2026-08-06_local-export_free-reign-gate-wired.md",
     "2026-08-06_local-export_genome-closes-wired.md",
     "2026-08-06_lunch-autonomous-progress.md",
     "2026-08-06_operator-accept-gate-scope.md",
     "2026-08-06_plant-wire-receipt.md",
+    "2026-08-06_public-trading-data-truth.md",
     "2026-08-06_system-brief.md",
+    "2026-08-06_while-gemini-phase3.md",
     "2026-08-06_windows-datacenter-masterplan.md"
   ],
   "plant_wired": true,
@@ -104,8 +105,9 @@ _Generated: 2026-08-06T19:11:15Z_
 - `TR-HL` **critical** — Hyperliquid signing gate default disarmed in monorepo policy
   - fences: review_manually
   - action: Never ambient-arm HL from agents
-- `SV-SP0` **high** — Keep chassis; rebuild trading brain
-  - fences: policy.is_dens_blocked / DENS_BLOCK, policy.evaluate_proposal rails rh_l2/rh_agentic, policy MOSS_GRANT
+- `PL-GATE` **critical** — Plant free-reign gate_order wired in telegram-bot executor (via=free_reign)
+  - fences: policy.evaluate_proposal rails rh_l2/rh_agentic
+  - action: Reload rh-executor process; monitor GATE DENIED logs
 
 ## Automations
 
@@ -126,7 +128,7 @@ _Generated: 2026-08-06T19:11:15Z_
 
 ## Blindspots
 
-- scoreboard: `{'count': 25, 'by_severity': {'P0': 6, 'P1': 12, 'P2': 7}, 'by_status': {'open': 11, 'recommended_accept': 1, 'resolved_plant': 3, 'encoded': 3, 'code_fixed_deploy_pending': 1, 'in_progress': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-EXECUTOR-DEPLOY', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
+- scoreboard: `{'count': 27, 'by_severity': {'P0': 7, 'P1': 13, 'P2': 7}, 'by_status': {'open': 13, 'recommended_accept': 1, 'resolved_plant': 3, 'encoded': 3, 'code_fixed_deploy_pending': 1, 'in_progress': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-PUBLIC-DESK-STALE', 'BS-EXECUTOR-DEPLOY', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
 
 ## Playbooks
 

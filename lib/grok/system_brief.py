@@ -257,7 +257,8 @@ def build_system_brief() -> dict[str, Any]:
     if not bridge.get("gate_scope_accepted"):
         next_actions.append("Operator: accept free_reign-only gate scope")
     next_actions.append("Win: run P0 acceptance before ARM L2")
-    next_actions.append("Gemini Cloud Shell: deploy dashboard SPA fix (assets JS MIME)")
+    next_actions.append("Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)")
+    next_actions.append("Plant: telemetry desk refresh via lib.grok.desk_projection each publish cycle")
     next_actions.append("GCP: cost posture min-instances=0 + Vertex idle skim")
 
     return {

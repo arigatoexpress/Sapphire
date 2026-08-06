@@ -1,14 +1,14 @@
 # Grok project taskboard
 
-_Updated: 2026-08-06T19:11:15Z_
+_Updated: 2026-08-06T20:12:06Z_
 
 ## Next actions
 
 - T-executor-reload: Plant: reload rh-executor so gate_order is live in process
+- T-telemetry-desk: Plant: refresh desk.* on telemetry publish (lib.grok.desk_projection)
 - T-website-dashboard: Fix sapphirealpha.xyz/dashboard empty SPA shell (~700B)
 - T-win-post-boot: Plant/Win: run P0 acceptance; only then ARM L2 schtasks
 - T-gcp-cost-posture: GCP cost posture: min-instances 0, Vertex idle, BQ freshness
-- T-website-evidence: Elevate Evidence Observatory story + architecture proof
 
 ## Static tasks
 
@@ -31,9 +31,10 @@ _Updated: 2026-08-06T19:11:15Z_
 - [x] `T-wire-genome-closes` **done** — Plant: append LessonBook on broker-reconciled closes
 - [ ] `T-win-post-boot` **todo** — Plant/Win: run P0 acceptance; only then ARM L2 schtasks
 - [ ] `T-executor-reload` **todo** — Plant: reload rh-executor so gate_order is live in process
+- [ ] `T-telemetry-desk` **todo** — Plant: refresh desk.* on telemetry publish (lib.grok.desk_projection)
 
 ## Stats
 
 ```json
-{'static_done': 9, 'static_open': 3, 'dynamic_open': 2, 'signals': {'monorepo_bridge_tools_ok': True, 'policy_tests_ok': True, 'genome_seeded': True, 'windows_module_ok': True, 'research_validator_ok': True, 'automations_catalog_ok': True, 'streamline_ok': True, 'bridge_local_export_seen': True, 'gate_wired': True, 'genome_wired': True}}
+{'static_done': 9, 'static_open': 3, 'dynamic_open': 3, 'signals': {'monorepo_bridge_tools_ok': True, 'policy_tests_ok': True, 'genome_seeded': True, 'windows_module_ok': True, 'research_validator_ok': True, 'automations_catalog_ok': True, 'streamline_ok': True, 'bridge_local_export_seen': True, 'gate_wired': True, 'genome_wired': True}}
 ```

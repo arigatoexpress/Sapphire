@@ -209,6 +209,24 @@ def tick(
             if dyn.get("id") == "T-wire-genome-closes":
                 dyn["status"] = "done"
                 dyn["completed_at"] = _utc()
+
+    if signals.get("gate_wired") and "T-telemetry-desk" not in existing_ids:
+        extras.append(
+            {
+                "id": "T-telemetry-desk",
+                "title": "Plant: refresh desk.* on telemetry publish (lib.grok.desk_projection)",
+                "lane": "plant",
+                "priority": 1,
+                "status": "todo",
+                "done_when": "public /api/v1/live desk.updated_at fresh + posture not unknown",
+            }
+        )
+        existing_ids.add("T-telemetry-desk")
+    if signals.get("desk_fresh"):
+        for dyn in extras:
+            if dyn.get("id") == "T-telemetry-desk":
+                dyn["status"] = "done"
+                dyn["completed_at"] = _utc()
     if by_id.get("T-win-dc", {}).get("status") == "done" and "T-win-post-boot" not in existing_ids:
         extras.append(
             {

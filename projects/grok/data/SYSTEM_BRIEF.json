@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-06T19:11:15Z",
+  "generated_at": "2026-08-06T20:12:06Z",
   "streamline": {
     "score": 8,
     "max": 8,
@@ -160,20 +160,20 @@
     ]
   },
   "bridge": {
-    "export_count": 33,
+    "export_count": 37,
     "by_day": {
       "2026-08-04": 1,
       "2026-08-05": 12,
-      "2026-08-06": 20
+      "2026-08-06": 24
     },
     "latest": [
-      "2026-08-06_holistic-blindspots-leverage.md",
-      "2026-08-06_local-export_free-reign-gate-wired.md",
       "2026-08-06_local-export_genome-closes-wired.md",
       "2026-08-06_lunch-autonomous-progress.md",
       "2026-08-06_operator-accept-gate-scope.md",
       "2026-08-06_plant-wire-receipt.md",
+      "2026-08-06_public-trading-data-truth.md",
       "2026-08-06_system-brief.md",
+      "2026-08-06_while-gemini-phase3.md",
       "2026-08-06_windows-datacenter-masterplan.md"
     ],
     "plant_wired": true,
@@ -405,35 +405,34 @@
       ]
     },
     {
-      "id": "SV-SP0",
-      "severity": "high",
-      "title": "Keep chassis; rebuild trading brain",
-      "action": null,
+      "id": "PL-GATE",
+      "severity": "critical",
+      "title": "Plant free-reign gate_order wired in telegram-bot executor (via=free_reign)",
+      "action": "Reload rh-executor process; monitor GATE DENIED logs",
       "policy_links": [
-        "policy.is_dens_blocked / DENS_BLOCK",
-        "policy.evaluate_proposal rails rh_l2/rh_agentic",
-        "policy MOSS_GRANT"
+        "policy.evaluate_proposal rails rh_l2/rh_agentic"
       ]
     }
   ],
-  "alpha_item_count": 35,
+  "alpha_item_count": 37,
   "next_actions": [
     "Plant: keep 30m grok-web-bridge LaunchAgent green",
     "Plant: reload rh-executor so gate_order is live in process",
     "Plant: upgrade genome to source=broker when fill prices available",
     "Win: run P0 acceptance before ARM L2",
-    "Gemini Cloud Shell: deploy dashboard SPA fix (assets JS MIME)",
+    "Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)",
+    "Plant: telemetry desk refresh via lib.grok.desk_projection each publish cycle",
     "GCP: cost posture min-instances=0 + Vertex idle skim"
   ],
   "blindspots": {
-    "count": 25,
+    "count": 27,
     "by_severity": {
-      "P0": 6,
-      "P1": 12,
+      "P0": 7,
+      "P1": 13,
       "P2": 7
     },
     "by_status": {
-      "open": 11,
+      "open": 13,
       "recommended_accept": 1,
       "resolved_plant": 3,
       "encoded": 3,
@@ -446,6 +445,7 @@
       "research": 1
     },
     "open_p0": [
+      "BS-PUBLIC-DESK-STALE",
       "BS-EXECUTOR-DEPLOY",
       "BS-WIN-P0",
       "BS-MOSS-GRANT"
