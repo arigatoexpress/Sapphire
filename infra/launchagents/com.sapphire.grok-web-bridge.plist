@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.grok-web-bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/aribs/ops-state/finish-line/scripts/sync_grok_web_exports.sh</string>
+        <string>--pull</string>
+    </array>
+
+    <!-- Every 30 minutes — within the 15-60m densify beat asked for in
+         docs/handoffs/GROK-BRIDGE-LANE-STATUS-2026-08-06.md -->
+    <key>StartInterval</key>
+    <integer>1800</integer>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/grok-web-bridge.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/grok-web-bridge.err</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Prevent overlapping runs if git pull / rsync is slow -->
+    <key>ThrottleInterval</key>
+    <integer>300</integer>
+</dict>
+</plist>
