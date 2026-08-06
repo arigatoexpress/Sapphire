@@ -1,10 +1,15 @@
 # Agent resume (2026-08)
 
-After Claude/Codex credit gaps, start at:
+**North star:** Windows desktop = always-on **private datacenter**; Mac = mobile commander; GCP Cloud Shell = invent/PR seat (not sole writer).
 
-- `ops-state/agent-reports/MASTER-HANDOFF-CLAUDE-OPUS-LATEST.md`
-- `data/grok-web-exports/2026-08-05_master-handoff-claude-opus.md` (git mirror)
-- Live plant: free-reign multi-rail · EXITS_QUEUED dust sells · options-first (AXTI)
+Read in order:
+
+1. `docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md`
+2. `docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md` (if you are Gemini / Cloud Shell)
+3. `ops-state/agent-reports/MASTER-HANDOFF-CLAUDE-OPUS-LATEST.md` (plant) · git mirror `data/grok-web-exports/2026-08-05_master-handoff-claude-opus.md`
+4. `docs/alpha/GROK-CHAT-ALPHA-2026-08-06.md` + `data/alpha/alpha_ledger.json`
+
+Live plant snapshot: free-reign multi-rail · EXITS_QUEUED dust sells · options-first (AXTI) · Win post-boot before ARM.
 
 ---
 
@@ -14,7 +19,7 @@ Read this first before editing code, docs, or configuration.
 
 ## What this repo does
 
-Sapphire is the command repo for Ari's autonomous system. It orchestrates trading, intelligence, content, and security ops through a shared event bus on a Tailscale mesh. Treat it as a live collection of composable runtime surfaces, not a fixed product brief.
+Sapphire is the command repo for Ari's autonomous system. The mission is a **Windows private datacenter** running agent harnesses over all assets/intel/infra/OSS so the plant earns on designated rails, publishes research, and self-improves — with Mac as commander and GCP as warehouse/remote seat. Orchestration is event-bus mediated on a Tailscale mesh. Treat this as a live collection of composable runtime surfaces, not a fixed product brief.
 
 ## Key directories and files
 

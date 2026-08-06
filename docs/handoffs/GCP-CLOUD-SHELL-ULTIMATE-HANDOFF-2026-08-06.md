@@ -5,6 +5,8 @@
 **Doctrine:** Local plant truth > Cloud Shell. Cloud Shell is a **read / invent / code / dry-run / PR** plane. It is **not** the trading control tower.  
 **Generated:** 2026-08-06 · Grok Build (web) after alpha ledger merge + master Opus handoff  
 **Repo:** `arigatoexpress/Sapphire` · branch `main`  
+**North star (Windows private DC):** [`docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md`](../strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md)  
+**Gemini paste prompt:** [`docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md`](./GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md)  
 **Companion bootstrap:** [`scripts/ops/gcp_cloudshell_bootstrap.sh`](../../scripts/ops/gcp_cloudshell_bootstrap.sh)  
 **Bridge export:** [`data/grok-web-exports/2026-08-06_gcp-cloudshell-ultimate-handoff.md`](../../data/grok-web-exports/2026-08-06_gcp-cloudshell-ultimate-handoff.md)
 
@@ -481,6 +483,7 @@ Compressed from plant handoffs + alpha ledger + SYSTEM_UPGRADE_PLAN history:
 
 | Arc | Intent | Cloud Shell share |
 |---|---|---|
+| **Windows private DC** | Always-on harnesses, research worker, GPU, designated-rail workers | Specs/PRs only — plant ARMs |
 | Multi-tier inference | Win GPU → Pi → Mac → Kimi cloud | Docs / inventory only |
 | Free-reign multi-rail | Designated wallets + caps + dens | Policy docs/tests; no broker |
 | AXTI options-first | Defined risk, gamma scale-out, TP/SL automation | Paper risk code |

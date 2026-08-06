@@ -1,9 +1,10 @@
-# Alpha ledger
+# Alpha ledger (machine + human)
 
-Machine-readable curated alpha from Grok chats / Drive / Notion.
+| File | Role |
+|---|---|
+| `alpha_ledger.json` | Ranked alpha — trading, automation, bridge, architecture |
+| `../grok-web-exports/` | Narrative exports for densify |
+| `../../docs/alpha/GROK-CHAT-ALPHA-2026-08-06.md` | Human critical path |
+| `../../docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md` | Mission north star |
 
-- `alpha_ledger.json` — ranked items, most recent first
-- Human twin: `docs/alpha/GROK-CHAT-ALPHA-2026-08-06.md`
-- Narrative export: `data/grok-web-exports/2026-08-06_alpha-scour-merge.md`
-
-Inert knowledge only. Not order authority.
+Windows private DC + agent harnesses is the governing mission as of 2026-08-06.

@@ -1,31 +1,78 @@
 {
   "version": 2,
-  "updated": "2026-04-03",
-  "description": "Sapphire OS device mesh — Pi-less architecture (Mac + Windows only)",
-
+  "updated": "2026-08-06",
+  "description": "Sapphire OS device mesh \u2014 Windows private datacenter + Mac commander (+ Pis when inventoryed)",
   "devices": {
     "mac": {
       "hostname": "macbook-pro-8",
       "tailscaleIp": "100.x.x.w",
       "os": "macOS",
-      "role": "Commander — all services, all MCPs, primary control node",
+      "role": "Commander \u2014 authority, killswitch, densify/Ralph, broker MCP when present, plant deck",
       "status": "online",
       "clawProfile": "mac-commander",
-      "agents": ["claude-code", "claw-code", "pm-bot-webhook"],
+      "agents": [
+        "claude-code",
+        "claw-code",
+        "pm-bot-webhook"
+      ],
       "tools": {
-        "brew": "5.1.0", "tailscale": "1.96.2", "node": "24.4.0",
-        "uv": "0.10.4", "gh": "2.86.0", "ollama": "0.19.0",
-        "docker": "29.1.2", "cargo": "1.94.1", "python3": "3.12.8",
-        "redis": "7.x", "tv": "tradingview-mcp"
+        "brew": "5.1.0",
+        "tailscale": "1.96.2",
+        "node": "24.4.0",
+        "uv": "0.10.4",
+        "gh": "2.86.0",
+        "ollama": "0.19.0",
+        "docker": "29.1.2",
+        "cargo": "1.94.1",
+        "python3": "3.12.8",
+        "redis": "7.x",
+        "tv": "tradingview-mcp"
       },
-      "ollamaModels": ["llama3.2:3b", "llama3.3:70b", "qwen3.6:27b", "gpt-oss:20b", "nomic-embed-text:latest", "nemotron-mini:latest", "hermes3:8b"],
+      "ollamaModels": [
+        "llama3.2:3b",
+        "llama3.3:70b",
+        "qwen3.6:27b",
+        "gpt-oss:20b",
+        "nomic-embed-text:latest",
+        "nemotron-mini:latest",
+        "hermes3:8b"
+      ],
       "services": [
-        {"name": "control-plane", "port": 8082, "status": "active", "launchAgent": "com.sapphire.control-plane"},
-        {"name": "dashboard", "port": 8080, "status": "active", "launchAgent": "com.sapphire.dashboard"},
-        {"name": "pm-bot", "port": 18082, "status": "active", "launchAgent": "com.sapphire.pm-bot"},
-        {"name": "openbb-api", "port": 6900, "status": "active", "launchAgent": "com.sapphire.openbb-api"},
-        {"name": "redis", "port": 6379, "status": "active", "launchAgent": "homebrew.mxcl.redis"},
-        {"name": "ollama", "port": 11434, "status": "active"}
+        {
+          "name": "control-plane",
+          "port": 8082,
+          "status": "active",
+          "launchAgent": "com.sapphire.control-plane"
+        },
+        {
+          "name": "dashboard",
+          "port": 8080,
+          "status": "active",
+          "launchAgent": "com.sapphire.dashboard"
+        },
+        {
+          "name": "pm-bot",
+          "port": 18082,
+          "status": "active",
+          "launchAgent": "com.sapphire.pm-bot"
+        },
+        {
+          "name": "openbb-api",
+          "port": 6900,
+          "status": "active",
+          "launchAgent": "com.sapphire.openbb-api"
+        },
+        {
+          "name": "redis",
+          "port": 6379,
+          "status": "active",
+          "launchAgent": "homebrew.mxcl.redis"
+        },
+        {
+          "name": "ollama",
+          "port": 11434,
+          "status": "active"
+        }
       ],
       "launchAgents": [
         "com.sapphire.control-plane",
@@ -35,56 +82,82 @@
         "homebrew.mxcl.redis"
       ]
     },
-
     "windows-pc": {
       "hostname": "DESKTOP-HFCK6U9",
       "tailscaleIp": "100.x.x.z",
       "os": "Windows",
-      "role": "GPU Workbench — inference, webhook relay, backtesting",
+      "role": "Private Datacenter \u2014 always-on GPU inference, research workers, TV agent, designated-rail execution workers when armed",
       "status": "online",
       "clawProfile": "windows-workbench",
-      "agents": ["claw-code"],
+      "agents": [
+        "claw-code"
+      ],
       "gpu": "NVIDIA RTX 5070 Ti (16GB GDDR7)",
       "ollamaModels": "29 models (nemotron-cascade-2, llama3.3:70b, deepseek-r1, qwen3:14b, qwen3.5:9b, qwen3.6:27b, qwen2.5:32b, gemma4, gemma3, phi4, gpt-oss:20b, etc.; qwen3.6:27b explicit alias benchmarked ~7 tok/s)",
       "services": [
-        {"name": "ollama", "port": 11434, "status": "active", "task": "OllamaTailscale"},
-        {"name": "webhook", "port": 9090, "status": "active", "task": "SapphireWebhook"}
-      ]
+        {
+          "name": "ollama",
+          "port": 11434,
+          "status": "active",
+          "task": "OllamaTailscale"
+        },
+        {
+          "name": "webhook",
+          "port": 9090,
+          "status": "active",
+          "task": "SapphireWebhook"
+        }
+      ],
+      "missionDoc": "docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md"
     },
-
     "rari1": {
       "hostname": "rari1",
       "tailscaleIp": "100.x.x.x",
       "os": "Linux (Raspberry Pi OS)",
-      "role": "DECOMMISSIONED — services moved to Mac",
+      "role": "DECOMMISSIONED \u2014 services moved to Mac",
       "status": "offline",
       "decommissionReason": "Pi OS Bookworm ignores wpa_supplicant.conf, 6GHz WiFi incompatible, no ethernet available",
       "servicesMovedTo": "mac"
     },
-
     "rari2": {
       "hostname": "rari2",
       "tailscaleIp": "100.x.x.y",
       "lanIp": "192.168.1.21",
       "os": "Linux (Raspberry Pi OS Bookworm, aarch64)",
-      "role": "Inference Pi + Trading Pi — Tier 2 Ollama node (lightweight models), signal logger",
+      "role": "Inference Pi + Trading Pi \u2014 Tier 2 Ollama node (lightweight models), signal logger",
       "status": "online",
       "onlineSince": "2026-04-07",
       "connection": "ethernet",
       "clawProfile": "rari2-trader",
-      "agents": ["signal-logger"],
+      "agents": [
+        "signal-logger"
+      ],
       "inferenceTier": {
         "tier": 2,
         "enabled": false,
         "enableFlag": "PI_OLLAMA_ENABLED=1 in com.sapphire.inference-proxy.plist",
         "setupScript": "~/Code/Sapphire/infra/pi/setup-ollama.sh",
         "ollamaPort": 11434,
-        "modelsToInstall": ["nemotron-mini:4b", "gemma2:2b", "qwen2.5:0.5b", "smollm2:1.7b", "qwen3:0.6b"],
-        "ramCeiling": "nemotron-mini:4b (~2.7GB loaded) — do NOT pull hermes3:8b"
+        "modelsToInstall": [
+          "nemotron-mini:4b",
+          "gemma2:2b",
+          "qwen2.5:0.5b",
+          "smollm2:1.7b",
+          "qwen3:0.6b"
+        ],
+        "ramCeiling": "nemotron-mini:4b (~2.7GB loaded) \u2014 do NOT pull hermes3:8b"
       },
       "services": [
-        {"name": "signal-logger", "port": 18081, "status": "active"},
-        {"name": "ollama", "port": 11434, "status": "pending-install"}
+        {
+          "name": "signal-logger",
+          "port": 18081,
+          "status": "active"
+        },
+        {
+          "name": "ollama",
+          "port": 11434,
+          "status": "pending-install"
+        }
       ],
       "system": {
         "cpu": "aarch64 (Raspberry Pi)",
@@ -96,6 +169,5 @@
       }
     }
   },
-
   "architecture_note": "Pi-less since 2026-04-03. All services run on Mac (commander) with GPU inference on Windows PC over Tailscale. Trading execution (Aster DEX, Hyperliquid) paused until Pis are re-provisioned with ethernet access or compatible WiFi setup."
 }

@@ -8,6 +8,8 @@ title: GCP Cloud Shell ultimate handoff (pointer)
 
 # GCP Cloud Shell ultimate handoff — plant densify pointer
 
+**North star:** [`docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md`](../../docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md)  
+**Gemini paste:** [`docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md`](../../docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md)  
 **Canonical full handoff (repo):**  
 [`docs/handoffs/GCP-CLOUD-SHELL-ULTIMATE-HANDOFF-2026-08-06.md`](../../docs/handoffs/GCP-CLOUD-SHELL-ULTIMATE-HANDOFF-2026-08-06.md)
 

@@ -62,7 +62,13 @@ log "repo: $REPO_ROOT"
 log "git:  $(git rev-parse --short HEAD 2>/dev/null || echo unknown) · $(git branch --show-current 2>/dev/null || echo detached)"
 
 HANDOFF="$REPO_ROOT/docs/handoffs/GCP-CLOUD-SHELL-ULTIMATE-HANDOFF-2026-08-06.md"
+GEMINI_PROMPT="$REPO_ROOT/docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md"
+MASTERPLAN="$REPO_ROOT/docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md"
 ALPHA="$REPO_ROOT/docs/alpha/GROK-CHAT-ALPHA-2026-08-06.md"
+
+for f in "$MASTERPLAN" "$GEMINI_PROMPT" "$HANDOFF" "$ALPHA"; do
+  if [[ -f "$f" ]]; then ok "present: ${f#$REPO_ROOT/}"; else warn "missing: ${f#$REPO_ROOT/}"; fi
+done
 
 # ---------------------------------------------------------------------------
 # Fences (always print first)
@@ -77,6 +83,9 @@ cat <<'FENCES'
   ✅  Code PRs: paper / research / docs / dens / dashboards
   ✅  Session notes → data/grok-web-exports/ for plant densify
 
+  ★  North star: Windows = private DC · Mac = commander · Cloud Shell = invent/PR
+  ★  Master plan: docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md
+  ★  Gemini paste: docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md
   ❌  Live trading / order place-cancel-replace / money movement
   ❌  THO / Project-Go-Forward client funds or prod cutovers
   ❌  Hermes / Telegram sends

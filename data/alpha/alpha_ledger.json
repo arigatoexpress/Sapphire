@@ -1,9 +1,9 @@
 {
-  "scouredAt": "2026-08-06T13:45:00Z",
+  "scouredAt": "2026-08-06T14:30:00Z",
   "invariants": [
-    "Designated rails only: RH Agentic ••••8144, RH L2, MOSS/MegaETH (grant-gated), paper",
-    "Models propose only — coordinator + first-party receipts authorize; no ambient spend/trade authority",
-    "No THO / Project-Go-Forward money · Hermes messaging send · keys in model/git",
+    "Designated rails only: RH Agentic \u2022\u2022\u2022\u20228144, RH L2, MOSS/MegaETH (grant-gated), paper",
+    "Models propose only \u2014 coordinator + first-party receipts authorize; no ambient spend/trade authority",
+    "No THO / Project-Go-Forward money \u00b7 Hermes messaging send \u00b7 keys in model/git",
     "Dust-sleeve placer refuses; do not re-buy IBIT/HOOD/PLTR/NVDA dust; dens stay (SONNY/BINGBONG class)",
     "Paper/research/docs may advance; money paths refuse without exact gate / free-reign mandate",
     "Never archive paths named RETIRED without readlink / LaunchAgent WorkingDirectory check",
@@ -22,12 +22,12 @@
     },
     {
       "kind": "drive+github",
-      "title": "MASTER HANDOFF — Claude Opus",
+      "title": "MASTER HANDOFF \u2014 Claude Opus",
       "recency": "2026-08-05"
     },
     {
       "kind": "github",
-      "title": "Alpha learnings — AXTI + L2 dens",
+      "title": "Alpha learnings \u2014 AXTI + L2 dens",
       "recency": "2026-08-05"
     },
     {
@@ -37,7 +37,7 @@
     },
     {
       "kind": "notion",
-      "title": "Sapphire Overnight Control Brief — 2026-07-27",
+      "title": "Sapphire Overnight Control Brief \u2014 2026-07-27",
       "recency": "2026-07-28"
     },
     {
@@ -63,11 +63,73 @@
   ],
   "items": [
     {
+      "id": "SV-10",
+      "domain": "architecture",
+      "recency": "2026-08-06",
+      "title": "Windows desktop is the private datacenter",
+      "body": "North star: DESKTOP-HFCK6U9 is always-on DC for GPU inference, research workers, TV agent, and designated-rail execution workers when armed. Mac is mobile commander (authority, densify, killswitch). GCP is warehouse + Cloud Shell invent/PR seat \u2014 not sole writer.",
+      "severity": "critical",
+      "status": "accepted",
+      "sapphirePaths": [
+        "docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md",
+        "docs/ops/windows-desktop-server-runbook.md",
+        "data/device_topology.json",
+        "README.md"
+      ],
+      "tags": [
+        "windows",
+        "datacenter",
+        "mission"
+      ],
+      "action": "Implement Win DC ladder P0\u2192P2; do not ARM until post-boot green"
+    },
+    {
+      "id": "AU-10",
+      "domain": "automation",
+      "recency": "2026-08-06",
+      "title": "Agent harnesses over chat personas",
+      "body": "Harness = goal + budget + tools + receipt schema + promote/demote + hard fence. Core set: plant supervisor, densify/Ralph, research worker (Win), free-reign multi-rail, AXTI risk, genome learner, content publish, knowledge bridge, Gemini OODA dry. Models propose only; NO_TRADE is an arm.",
+      "severity": "critical",
+      "status": "accepted",
+      "sapphirePaths": [
+        "docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md",
+        "docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md",
+        "scripts/windows_setup/"
+      ],
+      "tags": [
+        "harness",
+        "self-improve",
+        "gemini"
+      ],
+      "action": "Close genome outcomes loop; daily research worker after smoke"
+    },
+    {
+      "id": "BR-10",
+      "domain": "bridge",
+      "recency": "2026-08-06",
+      "title": "Gemini Cloud Shell master prompt is live",
+      "body": "Paste-ready Gemini handoff for Google Cloud Shell encodes Windows-DC mission, fences, bootstrap, Priority A\u2013E work, and end-of-session checklist. Companion: GCP ultimate handoff + gcp_cloudshell_bootstrap.sh.",
+      "severity": "high",
+      "status": "verified",
+      "sapphirePaths": [
+        "docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md",
+        "docs/handoffs/GCP-CLOUD-SHELL-ULTIMATE-HANDOFF-2026-08-06.md",
+        "scripts/ops/gcp_cloudshell_bootstrap.sh",
+        "GEMINI.md"
+      ],
+      "tags": [
+        "gemini",
+        "cloud-shell",
+        "handoff"
+      ],
+      "action": "On Cloud Shell: bootstrap \u2192 read master plan \u2192 Priority A inventory"
+    },
+    {
       "id": "OP-01",
       "domain": "trading",
       "recency": "2026-08-06",
       "title": "Operator feed: free-reign L2 $10; MOSS grant expired",
-      "body": "Plant SHIPPED. Free-reign L2 cap $10. MOSS armed=false with hours_left negative (~−11h) — grant must renew before any MegaETH sessions. Denylist includes SONNY/BINGBONG + short 0x prefixes + IBIT/HOOD/PLTR as free-reign spam block. Open bag empty; four dust exit proposals still the live equity plan.",
+      "body": "Plant SHIPPED. Free-reign L2 cap $10. MOSS armed=false with hours_left negative (~\u221211h) \u2014 grant must renew before any MegaETH sessions. Denylist includes SONNY/BINGBONG + short 0x prefixes + IBIT/HOOD/PLTR as free-reign spam block. Open bag empty; four dust exit proposals still the live equity plan.",
       "severity": "critical",
       "status": "active",
       "sapphirePaths": [
@@ -89,8 +151,8 @@
       "id": "OP-02",
       "domain": "thesis",
       "recency": "2026-08-06",
-      "title": "Active clusters: crypto_risk_perp · ai_narrative · space · sound_money",
-      "body": "Cluster sizing rule: size as one bet per cluster. crypto_risk_perp = HYPE+LIT (perp volume + BTC risk appetite). ai_narrative = BOT/PLTR/VVV. space = SPCX/DXYZ/ARKX. sound_money = GLD/IBIT. Weakest held vibe BOT → trim_or_hedge_cluster bias.",
+      "title": "Active clusters: crypto_risk_perp \u00b7 ai_narrative \u00b7 space \u00b7 sound_money",
+      "body": "Cluster sizing rule: size as one bet per cluster. crypto_risk_perp = HYPE+LIT (perp volume + BTC risk appetite). ai_narrative = BOT/PLTR/VVV. space = SPCX/DXYZ/ARKX. sound_money = GLD/IBIT. Weakest held vibe BOT \u2192 trim_or_hedge_cluster bias.",
       "severity": "high",
       "status": "research",
       "sapphirePaths": [
@@ -111,8 +173,8 @@
       "id": "OP-03",
       "domain": "trading",
       "recency": "2026-08-06",
-      "title": "Mac→Win decisions sync is the fill path",
-      "body": "Fills execute on Win. Mac free_reign must sync decisions.jsonl → Win (sync_decisions_to_win.sh). max_on_chain_open=1 + open bag blocks new L2 BUYs. Four dust sleeve exits remain approved_open with multi-hour expiry windows.",
+      "title": "Mac\u2192Win decisions sync is the fill path",
+      "body": "Fills execute on Win. Mac free_reign must sync decisions.jsonl \u2192 Win (sync_decisions_to_win.sh). max_on_chain_open=1 + open bag blocks new L2 BUYs. Four dust sleeve exits remain approved_open with multi-hour expiry windows.",
       "severity": "high",
       "status": "ops_debt",
       "sapphirePaths": [
@@ -135,7 +197,7 @@
       "domain": "trading",
       "recency": "2026-08-05",
       "title": "AXTI playbook: defined-risk options + gamma scale-out",
-      "body": "Broker-backed win: buy 2 AXTI Aug-7 $80c @ $0.70 ($140 risk) → sell 1 @ $2.25 (+$155) → sell 1 @ $0.90 (+$20) = +$175 (~+125%). Rules: defined risk first; catalyst window; gamma > theta; scale out on spikes; never hold through worthless decay; automate TP half at 2× / trail / hard SL −40% premium.",
+      "body": "Broker-backed win: buy 2 AXTI Aug-7 $80c @ $0.70 ($140 risk) \u2192 sell 1 @ $2.25 (+$155) \u2192 sell 1 @ $0.90 (+$20) = +$175 (~+125%). Rules: defined risk first; catalyst window; gamma > theta; scale out on spikes; never hold through worthless decay; automate TP half at 2\u00d7 / trail / hard SL \u221240% premium.",
       "severity": "critical",
       "status": "accepted",
       "sapphirePaths": [
@@ -148,7 +210,7 @@
         "playbook",
         "agentic"
       ],
-      "action": "After dust exits fill, stage 1–2 AXTI-class option probes (defined risk, ≤$35)",
+      "action": "After dust exits fill, stage 1\u20132 AXTI-class option probes (defined risk, \u2264$35)",
       "sources": [
         "2026-08-05_alpha-learnings-axti-l2.md",
         "master-handoff"
@@ -182,8 +244,8 @@
       "id": "TR-DUST",
       "domain": "trading",
       "recency": "2026-08-05",
-      "title": "Dust sleeve exits queued — do not re-place",
-      "body": "Four market sells for next RTH on RH Agentic ••••8144: IBIT, HOOD, PLTR, NVDA (sub-share dust from overnight $20×4 fill). place_agentic_rth must refuse dust under multi-rail/exits mandate. Do not cancel unless owner killswitches.",
+      "title": "Dust sleeve exits queued \u2014 do not re-place",
+      "body": "Four market sells for next RTH on RH Agentic \u2022\u2022\u2022\u20228144: IBIT, HOOD, PLTR, NVDA (sub-share dust from overnight $20\u00d74 fill). place_agentic_rth must refuse dust under multi-rail/exits mandate. Do not cancel unless owner killswitches.",
       "severity": "critical",
       "status": "active",
       "sapphirePaths": [
@@ -206,7 +268,7 @@
       "domain": "automation",
       "recency": "2026-08-05",
       "title": "Mandate free_reign_multi_rail (sticky)",
-      "body": "Free-reign ON designated rails: RH Agentic easy + options-first + no dust placer; RH L2 ON ≤$10 max 1 open + dens; MOSS trade=true when grant hours_left > 0. Desk cycle must not wipe free-reign (easy_mode.free_reign_payload sticky). Per-trade Telegram approval cards stay dead.",
+      "body": "Free-reign ON designated rails: RH Agentic easy + options-first + no dust placer; RH L2 ON \u2264$10 max 1 open + dens; MOSS trade=true when grant hours_left > 0. Desk cycle must not wipe free-reign (easy_mode.free_reign_payload sticky). Per-trade Telegram approval cards stay dead.",
       "severity": "high",
       "status": "accepted",
       "sapphirePaths": [
@@ -228,7 +290,7 @@
       "domain": "automation",
       "recency": "2026-08-05",
       "title": "Telegram dual surface: Trade Terminal + Command Center",
-      "body": "Mine PenguBot/BonkBot/OctoBot/Freqtrade patterns. Ship: position cards one-tap TP/SL/close; risk loop marks → RH option close; paste-thesis → /do; CC live JSON over Tailscale without trade buttons; Freqtrade-style strategy row in /tracks. Reject custody of keys in chat.",
+      "body": "Mine PenguBot/BonkBot/OctoBot/Freqtrade patterns. Ship: position cards one-tap TP/SL/close; risk loop marks \u2192 RH option close; paste-thesis \u2192 /do; CC live JSON over Tailscale without trade buttons; Freqtrade-style strategy row in /tracks. Reject custody of keys in chat.",
       "severity": "high",
       "status": "partial",
       "sapphirePaths": [
@@ -251,7 +313,7 @@
       "domain": "automation",
       "recency": "2026-08-05",
       "title": "Fleet recovery order before new alpha",
-      "body": "Win desktop back online post-crash — finish post-boot (bugcheck, dumps, schtasks, Ollama VRAM, free-reign/killswitch parity Mac↔Win) before feature work. Find Win laptop (prior probe signal 9). Pi A/B mesh 10.77.4.x role inventory. One owner for post-boot until green.",
+      "body": "Win desktop back online post-crash \u2014 finish post-boot (bugcheck, dumps, schtasks, Ollama VRAM, free-reign/killswitch parity Mac\u2194Win) before feature work. Find Win laptop (prior probe signal 9). Pi A/B mesh 10.77.4.x role inventory. One owner for post-boot until green.",
       "severity": "high",
       "status": "ops_debt",
       "sapphirePaths": [
@@ -272,8 +334,8 @@
       "id": "BR-05",
       "domain": "bridge",
       "recency": "2026-08-05",
-      "title": "Grok web ↔ local knowledge bridge is LIVE",
-      "body": "Canonical path arigatoexpress/Sapphire data/grok-web-exports/. Web MCP write verified. Local loop: git pull → Knowledge/0-Inbox/grok-web/ → densify/Ralph → plant. sync_grok_web_exports.sh. Prefer structured trade ideas: instrument/venue/size/thesis/falsifier/confidence/horizon/risk notes.",
+      "title": "Grok web \u2194 local knowledge bridge is LIVE",
+      "body": "Canonical path arigatoexpress/Sapphire data/grok-web-exports/. Web MCP write verified. Local loop: git pull \u2192 Knowledge/0-Inbox/grok-web/ \u2192 densify/Ralph \u2192 plant. sync_grok_web_exports.sh. Prefer structured trade ideas: instrument/venue/size/thesis/falsifier/confidence/horizon/risk notes.",
       "severity": "high",
       "status": "verified",
       "sapphirePaths": [
@@ -313,7 +375,7 @@
       "id": "BR-02",
       "domain": "bridge",
       "recency": "2026-08-06",
-      "title": "Transport priority: Mac → OIDC → API key → sim",
+      "title": "Transport priority: Mac \u2192 OIDC \u2192 API key \u2192 sim",
       "body": "Prefer Safari bridge when GROK_BRIDGE_URL is healthy; fall back to SuperGrok OIDC, then XAI_API_KEY, then away-sim for offline tests.",
       "severity": "high",
       "status": "verified",
@@ -329,7 +391,7 @@
       "domain": "bridge",
       "recency": "2026-08-06",
       "title": "Mac Safari bridge unreachable remotely",
-      "body": "Port 19998 / host Mac not reachable from remote sandboxes. Expected while away — set GROK_BRIDGE_URL + tunnel when home. Plant deck stays :8100; API :8099.",
+      "body": "Port 19998 / host Mac not reachable from remote sandboxes. Expected while away \u2014 set GROK_BRIDGE_URL + tunnel when home. Plant deck stays :8100; API :8099.",
       "severity": "medium",
       "status": "known",
       "sapphirePaths": [
@@ -345,7 +407,7 @@
       "domain": "architecture",
       "recency": "2026-08-05",
       "title": "Canonical live surfaces: Sapphire + ops-state",
-      "body": "One brain: ~/Code/Sapphire monorepo + ~/ops-state plant state (finish-line, telegram-bot, rh-chain, moss). Project-Go-Forward is THO client FENCED. Do not merge task*/ops-server/fleet-lease/quant-perps trees into Sapphire without ≥2 call-site extraction. Archive candidates: *.RETIRED-* after symlink safety check.",
+      "body": "One brain: ~/Code/Sapphire monorepo + ~/ops-state plant state (finish-line, telegram-bot, rh-chain, moss). Project-Go-Forward is THO client FENCED. Do not merge task*/ops-server/fleet-lease/quant-perps trees into Sapphire without \u22652 call-site extraction. Archive candidates: *.RETIRED-* after symlink safety check.",
       "severity": "high",
       "status": "accepted",
       "sapphirePaths": [
@@ -387,7 +449,7 @@
       "domain": "trading",
       "recency": "2026-07-29",
       "title": "Trading / mints / OAuth / prod cutovers at attended gates",
-      "body": "Overnight brief: Trading, token launches, mints, liquidity, public posts, OAuth grants, and production cutovers stay at exact attended gates. Reversible build/test/review continues autonomously. Free-reign multi-rail (Aug 5+) is a bounded exception on designated test rails under caps — not a blank check on all capital.",
+      "body": "Overnight brief: Trading, token launches, mints, liquidity, public posts, OAuth grants, and production cutovers stay at exact attended gates. Reversible build/test/review continues autonomously. Free-reign multi-rail (Aug 5+) is a bounded exception on designated test rails under caps \u2014 not a blank check on all capital.",
       "severity": "critical",
       "status": "accepted",
       "sapphirePaths": [
@@ -407,7 +469,7 @@
       "domain": "automation",
       "recency": "2026-07-27",
       "title": "Exact one-click approval bundles (task 053)",
-      "body": "Immutable hash, expiry, exact actions and accounts, preconditions, limits, rollback, independent review, fail-closed partial execution. One approval covers one frozen bundle — never an evergreen blank check. Aligns with free-reign mandate + AXTI risk automation.",
+      "body": "Immutable hash, expiry, exact actions and accounts, preconditions, limits, rollback, independent review, fail-closed partial execution. One approval covers one frozen bundle \u2014 never an evergreen blank check. Aligns with free-reign mandate + AXTI risk automation.",
       "severity": "high",
       "status": "in_progress",
       "sapphirePaths": [
@@ -427,7 +489,7 @@
       "domain": "automation",
       "recency": "2026-07-27",
       "title": "Knowledge embed integrity blockers (task 050)",
-      "body": "NO-SHIP despite 238 tests: (1) 1,024-d all-zero embedding could persist; (2) missing/empty vector store with matching incremental hashes could be mislabeled healthy. Repair in isolated worktree only — live Knowledge/cron/vector store untouched until fixed.",
+      "body": "NO-SHIP despite 238 tests: (1) 1,024-d all-zero embedding could persist; (2) missing/empty vector store with matching incremental hashes could be mislabeled healthy. Repair in isolated worktree only \u2014 live Knowledge/cron/vector store untouched until fixed.",
       "severity": "high",
       "status": "blocked",
       "sapphirePaths": [
@@ -447,7 +509,7 @@
       "domain": "architecture",
       "recency": "2026-07-28",
       "title": "Adaptive trading lab hot path (not LLM-as-trader)",
-      "body": "point-in-time events → deterministic features → strategy candidates → contextual allocator → portfolio/risk → proof-carrying execution → broker reconciliation → realized reward → online update. LLMs in slow research loop only. NO_TRADE is an arm. Capital ladder: historical → shadow → paper → min live → bounded scale from after-cost evidence.",
+      "body": "point-in-time events \u2192 deterministic features \u2192 strategy candidates \u2192 contextual allocator \u2192 portfolio/risk \u2192 proof-carrying execution \u2192 broker reconciliation \u2192 realized reward \u2192 online update. LLMs in slow research loop only. NO_TRADE is an arm. Capital ladder: historical \u2192 shadow \u2192 paper \u2192 min live \u2192 bounded scale from after-cost evidence.",
       "severity": "high",
       "status": "accepted",
       "sapphirePaths": [
@@ -468,8 +530,8 @@
       "id": "TR-01",
       "domain": "trading",
       "recency": "2026-07-25",
-      "title": "Signal spine: TV/OHLCV/chain → bus → surfaces",
-      "body": "Analytics + chain intel emit typed events on event_bus; dashboard SSE, Telegram drafts, and paper/live executors consume — never skip the bus.",
+      "title": "Signal spine: TV/OHLCV/chain \u2192 bus \u2192 surfaces",
+      "body": "Analytics + chain intel emit typed events on event_bus; dashboard SSE, Telegram drafts, and paper/live executors consume \u2014 never skip the bus.",
       "severity": "high",
       "status": "accepted",
       "sapphirePaths": [
@@ -486,7 +548,7 @@
       "domain": "thesis",
       "recency": "2026-07-28",
       "title": "Probe quant module archived as reference (Walter/CVNA/BHF)",
-      "body": "Local deterministic package: long_put, put_spread, position_size, deal_spread, stake_sensitivity + monitor rules (CVNA ≥8% day, vol ≥2×, IVR ≥75, BHF discount ≥15%, tagged events). No live brokerage. Archived from primary 24h loop; prefer thesis-aligned surfaces (tokenized equities, perps infra, verifiable AI).",
+      "body": "Local deterministic package: long_put, put_spread, position_size, deal_spread, stake_sensitivity + monitor rules (CVNA \u22658% day, vol \u22652\u00d7, IVR \u226575, BHF discount \u226515%, tagged events). No live brokerage. Archived from primary 24h loop; prefer thesis-aligned surfaces (tokenized equities, perps infra, verifiable AI).",
       "severity": "medium",
       "status": "archived_module",
       "sapphirePaths": [
@@ -521,7 +583,7 @@
         "verifiability"
       ],
       "sources": [
-        "Mark Walter Probe Quant §9"
+        "Mark Walter Probe Quant \u00a79"
       ]
     },
     {
@@ -563,7 +625,7 @@
       "domain": "automation",
       "recency": "2026-07-25",
       "title": "Fund factory loops no-op under killswitch / paper",
-      "body": "T12/T15 services can stay live while paused; journals stamp refused actions. Fund-factory Phase-1 paper rails built (RH-agentic, RH-L2, MegaETH) on feat branch — not live money.",
+      "body": "T12/T15 services can stay live while paused; journals stamp refused actions. Fund-factory Phase-1 paper rails built (RH-agentic, RH-L2, MegaETH) on feat branch \u2014 not live money.",
       "severity": "medium",
       "status": "verified",
       "sapphirePaths": [
@@ -582,7 +644,7 @@
       "domain": "automation",
       "recency": "2026-07-25",
       "title": "Few scheduled tasks actually installed",
-      "body": "Docs list many tasks; Mac may only have a handful. Don’t assume market-pulse exists from docs alone. Magnum-night-watch disabled (auto-resurrection hazard on disarmed gate).",
+      "body": "Docs list many tasks; Mac may only have a handful. Don\u2019t assume market-pulse exists from docs alone. Magnum-night-watch disabled (auto-resurrection hazard on disarmed gate).",
       "severity": "high",
       "status": "ops_debt",
       "sapphirePaths": [
@@ -619,7 +681,7 @@
       "domain": "trading",
       "recency": "2026-07-25",
       "title": "Sentiment fake-neutral on provider fail",
-      "body": "Silent 50/neutral default when upstream fails is not a real reading — treat as null/unknown.",
+      "body": "Silent 50/neutral default when upstream fails is not a real reading \u2014 treat as null/unknown.",
       "severity": "medium",
       "status": "bug_memory",
       "sapphirePaths": [
@@ -634,7 +696,7 @@
       "domain": "architecture",
       "recency": "2026-07-23",
       "title": "Keep chassis; rebuild trading brain",
-      "body": "Scorched-earth reframe: chassis healthy (~phases 0–3/5, verify-GREEN). Failure was alpha generation (alpha-zoo 0/27, sniper killed, ICE-MOM-17/Alpha42 retired, SONNY honeypot). Arena = RH Agentic + RH L2/Chain + MegaETH MOSS — Aster deprecated. Archive never blind-delete.",
+      "body": "Scorched-earth reframe: chassis healthy (~phases 0\u20133/5, verify-GREEN). Failure was alpha generation (alpha-zoo 0/27, sniper killed, ICE-MOM-17/Alpha42 retired, SONNY honeypot). Arena = RH Agentic + RH L2/Chain + MegaETH MOSS \u2014 Aster deprecated. Archive never blind-delete.",
       "severity": "high",
       "status": "accepted",
       "sapphirePaths": [
@@ -683,5 +745,7 @@
       "artifact": "Trading edge plan (source Drive)",
       "path": "docs/trading-strategy-lab.md"
     }
-  ]
+  ],
+  "itemCount": 32,
+  "note": "Includes Windows DC master plan + Gemini Cloud Shell handoff"
 }

@@ -1,13 +1,17 @@
 # Windows Desktop Server Runbook
 
-Last reviewed: 2026-04-29
+> **Mission (2026-08-06):** This machine is Sapphire's **always-on private datacenter**, not an optional GPU sidecar.  
+> North star: [`docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md`](../strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md)  
+> Gemini Cloud Shell implementers: [`docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md`](../handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md)
+
+Last reviewed: 2026-08-06 (mission banner) · operational detail last bulk-reviewed 2026-04-29
 
 This runbook covers `DESKTOP-HFCK6U9`, the Windows machine on Tailscale
 `100.x.x.z`. Treat it as Sapphire's private desktop accelerator: GPU
 inference first, historical backtesting and strategy experiments second, and
 persistent service host third.
 
-The node is not an execution authority. It must not submit live orders, sign
+The node is not ambient sole authority over all capital — it may run **designated-rail** workers only after post-boot green, dens/caps/killswitch parity with Mac, and explicit ARM. It must not submit live orders, sign
 broker payloads, send Telegram messages, print secrets, or write production data
 unless a later operator-reviewed PR explicitly enables a narrow path.
 
