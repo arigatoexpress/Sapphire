@@ -1,6 +1,6 @@
 # Sapphire × Grok — System Brief
 
-_Generated: 2026-08-06T20:12:06Z_
+_Generated: 2026-08-06T20:14:51Z_
 
 **Streamline score:** 8/8 (1.0)
 
@@ -34,11 +34,11 @@ _Generated: 2026-08-06T20:12:06Z_
 
 ```json
 {
-  "export_count": 37,
+  "export_count": 38,
   "by_day": {
     "2026-08-04": 1,
     "2026-08-05": 12,
-    "2026-08-06": 24
+    "2026-08-06": 25
   },
   "latest": [
     "2026-08-06_local-export_genome-closes-wired.md",
@@ -120,7 +120,7 @@ _Generated: 2026-08-06T20:12:06Z_
 
 ## Blindspots
 
-- scoreboard: `{'count': 27, 'by_severity': {'P0': 7, 'P1': 13, 'P2': 7}, 'by_status': {'open': 13, 'recommended_accept': 1, 'resolved_plant': 3, 'encoded': 3, 'code_fixed_deploy_pending': 1, 'in_progress': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-PUBLIC-DESK-STALE', 'BS-EXECUTOR-DEPLOY', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
+- scoreboard: `{'count': 28, 'by_severity': {'P1': 14, 'P0': 7, 'P2': 7}, 'by_status': {'in_progress': 2, 'open': 14, 'recommended_accept': 1, 'resolved_plant': 3, 'encoded': 3, 'partial': 1, 'policy_ready_plant_pending': 1, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-PUBLIC-DESK-STALE', 'BS-EXECUTOR-DEPLOY', 'BS-WIN-P0', 'BS-MOSS-GRANT', 'BS-DASHBOARD-SPA'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
 
 ## Playbooks
 

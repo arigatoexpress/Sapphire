@@ -1,22 +1,17 @@
-# Parallel now
+# What next (post Gemini Phase 3 setup)
 
-## Gemini (in flight)
+## Gemini — CRITICAL first
 
-Phase 3 masterplan — **do not compete** on Cloud Run.
+`docs/handoffs/GEMINI-PHASE3-STATUS-AND-NEXT-2026-08-06.md`
 
-When Gemini free for data-truth add-on:  
-`docs/handoffs/GEMINI-DATA-TRUTH-AND-PUBLIC-SURFACE-2026-08-06.md`
-
-Optional BQ: `docs/strategy/PAPER-OUTCOMES-WAREHOUSE-SCHEMA-2026-08-06.md`
+1. **Fix `/dashboard/assets/*` MIME** (dual-serve or base align)  
+2. Data-truth UI + Evidence elevation  
+3. Optional paper BQ schema  
 
 ## Claude (quota)
 
-1. Executor reload  
-2. Desk refresh using `lib.grok.desk_projection.build_desk_projection`  
-   → `docs/handoffs/CLAUDE-TELEMETRY-DESK-REFRESH-2026-08-06.md`
+Executor reload + telemetry desk refresh (`lib.grok.desk_projection`)
 
-## Monorepo ready
+## ACK already done
 
-- desk_projection + example JSON  
-- public_surface audit  
-- paper warehouse schema  
+00096-rub · min-instances=0 · hero · HEAD routes · epistemic handling  

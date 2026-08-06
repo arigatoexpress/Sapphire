@@ -7,6 +7,15 @@ from typing import Any
 # Severity: P0 blocks earn/safety · P1 blocks learning/ops · P2 polish
 BLINDSPOTS: list[dict[str, Any]] = [
     {
+        "id": "BS-GEMINI-P3-PARTIAL",
+        "severity": "P1",
+        "area": "public",
+        "title": "Phase 3 partial: 00096 live, min-instances 0, hero/HEAD done; MC assets path wrong",
+        "impact": "Looks deployed but operator SPA still blank",
+        "fix": "GEMINI-PHASE3-STATUS-AND-NEXT — dual asset serve",
+        "status": "in_progress",
+    },
+    {
         "id": "BS-PUBLIC-DESK-STALE",
         "severity": "P0",
         "area": "public",
@@ -109,10 +118,10 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "id": "BS-DASHBOARD-SPA",
         "severity": "P0",
         "area": "public",
-        "title": "Mission Control SPA assets 404 until deploy",
-        "impact": "Public/operator face looks broken",
-        "fix": "Deploy sapphire-alpha-dashboard 5ed4058+ with no-traffic first",
-        "status": "code_fixed_deploy_pending",
+        "title": "MC blank: /dashboard/assets/*.js served as text/html SPA shell",
+        "impact": "Mission Control does not paint despite 00096 deploy",
+        "fix": "Dual-serve /dashboard/assets and /assets from dist; never HTML for *.js",
+        "status": "open",
     },
     {
         "id": "BS-MAC-WIN-SYNC",

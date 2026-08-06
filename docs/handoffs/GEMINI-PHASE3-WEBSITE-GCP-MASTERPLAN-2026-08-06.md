@@ -1,3 +1,5 @@
+> **UPDATE 2026-08-06 later:** Phase 3 setup landed revision **00096-rub**, min-instances=0. Remaining critical: `/dashboard/assets` MIME — see `GEMINI-PHASE3-STATUS-AND-NEXT-2026-08-06.md`.
+
 # Gemini Cloud Shell — Phase 3 Masterplan + Prompt
 # Post–Phase 2: website professionalization + cost-efficient GCP warehouse
 

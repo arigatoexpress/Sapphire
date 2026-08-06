@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-06T20:12:06Z",
+  "generated_at": "2026-08-06T20:14:51Z",
   "streamline": {
     "score": 8,
     "max": 8,
@@ -160,11 +160,11 @@
     ]
   },
   "bridge": {
-    "export_count": 37,
+    "export_count": 38,
     "by_day": {
       "2026-08-04": 1,
       "2026-08-05": 12,
-      "2026-08-06": 24
+      "2026-08-06": 25
     },
     "latest": [
       "2026-08-06_local-export_genome-closes-wired.md",
@@ -425,19 +425,18 @@
     "GCP: cost posture min-instances=0 + Vertex idle skim"
   ],
   "blindspots": {
-    "count": 27,
+    "count": 28,
     "by_severity": {
+      "P1": 14,
       "P0": 7,
-      "P1": 13,
       "P2": 7
     },
     "by_status": {
-      "open": 13,
+      "in_progress": 2,
+      "open": 14,
       "recommended_accept": 1,
       "resolved_plant": 3,
       "encoded": 3,
-      "code_fixed_deploy_pending": 1,
-      "in_progress": 1,
       "partial": 1,
       "policy_ready_plant_pending": 1,
       "blocked": 1,
@@ -448,7 +447,8 @@
       "BS-PUBLIC-DESK-STALE",
       "BS-EXECUTOR-DEPLOY",
       "BS-WIN-P0",
-      "BS-MOSS-GRANT"
+      "BS-MOSS-GRANT",
+      "BS-DASHBOARD-SPA"
     ],
     "gcp_leverage_top": [
       "Deploy dashboard SPA fix (no-traffic \u2192 verify JS MIME \u2192 traffic)",

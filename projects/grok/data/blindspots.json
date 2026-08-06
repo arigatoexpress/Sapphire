@@ -1,6 +1,15 @@
 {
   "blindspots": [
     {
+      "id": "BS-GEMINI-P3-PARTIAL",
+      "severity": "P1",
+      "area": "public",
+      "title": "Phase 3 partial: 00096 live, min-instances 0, hero/HEAD done; MC assets path wrong",
+      "impact": "Looks deployed but operator SPA still blank",
+      "fix": "GEMINI-PHASE3-STATUS-AND-NEXT \u2014 dual asset serve",
+      "status": "in_progress"
+    },
+    {
       "id": "BS-PUBLIC-DESK-STALE",
       "severity": "P0",
       "area": "public",
@@ -103,10 +112,10 @@
       "id": "BS-DASHBOARD-SPA",
       "severity": "P0",
       "area": "public",
-      "title": "Mission Control SPA assets 404 until deploy",
-      "impact": "Public/operator face looks broken",
-      "fix": "Deploy sapphire-alpha-dashboard 5ed4058+ with no-traffic first",
-      "status": "code_fixed_deploy_pending"
+      "title": "MC blank: /dashboard/assets/*.js served as text/html SPA shell",
+      "impact": "Mission Control does not paint despite 00096 deploy",
+      "fix": "Dual-serve /dashboard/assets and /assets from dist; never HTML for *.js",
+      "status": "open"
     },
     {
       "id": "BS-MAC-WIN-SYNC",
@@ -295,19 +304,18 @@
     }
   ],
   "scoreboard": {
-    "count": 27,
+    "count": 28,
     "by_severity": {
+      "P1": 14,
       "P0": 7,
-      "P1": 13,
       "P2": 7
     },
     "by_status": {
-      "open": 13,
+      "in_progress": 2,
+      "open": 14,
       "recommended_accept": 1,
       "resolved_plant": 3,
       "encoded": 3,
-      "code_fixed_deploy_pending": 1,
-      "in_progress": 1,
       "partial": 1,
       "policy_ready_plant_pending": 1,
       "blocked": 1,
@@ -318,7 +326,8 @@
       "BS-PUBLIC-DESK-STALE",
       "BS-EXECUTOR-DEPLOY",
       "BS-WIN-P0",
-      "BS-MOSS-GRANT"
+      "BS-MOSS-GRANT",
+      "BS-DASHBOARD-SPA"
     ],
     "gcp_leverage_top": [
       "Deploy dashboard SPA fix (no-traffic \u2192 verify JS MIME \u2192 traffic)",
