@@ -1,0 +1,120 @@
+{
+  "updated_at": "2026-08-06T16:09:15Z",
+  "tasks": [
+    {
+      "id": "T-bridge-plant",
+      "title": "Claude: wire plant sync_grok_web_exports \u2192 Knowledge inbox",
+      "lane": "bridge",
+      "priority": 1,
+      "status": "done",
+      "done_when": "local-export receipt on main",
+      "completed_at": "2026-08-06T16:09:15Z"
+    },
+    {
+      "id": "T-genome",
+      "title": "Genome lesson schema + AXTI/dens seed",
+      "lane": "genome",
+      "priority": 1,
+      "status": "done",
+      "done_when": "LessonBook seed + tests",
+      "completed_at": "2026-08-06T16:08:43Z"
+    },
+    {
+      "id": "T-policy-kernel",
+      "title": "Ship dens/AXTI/free-reign paper policy + tests",
+      "lane": "policy",
+      "priority": 1,
+      "status": "done",
+      "done_when": "lib/grok/policy.py tests green",
+      "completed_at": "2026-08-06T16:08:43Z"
+    },
+    {
+      "id": "T-win-dc",
+      "title": "Windows DC acceptance pack (P0 blocks ARM)",
+      "lane": "windows",
+      "priority": 1,
+      "status": "done",
+      "done_when": "evaluate_windows_acceptance + checklist data",
+      "completed_at": "2026-08-06T16:08:43Z"
+    },
+    {
+      "id": "T-automations-catalog",
+      "title": "Catalog + clean Grok-related automations",
+      "lane": "automations",
+      "priority": 2,
+      "status": "done",
+      "done_when": "projects/grok/AUTOMATIONS.md",
+      "completed_at": "2026-08-06T16:08:43Z"
+    },
+    {
+      "id": "T-ci-readme",
+      "title": "Keep README test inventory bullet honest",
+      "lane": "ci",
+      "priority": 2,
+      "status": "done",
+      "done_when": "test_inventory --check-readme"
+    },
+    {
+      "id": "T-mission-docs",
+      "title": "Win DC master plan + Gemini Cloud Shell prompt",
+      "lane": "docs",
+      "priority": 2,
+      "status": "done",
+      "done_when": "docs/strategy + handoffs on main"
+    },
+    {
+      "id": "T-research-manifest",
+      "title": "Research-worker manifest validator (paper_only)",
+      "lane": "research",
+      "priority": 2,
+      "status": "done",
+      "done_when": "validate_research_manifest rejects live flags",
+      "completed_at": "2026-08-06T16:08:43Z"
+    }
+  ],
+  "dynamic_tasks": [
+    {
+      "id": "T-wire-policy-plant",
+      "title": "Plant: import lib.grok.policy into free-reign decision path",
+      "lane": "plant",
+      "priority": 1,
+      "status": "todo",
+      "done_when": "plant free-reign calls evaluate_proposal"
+    },
+    {
+      "id": "T-wire-genome-closes",
+      "title": "Plant: append LessonBook on broker-reconciled closes",
+      "lane": "plant",
+      "priority": 1,
+      "status": "todo",
+      "done_when": "outcomes wins/losses non-zero from real closes"
+    },
+    {
+      "id": "T-win-post-boot",
+      "title": "Plant/Win: run P0 acceptance; only then ARM L2 schtasks",
+      "lane": "windows",
+      "priority": 1,
+      "status": "todo",
+      "done_when": "arm_l2_allowed true from real probes"
+    }
+  ],
+  "stats": {
+    "static_done": 8,
+    "static_open": 0,
+    "dynamic_open": 3,
+    "signals": {
+      "monorepo_bridge_tools_ok": true,
+      "policy_tests_ok": true,
+      "genome_seeded": true,
+      "windows_module_ok": true,
+      "research_validator_ok": true,
+      "automations_catalog_ok": true,
+      "bridge_local_export_seen": true
+    }
+  },
+  "next_actions": [
+    "T-win-post-boot: Plant/Win: run P0 acceptance; only then ARM L2 schtasks",
+    "T-wire-genome-closes: Plant: append LessonBook on broker-reconciled closes",
+    "T-wire-policy-plant: Plant: import lib.grok.policy into free-reign decision path"
+  ]
+}

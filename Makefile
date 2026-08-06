@@ -174,3 +174,18 @@ safe-merge:  ## Squash-merge PR=<number> with explicit [skip ci] subject and sco
 .PHONY: ci
 ci: lint test test-plugin registry  ## Mirror CI locally (no secrets scan)
 	@echo "✓ local CI mirror passed"
+
+
+# --- Grok project ---
+.PHONY: grok-status grok-loop grok-bridge grok-test
+grok-status:
+	python3 scripts/ops/grok_project_status.py
+
+grok-loop:
+	python3 scripts/ops/grok_loop_tick.py --write
+
+grok-bridge:
+	python3 scripts/ops/grok_bridge_status.py --write-manifest
+
+grok-test:
+	python3 -m pytest tests/unit/test_grok_policy.py tests/unit/test_grok_genome.py tests/unit/test_grok_research_worker.py tests/unit/test_grok_windows.py tests/unit/test_grok_loop.py tests/unit/test_grok_bridge_status.py -q

@@ -1,0 +1,15 @@
+{
+  "name": "AXTI-class defined-risk options",
+  "rules": {
+    "scale_out_multiple": 2.0,
+    "hard_sl_fraction": -0.4,
+    "never_hold_to_worthless": true,
+    "defined_risk_only": true
+  },
+  "reference_trade": {
+    "symbol": "AXTI",
+    "realized_pnl_usd": 175,
+    "return_pct": 125,
+    "notes": "Aug 2026 agentic open + scale-outs before expiry"
+  }
+}

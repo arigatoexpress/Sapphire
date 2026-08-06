@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "host": "DESKTOP-HFCK6U9",
+  "mission": "docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md",
+  "state": {
+    "post_boot_report": false,
+    "tailscale_up": false,
+    "ssh_stable": false,
+    "ollama_aliases": false,
+    "no_sleep": false,
+    "free_reign_parity": false,
+    "schtasks_inventory": false,
+    "research_worker_smoke": false,
+    "tv_agent_readonly": false,
+    "genome_seeded": false
+  },
+  "note": "Plant fills booleans from real probes; evaluate via lib.grok.windows"
+}

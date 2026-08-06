@@ -37,6 +37,7 @@ policy, and a rule for what must not drift into it.
 - `infra/` — LaunchAgents, registries, org manifests, and cloud templates.
   Retention: git, no secret payloads.
 - `lib/` — reusable Sapphire libraries and product kernels. Retention: git.
+- `projects/` — long-lived multi-surface project hubs (e.g. `projects/grok/` knowledge bridge + policy + loop). Retention: git for source/data; runtime plant state stays in ops-state.
 - `packages/` — local package manifests and reusable package scaffolds.
   Retention: git source/config only; build output stays ignored.
 - `patches/` — small reviewable patch artifacts. Retention: git while active;

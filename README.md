@@ -48,6 +48,7 @@ Telegram          → away Central Terminal (Trade vs Command Center)
 
 | You are… | Open this |
 |---|---|
+| **Grok dedicated project** | [`projects/grok/`](projects/grok/) · `make grok-loop` · `make grok-status` |
 | **Gemini in Google Cloud Shell** | [`docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md`](docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md) → `bash scripts/ops/gcp_cloudshell_bootstrap.sh` |
 | **Any agent (Claude/Codex/Grok)** | [`AGENTS.md`](AGENTS.md) · [`SAPPHIRE_PROMPT.md`](SAPPHIRE_PROMPT.md) · master plan |
 | **On the Mac plant** | `ops-state` free-reign + [`docs/alpha/GROK-CHAT-ALPHA-2026-08-06.md`](docs/alpha/GROK-CHAT-ALPHA-2026-08-06.md) |

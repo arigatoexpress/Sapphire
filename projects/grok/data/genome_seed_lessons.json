@@ -1,0 +1,44 @@
+{
+  "lessons": [
+    {
+      "id": "lesson-axti-2026-08",
+      "source": "axti",
+      "symbol": "AXTI",
+      "rail": "rh_agentic",
+      "outcome": "win",
+      "realized_pnl_usd": 175.0,
+      "thesis": "Defined-risk short-dated calls into catalyst; scale out on gamma",
+      "lesson": "Repeat: defined-risk options, half at ~2\u00d7, SL \u221240%, never hold to worthless",
+      "tags": [
+        "axti",
+        "options-first",
+        "scale-out"
+      ],
+      "closed_at": "2026-08-04T00:00:00Z",
+      "meta": {}
+    },
+    {
+      "id": "lesson-dens-sonny-bingbong",
+      "source": "dens",
+      "symbol": "SONNY",
+      "rail": "rh_l2",
+      "outcome": "blocked",
+      "realized_pnl_usd": 0.0,
+      "thesis": "Honeypot dens class",
+      "lesson": "Permanent dens SONNY/BINGBONG class + short 0x prefixes \u2014 never re-enable free-reign spam",
+      "tags": [
+        "dens",
+        "permanent"
+      ],
+      "closed_at": "2026-08-05T00:00:00Z",
+      "meta": {}
+    }
+  ],
+  "summary": {
+    "count": 2,
+    "wins": 1,
+    "losses": 0,
+    "blocked": 1,
+    "realized_pnl_usd": 175.0
+  }
+}

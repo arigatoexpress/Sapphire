@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-06T12:00:00Z",
+  "host": "DESKTOP-HFCK6U9",
+  "git_sha": "deadbeef",
+  "paper_only": true,
+  "live_trading_enabled": false,
+  "telegram_sends_enabled": false
+}

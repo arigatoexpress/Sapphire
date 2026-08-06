@@ -1,0 +1,19 @@
+{
+  "symbols": [
+    "BINGBONG",
+    "CATE",
+    "HOODSDAY",
+    "NONGWAN",
+    "SONNY"
+  ],
+  "addr_prefixes": [
+    "0x9763"
+  ],
+  "dust_no_rebuy": [
+    "HOOD",
+    "IBIT",
+    "NVDA",
+    "PLTR"
+  ],
+  "note": "Permanent dens \u2014 never loosen without owner phrase"
+}

@@ -1,0 +1,46 @@
+{
+  "mandate": "free_reign_multi_rail",
+  "rails": {
+    "rh_agentic": {
+      "enabled": true,
+      "options_first": true,
+      "dust_placer_refuses": true,
+      "account_hint": "\u2022\u2022\u2022\u20228144"
+    },
+    "rh_l2": {
+      "enabled": true,
+      "max_notional_usd": 10.0,
+      "max_open": 1,
+      "dens_enforced": true
+    },
+    "moss": {
+      "enabled": true,
+      "require_grant_hours_left_gt": 0
+    },
+    "paper": {
+      "enabled": true
+    }
+  },
+  "axti": {
+    "scale_out_multiple": 2.0,
+    "hard_sl_fraction": -0.4,
+    "never_hold_to_worthless": true,
+    "defined_risk_only": true
+  },
+  "dens_symbols": [
+    "BINGBONG",
+    "CATE",
+    "HOODSDAY",
+    "NONGWAN",
+    "SONNY"
+  ],
+  "dust_no_rebuy": [
+    "HOOD",
+    "IBIT",
+    "NVDA",
+    "PLTR"
+  ],
+  "dens_addr_prefixes": [
+    "0x9763"
+  ]
+}

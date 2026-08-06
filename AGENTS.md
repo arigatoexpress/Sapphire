@@ -4,6 +4,7 @@
 
 Read in order:
 
+0. `projects/grok/README.md` + `projects/grok/TASKBOARD.md` (Grok dedicated project + loop)
 1. `docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md`
 2. `docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md` (if you are Gemini / Cloud Shell)
 3. `ops-state/agent-reports/MASTER-HANDOFF-CLAUDE-OPUS-LATEST.md` (plant) · git mirror `data/grok-web-exports/2026-08-05_master-handoff-claude-opus.md`
