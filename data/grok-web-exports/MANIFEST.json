@@ -1,0 +1,505 @@
+{
+  "generated_at": "2026-08-06T15:59:43Z",
+  "export_dir": "data/grok-web-exports",
+  "count": 17,
+  "issue_count": 3,
+  "by_source": {
+    "grok-web": 7,
+    "unknown": 1,
+    "grok-cli": 2,
+    "local-export": 7
+  },
+  "by_type": {
+    "architecture": 2,
+    "unknown": 1,
+    "ops": 4,
+    "status": 2,
+    "catalog": 2,
+    "plant-status": 1,
+    "handoff": 2,
+    "research": 1,
+    "alpha-scour": 1,
+    "masterplan": 1
+  },
+  "missing_required_hints": [],
+  "latest": [
+    {
+      "name": "2026-08-05_local-export_grok-all-queries.md",
+      "size": 33914,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "catalog",
+      "title": null,
+      "topics": [],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_local-export_grok-chat-catalog.md",
+      "size": 11032,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "catalog",
+      "title": null,
+      "topics": [],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_local-export_plant-alpha.md",
+      "size": 1590,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "plant-status",
+      "title": null,
+      "topics": [
+        "alpha",
+        "free-reign",
+        "plant-deck",
+        "executor",
+        "risk-snapshot"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_master-handoff-claude-opus.md",
+      "size": 9909,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "handoff",
+      "title": "Master handoff Claude Opus",
+      "topics": [
+        "claude",
+        "plant",
+        "free-reign"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_megaeth-moss-status.md",
+      "size": 517,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "status",
+      "title": "MegaETH MOSS status",
+      "topics": [
+        "moss",
+        "megaeth"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_repo-consolidation.md",
+      "size": 3012,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "ops",
+      "title": "Repo consolidation",
+      "topics": [
+        "repo",
+        "consolidation"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_session-wrap-grok.md",
+      "size": 2076,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "grok-cli",
+      "date": "2026-08-05",
+      "type": "ops",
+      "title": "Session wrap Grok",
+      "topics": [
+        "session",
+        "wrap"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_tg-terminal-oss-mine.md",
+      "size": 4532,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "research",
+      "title": "TG terminal OSS mine",
+      "topics": [
+        "telegram",
+        "oss"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_alpha-scour-merge.md",
+      "size": 15167,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "alpha-scour",
+      "title": "Alpha scour \u2192 Sapphire merge (most recent first)",
+      "topics": [
+        "trading",
+        "automation",
+        "bridge",
+        "sapphire-merge"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_gcp-cloudshell-ultimate-handoff.md",
+      "size": 2284,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "handoff",
+      "title": "GCP Cloud Shell ultimate handoff (pointer)",
+      "topics": [
+        "gcp",
+        "cloud-shell",
+        "masterplan",
+        "data-plane",
+        "fences",
+        "alpha"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_grok-bridge-lane-tools.md",
+      "size": 1151,
+      "mtime_utc": "2026-08-06T15:59:27Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "ops",
+      "title": "Grok bridge monorepo tools + Claude plant checklist",
+      "topics": [
+        "bridge",
+        "densify",
+        "ralph",
+        "monorepo-tools"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_windows-datacenter-masterplan.md",
+      "size": 2318,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "masterplan",
+      "title": "Windows private datacenter master plan + Gemini Cloud Shell prompt",
+      "topics": [
+        "windows",
+        "datacenter",
+        "harnesses",
+        "gemini",
+        "cloud-shell",
+        "alpha",
+        "free-reign"
+      ],
+      "issues": []
+    }
+  ],
+  "items": [
+    {
+      "name": "2026-08-04_bridge-setup.md",
+      "size": 1182,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-04",
+      "type": "architecture",
+      "title": null,
+      "topics": [
+        "bridge",
+        "knowledge-plane",
+        "plant-deck",
+        "densify",
+        "ralph"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_alpha-learnings-axti-l2.md",
+      "size": 2904,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": false,
+      "source": null,
+      "date": null,
+      "type": null,
+      "title": null,
+      "topics": [],
+      "issues": [
+        "missing_frontmatter",
+        "missing_source",
+        "missing_date"
+      ]
+    },
+    {
+      "name": "2026-08-05_bridge-setup.md",
+      "size": 1328,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-05",
+      "type": "architecture",
+      "title": "Grok Web \u2194 Local CLI bridge setup",
+      "topics": [
+        "knowledge-bridge",
+        "sapphire",
+        "cli",
+        "integration"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_connector-write-ok.md",
+      "size": 668,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-cli",
+      "date": "2026-08-05",
+      "type": "ops",
+      "title": null,
+      "topics": [
+        "bridge",
+        "github-connector",
+        "write-probe"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_fleet-win-recovery-handoff.md",
+      "size": 10722,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-05",
+      "type": "status",
+      "title": "Fleet + Win recovery handoff (evening CLI log)",
+      "topics": [
+        "handoff",
+        "windows",
+        "fleet",
+        "plant",
+        "free-reign",
+        "telegram",
+        "knowledge-bridge"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_local-export_grok-all-queries.md",
+      "size": 33914,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "catalog",
+      "title": null,
+      "topics": [],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_local-export_grok-chat-catalog.md",
+      "size": 11032,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "catalog",
+      "title": null,
+      "topics": [],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_local-export_plant-alpha.md",
+      "size": 1590,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "plant-status",
+      "title": null,
+      "topics": [
+        "alpha",
+        "free-reign",
+        "plant-deck",
+        "executor",
+        "risk-snapshot"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_master-handoff-claude-opus.md",
+      "size": 9909,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "handoff",
+      "title": "Master handoff Claude Opus",
+      "topics": [
+        "claude",
+        "plant",
+        "free-reign"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_megaeth-moss-status.md",
+      "size": 517,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "status",
+      "title": "MegaETH MOSS status",
+      "topics": [
+        "moss",
+        "megaeth"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_repo-consolidation.md",
+      "size": 3012,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "ops",
+      "title": "Repo consolidation",
+      "topics": [
+        "repo",
+        "consolidation"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_session-wrap-grok.md",
+      "size": 2076,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "grok-cli",
+      "date": "2026-08-05",
+      "type": "ops",
+      "title": "Session wrap Grok",
+      "topics": [
+        "session",
+        "wrap"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-05_tg-terminal-oss-mine.md",
+      "size": 4532,
+      "mtime_utc": "2026-08-06T15:59:43Z",
+      "has_frontmatter": true,
+      "source": "local-export",
+      "date": "2026-08-05",
+      "type": "research",
+      "title": "TG terminal OSS mine",
+      "topics": [
+        "telegram",
+        "oss"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_alpha-scour-merge.md",
+      "size": 15167,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "alpha-scour",
+      "title": "Alpha scour \u2192 Sapphire merge (most recent first)",
+      "topics": [
+        "trading",
+        "automation",
+        "bridge",
+        "sapphire-merge"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_gcp-cloudshell-ultimate-handoff.md",
+      "size": 2284,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "handoff",
+      "title": "GCP Cloud Shell ultimate handoff (pointer)",
+      "topics": [
+        "gcp",
+        "cloud-shell",
+        "masterplan",
+        "data-plane",
+        "fences",
+        "alpha"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_grok-bridge-lane-tools.md",
+      "size": 1151,
+      "mtime_utc": "2026-08-06T15:59:27Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "ops",
+      "title": "Grok bridge monorepo tools + Claude plant checklist",
+      "topics": [
+        "bridge",
+        "densify",
+        "ralph",
+        "monorepo-tools"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-06_windows-datacenter-masterplan.md",
+      "size": 2318,
+      "mtime_utc": "2026-08-06T15:56:49Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-06",
+      "type": "masterplan",
+      "title": "Windows private datacenter master plan + Gemini Cloud Shell prompt",
+      "topics": [
+        "windows",
+        "datacenter",
+        "harnesses",
+        "gemini",
+        "cloud-shell",
+        "alpha",
+        "free-reign"
+      ],
+      "issues": []
+    }
+  ],
+  "plant_sync": {
+    "monorepo_script": "scripts/ops/sync_grok_web_exports.sh",
+    "plant_wrapper": "~/ops-state/finish-line/scripts/sync_grok_web_exports.sh",
+    "inbox": "~/Knowledge/0-Inbox/grok-web/",
+    "deck": "http://127.0.0.1:8100/"
+  },
+  "ok": false
+}

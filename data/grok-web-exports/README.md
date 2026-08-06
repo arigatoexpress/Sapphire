@@ -1,37 +1,81 @@
-# Grok Web ↔ Local CLI Knowledge Bridge
+# Grok Web ↔ Local Plant Knowledge Bridge
 
-This folder is the **shared store** that lets Grok web (chat, research, trade ideas, architecture notes) and the local Grok CLI / densify / Ralph loop exchange knowledge without manual copy-paste.
+Shared, versioned store so **Grok web**, **Claude/Codex on plant**, and **Gemini on Cloud Shell** exchange knowledge without manual copy-paste.
 
-## Purpose
+## Pipeline
 
-- **Web → Local**: High-value outputs from Grok web sessions are pushed here as timestamped Markdown files.
-- **Local → Web** (optional, phase 2): Local densified plant reports, new research notes, or operator summaries can be pushed back under the same path (or a `local-exports/` sibling) so the web agents stay current with plant state.
+```text
+Grok web / Cloud Shell / agents
+        │  web-export: … commits
+        ▼
+data/grok-web-exports/*.md   ← this folder (git truth)
+        │  sync_grok_web_exports.sh
+        ▼
+~/Knowledge/0-Inbox/grok-web/
+        │  densify / Ralph / overnight
+        ▼
+publish_operator_feeds.py → plant deck :8100 / API :8099
+```
+
+## Scripts (monorepo)
+
+| Script | Purpose |
+|---|---|
+| [`scripts/ops/sync_grok_web_exports.sh`](../../scripts/ops/sync_grok_web_exports.sh) | Copy new/changed exports → Knowledge inbox (never deletes sources) |
+| [`scripts/ops/grok_bridge_status.py`](../../scripts/ops/grok_bridge_status.py) | Inventory + frontmatter check + optional `MANIFEST.json` |
+
+Plant may still wrap via:
+
+```bash
+bash ~/ops-state/finish-line/scripts/sync_grok_web_exports.sh
+# should call or mirror the monorepo script after Claude densifies
+```
 
 ## Conventions
 
 | Item | Rule |
 |------|------|
-| Filename | `YYYY-MM-DD_HHMM_topic-slug.md` or `YYYY-MM-DD_topic-slug.md` |
-| Commit message | `web-export: <short description> [YYYY-MM-DD]` or `local-export: ...` |
-| Frontmatter | Optional YAML with `source`, `date`, `topics`, `type` (trade-idea, research, architecture, chat-summary, etc.) |
-| Content | Clean Markdown. Prefer structured sections over raw chat dumps. |
+| Filename | `YYYY-MM-DD_topic-slug.md` (optional `HHMM_`) |
+| Commit | `web-export: <desc> [YYYY-MM-DD]` or `local-export: …` |
+| Frontmatter | `source`, `date`, `topics`, `type`, optional `title` |
+| Content | Clean Markdown; structured sections over raw dumps |
+| Staging | **Never** `git add -A` — stage explicit paths only |
 
-## Local Consumption
+### Recommended frontmatter
 
-Recommended local flow (implemented by a free-reign / Ralph loop):
+```yaml
+---
+source: grok-web   # or: local-export | grok-cli | cloud-shell | claude-plant
+date: 2026-08-06
+type: architecture # research | handoff | alpha | ops | plant-status | masterplan
+topics: [bridge, free-reign]
+title: Short title
+---
+```
 
-1. `git pull` (or sparse-checkout of `data/grok-web-exports/`) inside the Sapphire clone.
-2. Copy new or changed `.md` files into `~/Knowledge/0-Inbox/grok-web/`.
-3. Trigger densify / plant / Ralph processing on the inbox folder.
-4. (Optional) After densify, push any new local knowledge back here.
+### Structured trade ideas (when applicable)
+
+`instrument` · `venue` · `size` · `thesis` · `falsifier` · `confidence` · `horizon` · `risk notes`
+
+## Status
+
+```bash
+python3 scripts/ops/grok_bridge_status.py
+python3 scripts/ops/grok_bridge_status.py --write-manifest
+bash scripts/ops/sync_grok_web_exports.sh --dry-run
+bash scripts/ops/sync_grok_web_exports.sh --pull   # on plant
+```
+
+Lane coordination: [`docs/handoffs/GROK-BRIDGE-LANE-STATUS-2026-08-06.md`](../../docs/handoffs/GROK-BRIDGE-LANE-STATUS-2026-08-06.md)
 
 ## Why this path?
 
-Per `STRUCTURE.md`, `data/` is the correct home for tracked reference data. Hot runtime state stays gitignored. This keeps the bridge inside the existing monorepo instead of a separate private repo.
+Per `STRUCTURE.md`, `data/` holds tracked reference data. Hot runtime stays gitignored. Sparse-checkout friendly monorepo source of truth — not a second private repo.
 
 ## Complementary stores
 
-- **Google Drive**: External news ingest, long-form reports, media assets (via daily-holistic-ingest skill).
-- **Notion** (optional): Structured trade idea DB, status boards.
+- **Google Drive** — long-form reports / media
+- **Notion** — human boards (optional)
+- **ops-state** — live free-reign, killswitch, finish-line (not git-only)
 
-Git remains the zero-manual, versioned, bidirectional bridge for knowledge that both sides need.
+Git remains the zero-manual, versioned bridge for knowledge both sides need.

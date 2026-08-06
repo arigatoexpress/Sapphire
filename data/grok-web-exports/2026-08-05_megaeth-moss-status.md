@@ -1,3 +1,11 @@
+---
+source: local-export
+date: 2026-08-05
+type: status
+topics: [moss, megaeth]
+title: MegaETH MOSS status
+---
+
 # MegaETH / MOSS status — 2026-08-05T23:11Z
 
 - **wallet:** `0xeeba5ae287aed5a3a36b5d8e6caff94993690322`

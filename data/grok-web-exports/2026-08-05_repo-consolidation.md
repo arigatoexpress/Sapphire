@@ -1,3 +1,11 @@
+---
+source: local-export
+date: 2026-08-05
+type: ops
+topics: [repo, consolidation]
+title: Repo consolidation
+---
+
 # Repo consolidation map — 2026-08-05
 
 **Goal:** one brain (Sapphire + ops-state), fewer zombie clones, archive over delete.

@@ -1,3 +1,11 @@
+---
+source: local-export
+date: 2026-08-05
+type: handoff
+topics: [claude, plant, free-reign]
+title: Master handoff Claude Opus
+---
+
 # MASTER HANDOFF — Claude Opus
 
 **Generated:** 2026-08-05T23:20Z · **Author:** Grok 4.5 (local) after Claude/Codex credit exhaustion  

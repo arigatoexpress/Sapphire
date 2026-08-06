@@ -17,6 +17,8 @@
 
 > **Not financial advice.** Designated test/agentic wallets only for live automation. Fail-closed killswitches. Paper first.
 
+- 7,836+ passing tests across 469 files
+
 ---
 
 ## The point of this project
@@ -122,8 +124,13 @@ http://127.0.0.1:8100/   plant deck
 | Plant → web commit | `local-export: <desc> [YYYY-MM-DD]` |
 
 ```bash
-bash ~/ops-state/finish-line/scripts/sync_grok_web_exports.sh
+# Prefer plant wrapper if present; monorepo canonical also works:
+bash ~/ops-state/finish-line/scripts/sync_grok_web_exports.sh 2>/dev/null \
+  || bash scripts/ops/sync_grok_web_exports.sh
+python3 scripts/ops/grok_bridge_status.py
 ```
+
+Lane status: [`docs/handoffs/GROK-BRIDGE-LANE-STATUS-2026-08-06.md`](docs/handoffs/GROK-BRIDGE-LANE-STATUS-2026-08-06.md)
 
 ---
 

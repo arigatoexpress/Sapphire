@@ -1,3 +1,11 @@
+---
+source: local-export
+date: 2026-08-05
+type: research
+topics: [telegram, oss]
+title: TG terminal OSS mine
+---
+
 # Mine: PenguBot · BonkBot · OSS high-alpha systems → Ari plant
 
 **Date:** 2026-08-05T23:25Z  
