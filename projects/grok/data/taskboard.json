@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-08-06T20:31:43Z",
+  "updated_at": "2026-08-07T14:03:09Z",
   "tasks": [
     {
       "id": "T-bridge-plant",
@@ -113,7 +113,7 @@
       "priority": 1,
       "status": "done",
       "done_when": "plant free-reign calls evaluate_proposal",
-      "completed_at": "2026-08-06T20:31:43Z"
+      "completed_at": "2026-08-07T14:03:09Z"
     },
     {
       "id": "T-wire-genome-closes",
@@ -122,7 +122,7 @@
       "priority": 1,
       "status": "done",
       "done_when": "outcomes wins/losses non-zero from real closes",
-      "completed_at": "2026-08-06T20:31:43Z"
+      "completed_at": "2026-08-07T14:03:09Z"
     },
     {
       "id": "T-win-post-boot",
@@ -137,8 +137,9 @@
       "title": "Plant: reload rh-executor so gate_order is live in process",
       "lane": "plant",
       "priority": 1,
-      "status": "todo",
-      "done_when": "executor process running wired executor.py"
+      "status": "done",
+      "done_when": "executor process running wired executor.py",
+      "completed_at": "2026-08-07T14:03:09Z"
     },
     {
       "id": "T-telemetry-desk",
@@ -152,7 +153,7 @@
   "stats": {
     "static_done": 9,
     "static_open": 3,
-    "dynamic_open": 3,
+    "dynamic_open": 2,
     "signals": {
       "monorepo_bridge_tools_ok": true,
       "policy_tests_ok": true,
@@ -163,14 +164,16 @@
       "streamline_ok": true,
       "bridge_local_export_seen": true,
       "gate_wired": true,
-      "genome_wired": true
+      "genome_wired": true,
+      "executor_reloaded": true,
+      "desk_fresh": false
     }
   },
   "next_actions": [
-    "T-executor-reload: Plant: reload rh-executor so gate_order is live in process",
     "T-telemetry-desk: Plant: refresh desk.* on telemetry publish (lib.grok.desk_projection)",
     "T-website-dashboard: Fix sapphirealpha.xyz/dashboard empty SPA shell (~700B)",
     "T-win-post-boot: Plant/Win: run P0 acceptance; only then ARM L2 schtasks",
-    "T-gcp-cost-posture: GCP cost posture: min-instances 0, Vertex idle, BQ freshness"
+    "T-gcp-cost-posture: GCP cost posture: min-instances 0, Vertex idle, BQ freshness",
+    "T-website-evidence: Elevate Evidence Observatory story + architecture proof"
   ]
 }

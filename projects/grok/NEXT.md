@@ -1,16 +1,22 @@
-# Parallel now
+# What next — 2026-08-07 morning
 
-## Gemini (cooking)
+## Gemini
 
-MC asset MIME dual-serve + Phase 3 remainder — do not thrash.
+**Out of credits** — website data-truth UI paused. MC already paints (`00100-lok`).
 
-## NEW — Grok × Google Drive
+## Claude — PASTE NOW
 
-- Drive: [Grok Bridge](https://drive.google.com/drive/folders/1CQiAUpKC5tbK166XOKEF2SgvbDHbheoz)
-- Pack: `python3 scripts/ops/grok_drive_pack.py --write` → `data/grok-drive-pack/`
-- Doc: `docs/handoffs/GROK-DRIVE-BRIDGE-2026-08-06.md`
-- Plant: optional rclone sync of pack into Drive lanes
+`docs/handoffs/CLAUDE-MORNING-DISPATCH-2026-08-07.md`
 
-## Claude (quota)
+1. **P0** Telemetry desk quality (`desk_projection`) — fields still `unknown`  
+2. **P1** Drive pack sync  
+3. Confirm Win executor RH-login hang (Ari must re-auth)
 
-Executor reload + desk telemetry refresh
+## Ari (5 min at Windows)
+
+Re-auth Robinhood for `robin_stocks` so `rh-executor` can leave the login prompt.
+Gate code is already live (`dbfb54d`).
+
+## Done yesterday
+
+Executor reload · gate_order · genome · Drive folders · MC MIME fix  

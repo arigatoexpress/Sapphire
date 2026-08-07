@@ -1,6 +1,24 @@
 {
   "blindspots": [
     {
+      "id": "BS-RH-SESSION",
+      "severity": "P0",
+      "area": "plant",
+      "title": "Windows rh-executor hung on expired robin_stocks session (interactive login)",
+      "impact": "Gated executor cannot process free-reign proposals until re-auth",
+      "fix": "Ari attended RH login on DESKTOP-HFCK6U9 console \u2014 no agent credentials",
+      "status": "needs_operator"
+    },
+    {
+      "id": "BS-GEMINI-CREDITS",
+      "severity": "P1",
+      "area": "public",
+      "title": "Gemini Cloud Shell out of credits \u2014 website data-truth UI paused",
+      "impact": "Operating-rules panel / Evidence elevation delayed",
+      "fix": "Resume when Gemini credits restore; MC already paints on 00100",
+      "status": "blocked"
+    },
+    {
       "id": "BS-GEMINI-P3-PARTIAL",
       "severity": "P1",
       "area": "public",
@@ -31,10 +49,10 @@
       "id": "BS-EXECUTOR-DEPLOY",
       "severity": "P0",
       "area": "plant",
-      "title": "gate_order wired in Mac source \u2014 live rh-executor schtask may still run old code",
-      "impact": "Free-reign denials not enforced until executor process reloads new executor.py",
-      "fix": "Restart/redeploy rh-executor on Mac/Win after ops-state/telegram-bot/executor.py wire",
-      "status": "open"
+      "title": "rh-executor reloaded with gate_order on Windows",
+      "impact": "Gate code live; RH session expired blocks polling until Ari re-auth",
+      "fix": "Ari: attended RH re-auth on Win console; then confirm process_once loop",
+      "status": "resolved_plant"
     },
     {
       "id": "BS-GENOME-BROKER-PX",
@@ -110,12 +128,12 @@
     },
     {
       "id": "BS-DASHBOARD-SPA",
-      "severity": "P0",
+      "severity": "P1",
       "area": "public",
-      "title": "MC blank: /dashboard/assets/*.js served as text/html SPA shell",
-      "impact": "Mission Control does not paint despite 00096 deploy",
-      "fix": "Dual-serve /dashboard/assets and /assets from dist; never HTML for *.js",
-      "status": "open"
+      "title": "MC assets fixed on 00100; data-truth UI still pending Gemini credits",
+      "impact": "SPA paints; desk/trading panels still sparse by architecture",
+      "fix": "Claude desk refresh + Gemini data-truth when credits return",
+      "status": "code_fixed_deploy_pending"
     },
     {
       "id": "BS-MAC-WIN-SYNC",
@@ -304,30 +322,30 @@
     }
   ],
   "scoreboard": {
-    "count": 28,
+    "count": 30,
     "by_severity": {
-      "P1": 14,
       "P0": 7,
+      "P1": 16,
       "P2": 7
     },
     "by_status": {
+      "needs_operator": 1,
+      "blocked": 2,
       "in_progress": 2,
-      "open": 14,
+      "open": 12,
+      "resolved_plant": 4,
       "recommended_accept": 1,
-      "resolved_plant": 3,
       "encoded": 3,
+      "code_fixed_deploy_pending": 1,
       "partial": 1,
       "policy_ready_plant_pending": 1,
-      "blocked": 1,
       "documented": 1,
       "research": 1
     },
     "open_p0": [
       "BS-PUBLIC-DESK-STALE",
-      "BS-EXECUTOR-DEPLOY",
       "BS-WIN-P0",
-      "BS-MOSS-GRANT",
-      "BS-DASHBOARD-SPA"
+      "BS-MOSS-GRANT"
     ],
     "gcp_leverage_top": [
       "Deploy dashboard SPA fix (no-traffic \u2192 verify JS MIME \u2192 traffic)",

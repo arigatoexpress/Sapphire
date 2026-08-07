@@ -7,6 +7,24 @@ from typing import Any
 # Severity: P0 blocks earn/safety · P1 blocks learning/ops · P2 polish
 BLINDSPOTS: list[dict[str, Any]] = [
     {
+        "id": "BS-RH-SESSION",
+        "severity": "P0",
+        "area": "plant",
+        "title": "Windows rh-executor hung on expired robin_stocks session (interactive login)",
+        "impact": "Gated executor cannot process free-reign proposals until re-auth",
+        "fix": "Ari attended RH login on DESKTOP-HFCK6U9 console — no agent credentials",
+        "status": "needs_operator",
+    },
+    {
+        "id": "BS-GEMINI-CREDITS",
+        "severity": "P1",
+        "area": "public",
+        "title": "Gemini Cloud Shell out of credits — website data-truth UI paused",
+        "impact": "Operating-rules panel / Evidence elevation delayed",
+        "fix": "Resume when Gemini credits restore; MC already paints on 00100",
+        "status": "blocked",
+    },
+    {
         "id": "BS-GEMINI-P3-PARTIAL",
         "severity": "P1",
         "area": "public",
@@ -37,10 +55,10 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "id": "BS-EXECUTOR-DEPLOY",
         "severity": "P0",
         "area": "plant",
-        "title": "gate_order wired in Mac source — live rh-executor schtask may still run old code",
-        "impact": "Free-reign denials not enforced until executor process reloads new executor.py",
-        "fix": "Restart/redeploy rh-executor on Mac/Win after ops-state/telegram-bot/executor.py wire",
-        "status": "open",
+        "title": "rh-executor reloaded with gate_order on Windows",
+        "impact": "Gate code live; RH session expired blocks polling until Ari re-auth",
+        "fix": "Ari: attended RH re-auth on Win console; then confirm process_once loop",
+        "status": "resolved_plant",
     },
     {
         "id": "BS-GENOME-BROKER-PX",
@@ -116,12 +134,12 @@ BLINDSPOTS: list[dict[str, Any]] = [
     },
     {
         "id": "BS-DASHBOARD-SPA",
-        "severity": "P0",
+        "severity": "P1",
         "area": "public",
-        "title": "MC blank: /dashboard/assets/*.js served as text/html SPA shell",
-        "impact": "Mission Control does not paint despite 00096 deploy",
-        "fix": "Dual-serve /dashboard/assets and /assets from dist; never HTML for *.js",
-        "status": "open",
+        "title": "MC assets fixed on 00100; data-truth UI still pending Gemini credits",
+        "impact": "SPA paints; desk/trading panels still sparse by architecture",
+        "fix": "Claude desk refresh + Gemini data-truth when credits return",
+        "status": "code_fixed_deploy_pending",
     },
     {
         "id": "BS-MAC-WIN-SYNC",
@@ -319,7 +337,7 @@ def blindspot_scoreboard() -> dict[str, Any]:
     for b in BLINDSPOTS:
         by_sev[b["severity"]] = by_sev.get(b["severity"], 0) + 1
         by_status[b["status"]] = by_status.get(b["status"], 0) + 1
-    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending", "resolved_plant", "needs_operator_decision", "recommended_accept")]
+    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending", "resolved_plant", "needs_operator_decision", "recommended_accept", "needs_operator", "blocked")]
     return {
         "count": len(BLINDSPOTS),
         "by_severity": by_sev,

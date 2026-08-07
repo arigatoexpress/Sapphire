@@ -1,13 +1,14 @@
 # Sapphire × Grok — System Brief
 
-_Generated: 2026-08-06T20:14:51Z_
+_Generated: 2026-08-07T14:03:09Z_
 
 **Streamline score:** 8/8 (1.0)
 
 ## Next actions
 
 - Plant: keep 30m grok-web-bridge LaunchAgent green
-- Plant: reload rh-executor so gate_order is live in process
+- Plant: free-reign gate loaded — Ari RH re-auth if hung on login; then monitor denials
+- Plant: fill desk.* via lib.grok.desk_projection (posture not stuck unknown)
 - Plant: upgrade genome to source=broker when fill prices available
 - Win: run P0 acceptance before ARM L2
 - Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)
@@ -34,21 +35,22 @@ _Generated: 2026-08-06T20:14:51Z_
 
 ```json
 {
-  "export_count": 38,
+  "export_count": 41,
   "by_day": {
     "2026-08-04": 1,
     "2026-08-05": 12,
-    "2026-08-06": 25
+    "2026-08-06": 27,
+    "2026-08-07": 1
   },
   "latest": [
-    "2026-08-06_local-export_genome-closes-wired.md",
     "2026-08-06_lunch-autonomous-progress.md",
     "2026-08-06_operator-accept-gate-scope.md",
     "2026-08-06_plant-wire-receipt.md",
     "2026-08-06_public-trading-data-truth.md",
     "2026-08-06_system-brief.md",
     "2026-08-06_while-gemini-phase3.md",
-    "2026-08-06_windows-datacenter-masterplan.md"
+    "2026-08-06_windows-datacenter-masterplan.md",
+    "2026-08-07_claude-morning-gemini-out.md"
   ],
   "plant_wired": true,
   "mac_bridge_note": true,
@@ -56,7 +58,7 @@ _Generated: 2026-08-06T20:14:51Z_
   "plant_wire_receipt": true,
   "gate_wired": true,
   "genome_wired": true,
-  "executor_reloaded": false,
+  "executor_reloaded": true,
   "gate_scope_accepted": true
 }
 ```
@@ -103,8 +105,9 @@ _Generated: 2026-08-06T20:14:51Z_
 
 ## Automations
 
-- catalog: {'count': 13, 'by_status': {'live': 7, 'monorepo_ready_plant_pending': 1, 'paper_only_not_armed_until_p0': 1, 'read_only': 1, 'dry_run_default': 1, 'plant': 1, 'policy_in_monorepo': 1}} · resolved_in_repo: 11
+- catalog: {'count': 14, 'by_status': {'live': 8, 'monorepo_ready_plant_pending': 1, 'paper_only_not_armed_until_p0': 1, 'read_only': 1, 'dry_run_default': 1, 'plant': 1, 'policy_in_monorepo': 1}} · resolved_in_repo: 12
 
+- ✓ `grok-drive-pack` `live` — scripts/ops/grok_drive_pack.py
 - ✓ `grok-system-streamline` `live` — scripts/ops/grok_system_streamline.py
 - ✓ `grok-mac-bridge-http` `live` — services/grok-bridge/
 - ✓ `grok-web-bridge-launchagent` `live` — infra/launchagents/com.sapphire.grok-web-bridge.plist
@@ -116,11 +119,10 @@ _Generated: 2026-08-06T20:14:51Z_
 - ✓ `win-research-worker` `paper_only_not_armed_until_p0` — scripts/windows_setup/run_research_worker.ps1
 - ✓ `win-tv-agent` `read_only` — scripts/windows_setup/start_tv_agent.ps1
 - ✓ `gemini-ooda-daily` `dry_run_default` — infra/launchagents/com.sapphire.gemini-ooda-daily.plist
-- · `ralph-densify` `plant` — ops-state densify/Ralph loops
 
 ## Blindspots
 
-- scoreboard: `{'count': 28, 'by_severity': {'P1': 14, 'P0': 7, 'P2': 7}, 'by_status': {'in_progress': 2, 'open': 14, 'recommended_accept': 1, 'resolved_plant': 3, 'encoded': 3, 'partial': 1, 'policy_ready_plant_pending': 1, 'blocked': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-PUBLIC-DESK-STALE', 'BS-EXECUTOR-DEPLOY', 'BS-WIN-P0', 'BS-MOSS-GRANT', 'BS-DASHBOARD-SPA'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
+- scoreboard: `{'count': 30, 'by_severity': {'P0': 7, 'P1': 16, 'P2': 7}, 'by_status': {'needs_operator': 1, 'blocked': 2, 'in_progress': 2, 'open': 12, 'resolved_plant': 4, 'recommended_accept': 1, 'encoded': 3, 'code_fixed_deploy_pending': 1, 'partial': 1, 'policy_ready_plant_pending': 1, 'documented': 1, 'research': 1}, 'open_p0': ['BS-PUBLIC-DESK-STALE', 'BS-WIN-P0', 'BS-MOSS-GRANT'], 'gcp_leverage_top': ['Deploy dashboard SPA fix (no-traffic → verify JS MIME → traffic)', 'Cloud Run min-instances=0 + right-size memory', 'BQ warehouse for paper outcomes + regime digests (batch SQL)']}`
 
 ## Playbooks
 

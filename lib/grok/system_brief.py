@@ -249,7 +249,11 @@ def build_system_brief() -> dict[str, Any]:
     elif not bridge.get("executor_reloaded"):
         next_actions.append("Plant: reload rh-executor so gate_order is live in process")
     else:
-        next_actions.append("Plant: free-reign gate live — monitor denials in executor logs")
+        next_actions.append("Plant: free-reign gate loaded — Ari RH re-auth if hung on login; then monitor denials")
+    if not any((ROOT / "data/grok-web-exports").glob("*telemetry-desk*")) and not any(
+        (ROOT / "data/grok-web-exports").glob("*desk-refresh*")
+    ):
+        next_actions.append("Plant: fill desk.* via lib.grok.desk_projection (posture not stuck unknown)")
     if not bridge.get("genome_wired"):
         next_actions.append("Plant: wire record_closed_trade on full lot closes")
     else:

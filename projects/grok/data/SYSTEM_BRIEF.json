@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-06T20:14:51Z",
+  "generated_at": "2026-08-07T14:03:09Z",
   "streamline": {
     "score": 8,
     "max": 8,
@@ -160,21 +160,22 @@
     ]
   },
   "bridge": {
-    "export_count": 38,
+    "export_count": 41,
     "by_day": {
       "2026-08-04": 1,
       "2026-08-05": 12,
-      "2026-08-06": 25
+      "2026-08-06": 27,
+      "2026-08-07": 1
     },
     "latest": [
-      "2026-08-06_local-export_genome-closes-wired.md",
       "2026-08-06_lunch-autonomous-progress.md",
       "2026-08-06_operator-accept-gate-scope.md",
       "2026-08-06_plant-wire-receipt.md",
       "2026-08-06_public-trading-data-truth.md",
       "2026-08-06_system-brief.md",
       "2026-08-06_while-gemini-phase3.md",
-      "2026-08-06_windows-datacenter-masterplan.md"
+      "2026-08-06_windows-datacenter-masterplan.md",
+      "2026-08-07_claude-morning-gemini-out.md"
     ],
     "plant_wired": true,
     "mac_bridge_note": true,
@@ -182,14 +183,14 @@
     "plant_wire_receipt": true,
     "gate_wired": true,
     "genome_wired": true,
-    "executor_reloaded": false,
+    "executor_reloaded": true,
     "gate_scope_accepted": true
   },
   "automations": {
     "summary": {
-      "count": 13,
+      "count": 14,
       "by_status": {
-        "live": 7,
+        "live": 8,
         "monorepo_ready_plant_pending": 1,
         "paper_only_not_armed_until_p0": 1,
         "read_only": 1,
@@ -198,8 +199,15 @@
         "policy_in_monorepo": 1
       }
     },
-    "resolved_in_repo": 11,
+    "resolved_in_repo": 12,
     "items": [
+      {
+        "id": "grok-drive-pack",
+        "path": "scripts/ops/grok_drive_pack.py",
+        "status": "live",
+        "exists_in_repo": true,
+        "action": "Build sanitized Drive pack \u2192 Sapphire/Grok Bridge folders"
+      },
       {
         "id": "grok-system-streamline",
         "path": "scripts/ops/grok_system_streamline.py",
@@ -417,7 +425,8 @@
   "alpha_item_count": 37,
   "next_actions": [
     "Plant: keep 30m grok-web-bridge LaunchAgent green",
-    "Plant: reload rh-executor so gate_order is live in process",
+    "Plant: free-reign gate loaded \u2014 Ari RH re-auth if hung on login; then monitor denials",
+    "Plant: fill desk.* via lib.grok.desk_projection (posture not stuck unknown)",
     "Plant: upgrade genome to source=broker when fill prices available",
     "Win: run P0 acceptance before ARM L2",
     "Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)",
@@ -425,30 +434,30 @@
     "GCP: cost posture min-instances=0 + Vertex idle skim"
   ],
   "blindspots": {
-    "count": 28,
+    "count": 30,
     "by_severity": {
-      "P1": 14,
       "P0": 7,
+      "P1": 16,
       "P2": 7
     },
     "by_status": {
+      "needs_operator": 1,
+      "blocked": 2,
       "in_progress": 2,
-      "open": 14,
+      "open": 12,
+      "resolved_plant": 4,
       "recommended_accept": 1,
-      "resolved_plant": 3,
       "encoded": 3,
+      "code_fixed_deploy_pending": 1,
       "partial": 1,
       "policy_ready_plant_pending": 1,
-      "blocked": 1,
       "documented": 1,
       "research": 1
     },
     "open_p0": [
       "BS-PUBLIC-DESK-STALE",
-      "BS-EXECUTOR-DEPLOY",
       "BS-WIN-P0",
-      "BS-MOSS-GRANT",
-      "BS-DASHBOARD-SPA"
+      "BS-MOSS-GRANT"
     ],
     "gcp_leverage_top": [
       "Deploy dashboard SPA fix (no-traffic \u2192 verify JS MIME \u2192 traffic)",

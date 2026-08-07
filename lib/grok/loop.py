@@ -222,6 +222,11 @@ def tick(
             }
         )
         existing_ids.add("T-telemetry-desk")
+    if signals.get("executor_reloaded"):
+        for dyn in extras:
+            if dyn.get("id") == "T-executor-reload":
+                dyn["status"] = "done"
+                dyn["completed_at"] = _utc()
     if signals.get("desk_fresh"):
         for dyn in extras:
             if dyn.get("id") == "T-telemetry-desk":

@@ -89,6 +89,10 @@ def _detect_signals() -> dict:
         exp.glob("*gate_order*wired*")
     )
     signals["genome_wired"] = any(exp.glob("*genome-closes-wired*"))
+    signals["executor_reloaded"] = any(exp.glob("*executor-reload*"))
+    signals["desk_fresh"] = any(exp.glob("*telemetry-desk*")) or any(
+        exp.glob("*desk-refresh*")
+    )
 
     return signals
 
