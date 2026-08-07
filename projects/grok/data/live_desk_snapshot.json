@@ -1,0 +1,66 @@
+{
+  "status": "live",
+  "freshness_s": 25.5,
+  "desk": {
+    "posture": "capital_preservation",
+    "execution": "gated",
+    "updated_at": "2026-08-07T14:19:20+00:00",
+    "leader": "unknown",
+    "epistemics": {
+      "fresh": true,
+      "regime": {
+        "label": "unknown",
+        "fit": null,
+        "data_quality": null,
+        "drivers": [
+          "specialist=apex_flow, directive=easy_mode_trade"
+        ]
+      },
+      "thesis": null,
+      "learning": {
+        "status": "unavailable",
+        "open": null,
+        "resolved": null,
+        "mean_brier": null,
+        "accuracy": null,
+        "lessons": 0,
+        "updated_ts": 1786112360.132
+      }
+    },
+    "autonomy": {
+      "desired": "on",
+      "active": true,
+      "new_entries": "available",
+      "reason": "free_reign:easy, L2 cap $10.0"
+    },
+    "safety_floor": {
+      "gate_valid": true,
+      "pause_clear": true,
+      "ledger": "unknown",
+      "bounded_policy": true
+    },
+    "risk": {
+      "ledger_state": "unknown",
+      "realized_drawdown_pct": null,
+      "drawdown_limit_pct": null,
+      "budget_remaining_pct": null,
+      "new_risk": "unknown"
+    }
+  },
+  "markets": {
+    "network": "Robinhood Chain",
+    "status": "current",
+    "feed_age_s": 26.155,
+    "events_per_min": 601.0,
+    "paper_strategies": null,
+    "decision_gate": "unknown",
+    "execution": "unknown"
+  },
+  "summary": {
+    "state": "observing",
+    "active_agents": 5,
+    "events_per_min": null,
+    "verified_today": null,
+    "attention": null
+  }
+}

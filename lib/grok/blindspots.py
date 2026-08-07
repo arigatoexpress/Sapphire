@@ -35,12 +35,12 @@ BLINDSPOTS: list[dict[str, Any]] = [
     },
     {
         "id": "BS-PUBLIC-DESK-STALE",
-        "severity": "P0",
+        "severity": "P1",
         "area": "public",
-        "title": "Public /api/v1/live desk block stale/unknown — trading UI looks empty",
-        "impact": "Users think system has no trading data; markets epm high while desk null",
-        "fix": "Plant telemetry desk refresh + Gemini UI stale honesty + operating rules",
-        "status": "open",
+        "title": "Public desk now capital_preservation/gated — refine regime/thesis + Gemini UI",
+        "impact": "Core empty-desk bug improved; regime still unknown; UI data-truth pending Gemini credits",
+        "fix": "Claude formal export + enrich epistemics; Gemini data-truth when credits return",
+        "status": "partial",
     },
     {
         "id": "BS-PUBLIC-WIDGETS-GATE",

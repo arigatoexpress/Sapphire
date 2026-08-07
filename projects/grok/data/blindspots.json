@@ -29,12 +29,12 @@
     },
     {
       "id": "BS-PUBLIC-DESK-STALE",
-      "severity": "P0",
+      "severity": "P1",
       "area": "public",
-      "title": "Public /api/v1/live desk block stale/unknown \u2014 trading UI looks empty",
-      "impact": "Users think system has no trading data; markets epm high while desk null",
-      "fix": "Plant telemetry desk refresh + Gemini UI stale honesty + operating rules",
-      "status": "open"
+      "title": "Public desk now capital_preservation/gated \u2014 refine regime/thesis + Gemini UI",
+      "impact": "Core empty-desk bug improved; regime still unknown; UI data-truth pending Gemini credits",
+      "fix": "Claude formal export + enrich epistemics; Gemini data-truth when credits return",
+      "status": "partial"
     },
     {
       "id": "BS-PUBLIC-WIDGETS-GATE",
@@ -324,26 +324,25 @@
   "scoreboard": {
     "count": 30,
     "by_severity": {
-      "P0": 7,
-      "P1": 16,
+      "P0": 6,
+      "P1": 17,
       "P2": 7
     },
     "by_status": {
       "needs_operator": 1,
       "blocked": 2,
       "in_progress": 2,
-      "open": 12,
+      "partial": 2,
+      "open": 11,
       "resolved_plant": 4,
       "recommended_accept": 1,
       "encoded": 3,
       "code_fixed_deploy_pending": 1,
-      "partial": 1,
       "policy_ready_plant_pending": 1,
       "documented": 1,
       "research": 1
     },
     "open_p0": [
-      "BS-PUBLIC-DESK-STALE",
       "BS-WIN-P0",
       "BS-MOSS-GRANT"
     ],

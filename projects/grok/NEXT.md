@@ -1,22 +1,20 @@
-# What next — 2026-08-07 morning
+# What next — desk fields greening
+
+## Claude (running)
+
+Morning P0 desk_projection — **live already shows** posture=`capital_preservation`, execution=`gated`.  
+Finish: formal local-export + Drive pack sync.
+
+## Ari
+
+**RH re-auth** on DESKTOP-HFCK6U9 so rh-executor leaves login hang. Gate code already live.
 
 ## Gemini
 
-**Out of credits** — website data-truth UI paused. MC already paints (`00100-lok`).
+Credits out — pause. MC paints on 00100.
 
-## Claude — PASTE NOW
+## Open after Claude export
 
-`docs/handoffs/CLAUDE-MORNING-DISPATCH-2026-08-07.md`
-
-1. **P0** Telemetry desk quality (`desk_projection`) — fields still `unknown`  
-2. **P1** Drive pack sync  
-3. Confirm Win executor RH-login hang (Ari must re-auth)
-
-## Ari (5 min at Windows)
-
-Re-auth Robinhood for `robin_stocks` so `rh-executor` can leave the login prompt.
-Gate code is already live (`dbfb54d`).
-
-## Done yesterday
-
-Executor reload · gate_order · genome · Drive folders · MC MIME fix  
+- Enrich regime/thesis if plant has real sources  
+- Win P0 probes (no L2 ARM)  
+- Gemini data-truth UI when credits return  
