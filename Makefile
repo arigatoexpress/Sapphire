@@ -3,7 +3,7 @@
 PY ?= /usr/local/bin/python3
 RUFF ?= ruff
 PYTEST ?= $(PY) -m pytest
-GOOGLE_PROJECT ?= tho-ai-agent
+GOOGLE_PROJECT ?= sapphire-479610
 GOOGLE_REGION ?= us-central1
 GOOGLE_MEMBERSHIPS ?= google_developer_premium google_ai_plus
 GOOGLE_MEMBERSHIP_ARGS = $(foreach membership,$(GOOGLE_MEMBERSHIPS),--membership $(membership))
