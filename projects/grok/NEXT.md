@@ -1,18 +1,16 @@
-# What next — 2026-08-07
+# What next — Option A RH re-auth live
 
-## You (phone, away from home)
+## Claude Dispatch
 
-1. Paste remote RH re-auth to Claude:  
-   `docs/handoffs/CLAUDE-REMOTE-RH-REAUTH-2026-08-07.md`
-2. Reply **`APPROVE RH REAUTH`** when asked  
-3. Relay MFA/device-approve when asked  
-4. Prefer **not** sending RH password over Telegram  
+1. Spawn **Mac code agent** for remote RH re-auth (Option A)  
+2. Wait for Ari: **`APPROVE RH REAUTH`**  
+3. Pause for MFA code when needed  
+4. Parallel: desk P0 agent  
 
-## Claude parallel
+## Ari (phone)
 
-- Desk P0 (already greening live)  
-- Remote RH re-auth (new)  
-- Drive pack when free  
+Send Claude: **`APPROVE RH REAUTH`**  
+Then MFA when asked. Prefer not sending RH password over chat.
 
 ## Gemini
 

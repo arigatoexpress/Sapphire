@@ -197,3 +197,16 @@ Find rh_login_pickle_only (or plant equivalent), backup pickle, login, restart r
 | Verifying poll loop after | "Just disable auth" |
 
 Telegram is for **approval + MFA relay**, not a password vault.
+
+
+---
+
+## Dispatch / sandbox note (2026-08-07)
+
+Claude **Dispatch** may not hold interactive SSH itself. **Option A (approved):**
+spawn a **Mac code agent / Claude Code task** with Tailscale SSH to Windows.
+
+Ari approval phrase (this chat or Telegram): **`APPROVE RH REAUTH`**
+
+When MFA needed: agent pauses → Ari sends **one** 6-digit (or app) code → agent continues.
+Never log password or MFA into git/densify. Desk P0 continues in parallel.
