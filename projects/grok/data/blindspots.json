@@ -6,8 +6,8 @@
       "area": "plant",
       "title": "Windows rh-executor hung on expired robin_stocks session (interactive login)",
       "impact": "Gated executor cannot process free-reign proposals until re-auth",
-      "fix": "Ari attended RH login on DESKTOP-HFCK6U9 console \u2014 no agent credentials",
-      "status": "needs_operator"
+      "fix": "Remote: Claude Mac + Tailscale + Telegram APPROVE RH REAUTH + MFA; see CLAUDE-REMOTE-RH-REAUTH-2026-08-07.md",
+      "status": "in_progress"
     },
     {
       "id": "BS-GEMINI-CREDITS",
@@ -329,9 +329,8 @@
       "P2": 7
     },
     "by_status": {
-      "needs_operator": 1,
+      "in_progress": 3,
       "blocked": 2,
-      "in_progress": 2,
       "partial": 2,
       "open": 11,
       "resolved_plant": 4,
@@ -343,6 +342,7 @@
       "research": 1
     },
     "open_p0": [
+      "BS-RH-SESSION",
       "BS-WIN-P0",
       "BS-MOSS-GRANT"
     ],

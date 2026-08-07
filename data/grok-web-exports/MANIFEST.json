@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-08-07T14:20:18Z",
+  "generated_at": "2026-08-07T14:22:56Z",
   "export_dir": "data/grok-web-exports",
-  "count": 42,
+  "count": 43,
   "issue_count": 3,
   "by_source": {
-    "grok-web": 27,
+    "grok-web": 28,
     "unknown": 1,
     "grok-cli": 2,
     "local-export": 12
@@ -16,7 +16,7 @@
     "status": 5,
     "catalog": 2,
     "plant-status": 8,
-    "handoff": 8,
+    "handoff": 9,
     "research": 3,
     "alpha-scour": 1,
     "bridge": 1,
@@ -27,27 +27,9 @@
   "missing_required_hints": [],
   "latest": [
     {
-      "name": "2026-08-06_local-export_executor-reloaded.md",
-      "size": 6354,
-      "mtime_utc": "2026-08-07T14:19:54Z",
-      "has_frontmatter": true,
-      "source": "local-export",
-      "date": "2026-08-06",
-      "type": "plant-status",
-      "title": "local-export: rh-executor reloaded with gate_order",
-      "topics": [
-        "executor",
-        "reload",
-        "free-reign",
-        "windows",
-        "rh-executor"
-      ],
-      "issues": []
-    },
-    {
       "name": "2026-08-06_local-export_free-reign-gate-wired.md",
       "size": 6248,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -65,7 +47,7 @@
     {
       "name": "2026-08-06_local-export_genome-closes-wired.md",
       "size": 2858,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -83,7 +65,7 @@
     {
       "name": "2026-08-06_lunch-autonomous-progress.md",
       "size": 543,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -99,7 +81,7 @@
     {
       "name": "2026-08-06_operator-accept-gate-scope.md",
       "size": 414,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -115,7 +97,7 @@
     {
       "name": "2026-08-06_plant-wire-receipt.md",
       "size": 1969,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -132,7 +114,7 @@
     {
       "name": "2026-08-06_public-trading-data-truth.md",
       "size": 676,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -149,7 +131,7 @@
     {
       "name": "2026-08-06_system-brief.md",
       "size": 7002,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -167,7 +149,7 @@
     {
       "name": "2026-08-06_while-gemini-phase3.md",
       "size": 824,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -184,7 +166,7 @@
     {
       "name": "2026-08-06_windows-datacenter-masterplan.md",
       "size": 2318,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -204,7 +186,7 @@
     {
       "name": "2026-08-07_ack-desk-fields-live.md",
       "size": 790,
-      "mtime_utc": "2026-08-07T14:20:18Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-07",
@@ -220,7 +202,7 @@
     {
       "name": "2026-08-07_claude-morning-gemini-out.md",
       "size": 389,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-07",
@@ -232,13 +214,31 @@
         "plant"
       ],
       "issues": []
+    },
+    {
+      "name": "2026-08-07_remote-rh-reauth-prompt.md",
+      "size": 398,
+      "mtime_utc": "2026-08-07T14:22:56Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-07",
+      "type": "handoff",
+      "title": "Remote RH re-auth via Mac Claude + Telegram MFA",
+      "topics": [
+        "robinhood",
+        "reauth",
+        "telegram",
+        "windows",
+        "claude"
+      ],
+      "issues": []
     }
   ],
   "items": [
     {
       "name": "2026-08-04_bridge-setup.md",
       "size": 1182,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-04",
@@ -256,7 +256,7 @@
     {
       "name": "2026-08-05_alpha-learnings-axti-l2.md",
       "size": 2904,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": false,
       "source": null,
       "date": null,
@@ -272,7 +272,7 @@
     {
       "name": "2026-08-05_bridge-setup.md",
       "size": 1328,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-05",
@@ -289,7 +289,7 @@
     {
       "name": "2026-08-05_connector-write-ok.md",
       "size": 668,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-cli",
       "date": "2026-08-05",
@@ -305,7 +305,7 @@
     {
       "name": "2026-08-05_fleet-win-recovery-handoff.md",
       "size": 10722,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-05",
@@ -325,7 +325,7 @@
     {
       "name": "2026-08-05_local-export_grok-all-queries.md",
       "size": 33914,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -337,7 +337,7 @@
     {
       "name": "2026-08-05_local-export_grok-chat-catalog.md",
       "size": 11032,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -349,7 +349,7 @@
     {
       "name": "2026-08-05_local-export_plant-alpha.md",
       "size": 1590,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -367,7 +367,7 @@
     {
       "name": "2026-08-05_master-handoff-claude-opus.md",
       "size": 9909,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -383,7 +383,7 @@
     {
       "name": "2026-08-05_megaeth-moss-status.md",
       "size": 517,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -398,7 +398,7 @@
     {
       "name": "2026-08-05_repo-consolidation.md",
       "size": 3012,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -413,7 +413,7 @@
     {
       "name": "2026-08-05_session-wrap-grok.md",
       "size": 2076,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-cli",
       "date": "2026-08-05",
@@ -428,7 +428,7 @@
     {
       "name": "2026-08-05_tg-terminal-oss-mine.md",
       "size": 4532,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-05",
@@ -443,7 +443,7 @@
     {
       "name": "2026-08-06_ack-p0-ab-gate-genome.md",
       "size": 916,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -460,7 +460,7 @@
     {
       "name": "2026-08-06_ack-plant-bridge-green.md",
       "size": 1279,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -477,7 +477,7 @@
     {
       "name": "2026-08-06_alpha-scour-merge.md",
       "size": 15167,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -494,7 +494,7 @@
     {
       "name": "2026-08-06_claude-code-ultimate-dispatch.md",
       "size": 467,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -511,7 +511,7 @@
     {
       "name": "2026-08-06_claude-plant-prompts.md",
       "size": 433,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -529,7 +529,7 @@
     {
       "name": "2026-08-06_claude-usage-limit-resume.md",
       "size": 410,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -545,7 +545,7 @@
     {
       "name": "2026-08-06_dashboard-spa-asset-fix.md",
       "size": 989,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -562,7 +562,7 @@
     {
       "name": "2026-08-06_free-reign-gate-ready.md",
       "size": 909,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -579,7 +579,7 @@
     {
       "name": "2026-08-06_gcp-cloudshell-ultimate-handoff.md",
       "size": 2284,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -598,7 +598,7 @@
     {
       "name": "2026-08-06_gemini-phase3-ack-asset-bug.md",
       "size": 462,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -614,7 +614,7 @@
     {
       "name": "2026-08-06_gemini-phase3-masterplan.md",
       "size": 461,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -631,7 +631,7 @@
     {
       "name": "2026-08-06_gemini-website-gcp-master-prompt.md",
       "size": 1181,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -650,7 +650,7 @@
     {
       "name": "2026-08-06_grok-bridge-lane-tools.md",
       "size": 1151,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -667,7 +667,7 @@
     {
       "name": "2026-08-06_grok-drive-bridge.md",
       "size": 528,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -683,7 +683,7 @@
     {
       "name": "2026-08-06_grok-mac-bridge-live.md",
       "size": 2269,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -700,7 +700,7 @@
     {
       "name": "2026-08-06_grok-project-bootstrap.md",
       "size": 932,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -719,7 +719,7 @@
     {
       "name": "2026-08-06_holistic-blindspots-leverage.md",
       "size": 802,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -738,7 +738,7 @@
     {
       "name": "2026-08-06_local-export_executor-reloaded.md",
       "size": 6354,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -756,7 +756,7 @@
     {
       "name": "2026-08-06_local-export_free-reign-gate-wired.md",
       "size": 6248,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -774,7 +774,7 @@
     {
       "name": "2026-08-06_local-export_genome-closes-wired.md",
       "size": 2858,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -792,7 +792,7 @@
     {
       "name": "2026-08-06_lunch-autonomous-progress.md",
       "size": 543,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -808,7 +808,7 @@
     {
       "name": "2026-08-06_operator-accept-gate-scope.md",
       "size": 414,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -824,7 +824,7 @@
     {
       "name": "2026-08-06_plant-wire-receipt.md",
       "size": 1969,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "local-export",
       "date": "2026-08-06",
@@ -841,7 +841,7 @@
     {
       "name": "2026-08-06_public-trading-data-truth.md",
       "size": 676,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -858,7 +858,7 @@
     {
       "name": "2026-08-06_system-brief.md",
       "size": 7002,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -876,7 +876,7 @@
     {
       "name": "2026-08-06_while-gemini-phase3.md",
       "size": 824,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -893,7 +893,7 @@
     {
       "name": "2026-08-06_windows-datacenter-masterplan.md",
       "size": 2318,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-06",
@@ -913,7 +913,7 @@
     {
       "name": "2026-08-07_ack-desk-fields-live.md",
       "size": 790,
-      "mtime_utc": "2026-08-07T14:20:18Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-07",
@@ -929,7 +929,7 @@
     {
       "name": "2026-08-07_claude-morning-gemini-out.md",
       "size": 389,
-      "mtime_utc": "2026-08-07T14:19:54Z",
+      "mtime_utc": "2026-08-07T14:21:37Z",
       "has_frontmatter": true,
       "source": "grok-web",
       "date": "2026-08-07",
@@ -939,6 +939,24 @@
         "claude",
         "gemini",
         "plant"
+      ],
+      "issues": []
+    },
+    {
+      "name": "2026-08-07_remote-rh-reauth-prompt.md",
+      "size": 398,
+      "mtime_utc": "2026-08-07T14:22:56Z",
+      "has_frontmatter": true,
+      "source": "grok-web",
+      "date": "2026-08-07",
+      "type": "handoff",
+      "title": "Remote RH re-auth via Mac Claude + Telegram MFA",
+      "topics": [
+        "robinhood",
+        "reauth",
+        "telegram",
+        "windows",
+        "claude"
       ],
       "issues": []
     }

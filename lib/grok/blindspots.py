@@ -12,8 +12,8 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "area": "plant",
         "title": "Windows rh-executor hung on expired robin_stocks session (interactive login)",
         "impact": "Gated executor cannot process free-reign proposals until re-auth",
-        "fix": "Ari attended RH login on DESKTOP-HFCK6U9 console — no agent credentials",
-        "status": "needs_operator",
+        "fix": "Remote: Claude Mac + Tailscale + Telegram APPROVE RH REAUTH + MFA; see CLAUDE-REMOTE-RH-REAUTH-2026-08-07.md",
+        "status": "in_progress",
     },
     {
         "id": "BS-GEMINI-CREDITS",

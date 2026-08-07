@@ -1,20 +1,19 @@
-# What next — desk fields greening
+# What next — 2026-08-07
 
-## Claude (running)
+## You (phone, away from home)
 
-Morning P0 desk_projection — **live already shows** posture=`capital_preservation`, execution=`gated`.  
-Finish: formal local-export + Drive pack sync.
+1. Paste remote RH re-auth to Claude:  
+   `docs/handoffs/CLAUDE-REMOTE-RH-REAUTH-2026-08-07.md`
+2. Reply **`APPROVE RH REAUTH`** when asked  
+3. Relay MFA/device-approve when asked  
+4. Prefer **not** sending RH password over Telegram  
 
-## Ari
+## Claude parallel
 
-**RH re-auth** on DESKTOP-HFCK6U9 so rh-executor leaves login hang. Gate code already live.
+- Desk P0 (already greening live)  
+- Remote RH re-auth (new)  
+- Drive pack when free  
 
 ## Gemini
 
-Credits out — pause. MC paints on 00100.
-
-## Open after Claude export
-
-- Enrich regime/thesis if plant has real sources  
-- Win P0 probes (no L2 ARM)  
-- Gemini data-truth UI when credits return  
+Credits out — paused  
