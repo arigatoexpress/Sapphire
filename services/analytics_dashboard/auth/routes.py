@@ -134,7 +134,7 @@ def build_blueprint(
     rp_id = rp_id or os.environ.get("RP_ID", "localhost")
     rp_name = rp_name or os.environ.get("RP_NAME", RP_NAME_DEFAULT)
     credential_store = credential_store or default_store(
-        os.environ.get("GCP_PROJECT", "tho-ai-agent")
+        os.environ.get("GCP_PROJECT", "sapphire-479610")
     )
     session_manager = session_manager or SessionManager()
     if cookie_secure is None:

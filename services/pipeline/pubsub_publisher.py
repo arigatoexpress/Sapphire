@@ -24,7 +24,7 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
+PROJECT = os.environ.get("GCP_PROJECT", "sapphire-479610")
 ENABLED = os.environ.get("SAPPHIRE_PUBSUB", "1") == "1"
 
 TOPICS = {

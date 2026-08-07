@@ -30,7 +30,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 ORG_REPOS_MANIFEST = ROOT / "infra" / "org-repos.yaml"
-DEFAULT_PROJECT = "tho-ai-agent"
+DEFAULT_PROJECT = "sapphire-479610"
 DEFAULT_REGION = "us-central1"
 DEFAULT_BUCKET = "sapphire-data-lake"
 DEFAULT_DATASET = "sapphire"

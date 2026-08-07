@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-DEFAULT_PROJECTS = ("tho-ai-agent", "sapphire-479610")
+DEFAULT_PROJECTS = ("sapphire-479610",)
 DEFAULT_REGION = "us-central1"
 ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_PROBE_MARKERS = (

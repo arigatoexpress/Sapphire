@@ -41,7 +41,7 @@ from og_guard import build_0guard_progress  # noqa: E402
 from og_proof import build_og_proof_manifest  # noqa: E402
 from project_tabs import get_project_tab, public_project_tabs  # noqa: E402
 
-PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
+PROJECT = os.environ.get("GCP_PROJECT", "sapphire-479610")
 DATASET = os.environ.get("BQ_DATASET", "sapphire")
 _LLMS_TXT_PATH = _HERE / "llms.txt"
 

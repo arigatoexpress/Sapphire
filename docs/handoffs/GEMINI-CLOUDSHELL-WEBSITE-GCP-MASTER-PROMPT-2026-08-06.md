@@ -192,13 +192,13 @@ gcloud run services describe sapphire-alpha-dashboard \
   --format='yaml(status.url,status.traffic,spec.template.metadata.annotations,spec.template.spec.containers[0].resources)'
 
 # Data plane
-gcloud config set project tho-ai-agent
+gcloud config set project sapphire-479610
 python3 $SAPPHIRE_DIR/scripts/ops/cost_posture_report.py --format markdown --hours 48 --log-limit 10 || true
-python3 $SAPPHIRE_DIR/scripts/ops/gcp_ai_inventory.py --project tho-ai-agent --region us-central1 --format markdown || true
-bq query --project_id=tho-ai-agent --use_legacy_sql=false --format=prettyjson '
+python3 $SAPPHIRE_DIR/scripts/ops/gcp_ai_inventory.py --project sapphire-479610 --region us-central1 --format markdown || true
+bq query --project_id=sapphire-479610 --use_legacy_sql=false --format=prettyjson '
 SELECT table_id, row_count, ROUND(size_bytes/1024/1024,2) AS mb,
        TIMESTAMP_MILLIS(last_modified_time) AS last_modified
-FROM `tho-ai-agent.sapphire.__TABLES__`
+FROM `sapphire-479610.sapphire_telemetry.__TABLES__`
 ORDER BY last_modified_time DESC LIMIT 20'
 ```
 

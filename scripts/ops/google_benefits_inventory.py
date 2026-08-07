@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-DEFAULT_PROJECT = "tho-ai-agent"
+DEFAULT_PROJECT = "sapphire-479610"
 
 MEMBERSHIPS = {
     "google_developer_standard": "Google Developer Program Standard",

@@ -30,8 +30,8 @@ ROOT = Path.home() / "Code" / "Sapphire"
 DATA = ROOT / "data"
 LA_DIR = Path.home() / "Library" / "LaunchAgents"
 
-GCP_PROJECT = "tho-ai-agent"
-GCP_NUMBER = "691674245427"
+GCP_PROJECT = "sapphire-479610"
+GCP_NUMBER = "267358751314"
 
 
 # -- Config ----------------------------------------------------------------

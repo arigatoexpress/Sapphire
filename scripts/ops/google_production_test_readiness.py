@@ -29,7 +29,7 @@ import gcp_ai_inventory
 import google_benefits_inventory
 import google_workspace_threat_hygiene
 
-DEFAULT_PROJECTS = ("tho-ai-agent",)
+DEFAULT_PROJECTS = ("sapphire-479610",)
 DEFAULT_REGIONS = ("us-central1",)
 DEFAULT_MEMBERSHIPS = ("google_developer_premium", "google_ai_plus")
 
@@ -393,7 +393,7 @@ def _production_test_lanes(report: dict[str, Any]) -> list[dict[str, str]]:
         {
             "lane": "GCP / Vertex AI inventory",
             "status": "ready" if gcp_ready else "needs_attention",
-            "command": "python3 scripts/ops/gcp_ai_inventory.py --project tho-ai-agent --region us-central1",
+            "command": "python3 scripts/ops/gcp_ai_inventory.py --project sapphire-479610 --region us-central1",
             "artifact": "Read-only project/API/dataset/Vertex resource report.",
             "live_gate": "No Vertex job, tuning, endpoint, or data write until a reviewed runbook exists.",
         },
@@ -449,7 +449,7 @@ def _next_safe_commands(
         f"python3 scripts/ops/google_production_test_readiness.py {project_args} {region_args} {membership_args} --format markdown",
         f"python3 scripts/ops/google_workspace_threat_hygiene.py --days {workspace_days}",
         f"python3 scripts/ops/gcp_ai_inventory.py {project_args} {region_args}",
-        "python3 scripts/ops/cost_posture_report.py --project tho-ai-agent --region us-central1 --hours 24 --log-limit 25",
+        "python3 scripts/ops/cost_posture_report.py --project sapphire-479610 --region us-central1 --hours 24 --log-limit 25",
     ]
 
 
@@ -579,7 +579,7 @@ def parse_args() -> argparse.Namespace:
         "--project",
         dest="projects",
         action="append",
-        help="GCP project to inspect. Repeatable. Defaults to tho-ai-agent.",
+        help="GCP project to inspect. Repeatable. Defaults to sapphire-479610.",
     )
     parser.add_argument(
         "--region",

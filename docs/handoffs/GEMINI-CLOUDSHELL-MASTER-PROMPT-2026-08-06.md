@@ -68,7 +68,7 @@ You help Ari build **Sapphire OS**: a self-sovereign capital intelligence plant 
 
 ```bash
 gcloud auth login   # if needed
-gcloud config set project tho-ai-agent
+gcloud config set project sapphire-479610
 gcloud config set run/region us-central1
 
 export SAPPHIRE_DIR="${SAPPHIRE_DIR:-$HOME/Sapphire}"

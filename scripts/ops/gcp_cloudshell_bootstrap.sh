@@ -15,11 +15,11 @@
 
 set -euo pipefail
 
-PROJECT="${PROJECT:-tho-ai-agent}"
+PROJECT="${PROJECT:-sapphire-479610}"
 WEBSITE_PROJECT="${WEBSITE_PROJECT:-sapphire-479610}"
 REGION="${REGION:-us-central1}"
 BQ_LOCATION="${BQ_LOCATION:-US}"
-DATASET="${DATASET:-sapphire}"
+DATASET="${DATASET:-sapphire_telemetry}"
 BUCKET="${BUCKET:-sapphire-data-lake}"
 DEEP=0
 OUT_DIR="${OUT_DIR:-}"

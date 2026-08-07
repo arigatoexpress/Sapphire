@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 DEFAULT_PROXY_URL = "http://127.0.0.1:11435"
-DEFAULT_GCP_PROJECT = "tho-ai-agent"
+DEFAULT_GCP_PROJECT = "sapphire-479610"
 DEFAULT_GCP_REGION = "us-central1"
 DEFAULT_CLOUD_RUN_SERVICES = (
     "sapphire-analytics",

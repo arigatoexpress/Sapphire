@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-tho-ai-agent}"
+PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 ALPHA_SERVICE="${ALPHA_SERVICE:-}"
 PM_HUB_SERVICE="${PM_HUB_SERVICE:-agentic-pm-hub}"
 THO_AGENT_SERVICE="${THO_AGENT_SERVICE:-tho-agent}"

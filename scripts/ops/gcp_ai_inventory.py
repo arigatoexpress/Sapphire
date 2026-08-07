@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-DEFAULT_PROJECTS = ("tho-ai-agent",)
+DEFAULT_PROJECTS = ("sapphire-479610",)
 DEFAULT_REGIONS = ("us-central1",)
 
 TRACKED_SERVICES = (
@@ -419,7 +419,7 @@ def parse_args() -> argparse.Namespace:
         "--project",
         dest="projects",
         action="append",
-        help="GCP project to inspect. Repeatable. Defaults to tho-ai-agent.",
+        help="GCP project to inspect. Repeatable. Defaults to sapphire-479610.",
     )
     parser.add_argument(
         "--region",

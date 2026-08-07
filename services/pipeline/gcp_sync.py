@@ -41,7 +41,7 @@ from lib.core.routine_pause import abort_if_paused
 # Config
 # ---------------------------------------------------------------------------
 
-PROJECT = "tho-ai-agent"
+PROJECT = os.environ.get("GCP_PROJECT", "sapphire-479610")
 DATASET = "sapphire"
 BUCKET = "sapphire-data-lake"
 

@@ -121,7 +121,7 @@ def _http_post_json(
         return 0, str(exc)
 
 
-def _read_secret(name: str, project: str = "tho-ai-agent") -> str | None:
+def _read_secret(name: str, project: str = "sapphire-479610") -> str | None:
     """Best-effort secret-manager read. Returns None on failure or 'placeholder'."""
     # Prefer env override (LaunchAgent / dev path) before hitting metadata.
     env = os.environ.get(name.upper().replace("-", "_"))
@@ -218,7 +218,7 @@ def _telegram_notify(text: str, chat_id: str | None = None) -> dict:
     return {"ok": True, "message_id": (resp.get("result") or {}).get("message_id")}
 
 
-def _scheduler_refresh(job_name: str, project: str = "tho-ai-agent") -> dict:
+def _scheduler_refresh(job_name: str, project: str = "sapphire-479610") -> dict:
     """Force-run a Cloud Scheduler job. No-op if SDK unavailable."""
     try:
         from google.cloud import scheduler_v1  # type: ignore
