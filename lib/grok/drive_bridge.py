@@ -43,9 +43,7 @@ def _safe_text(path: Path) -> bool:
         return False
     if _SECRETISH.search(text):
         return False
-    if path.suffix.lower() in {".pem", ".p12", ".key", ".env"}:
-        return False
-    return True
+    return path.suffix.lower() not in {".pem", ".p12", ".key", ".env"}
 
 
 def _copy_safe(src: Path, dest: Path) -> bool:
