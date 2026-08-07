@@ -6,8 +6,9 @@ Models propose; this module only evaluates. No network, no broker, no secrets.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 # Permanent dens class (meme/honeypot) — never free-reign spam
 DEFAULT_DENS_SYMBOLS: frozenset[str] = frozenset(
@@ -157,7 +158,9 @@ def is_dens_blocked(
     dens_addr_prefixes: Sequence[str] | None = None,
 ) -> tuple[bool, str]:
     """Return (blocked, reason). Permanent dens class + 0x prefix match."""
-    dens = {_norm_sym(s) for s in (dens_symbols if dens_symbols is not None else DEFAULT_DENS_SYMBOLS)}
+    dens = {
+        _norm_sym(s) for s in (dens_symbols if dens_symbols is not None else DEFAULT_DENS_SYMBOLS)
+    }
     sym = _norm_sym(symbol)
     if sym in dens:
         return True, f"dens_symbol:{sym}"
@@ -217,7 +220,9 @@ def evaluate_proposal(
         dens_addr_prefixes=dens_prefs,
     )
     if blocked and side == "buy":
-        return Decision(False, f"dens permanent block ({why})", "DENS_BLOCK", "NO_TRADE", {"match": why})
+        return Decision(
+            False, f"dens permanent block ({why})", "DENS_BLOCK", "NO_TRADE", {"match": why}
+        )
 
     # dust no re-buy
     if side == "buy" and sym in dust and rail_cfg.get("dust_placer_refuses", rail == "rh_agentic"):
@@ -285,7 +290,9 @@ def evaluate_proposal(
     # --- capital preservation (late-cycle thesis) ---
     cap = pol.get("capital_preservation") or {}
     if cap.get("enabled", True) and side == "buy":
-        if proposal.day_realized_pnl_usd <= -abs(float(cap.get("max_realized_loss_usd_per_day", 75.0))):
+        if proposal.day_realized_pnl_usd <= -abs(
+            float(cap.get("max_realized_loss_usd_per_day", 75.0))
+        ):
             return Decision(
                 False,
                 f"daily loss halt ({proposal.day_realized_pnl_usd})",
@@ -387,7 +394,10 @@ def evaluate_scale_out(
     policy: Mapping[str, Any] | None = None,
 ) -> Decision:
     """AXTI scale-out: half at ~2×, hard SL −40% premium, never worthless hold advice."""
-    pol = {**(FREE_REIGN_DEFAULTS.get("axti") or {}), **((policy or {}).get("axti") or policy or {})}
+    pol = {
+        **(FREE_REIGN_DEFAULTS.get("axti") or {}),
+        **((policy or {}).get("axti") or policy or {}),
+    }
     mult = float(pol.get("scale_out_multiple", 2.0))
     sl_frac = float(pol.get("hard_sl_fraction", -0.40))
     if entry_premium <= 0 or remaining_qty <= 0:
@@ -408,7 +418,11 @@ def evaluate_scale_out(
             f"scale-out trigger (~{mult:.1f}×) — close half / trail rest",
             "AXTI_SCALE_OUT",
             "TRADE",
-            {"action": "close_half_trail_rest", "pnl_frac": pnl_frac, "multiple": mark_premium / entry_premium},
+            {
+                "action": "close_half_trail_rest",
+                "pnl_frac": pnl_frac,
+                "multiple": mark_premium / entry_premium,
+            },
         )
     return Decision(
         False,

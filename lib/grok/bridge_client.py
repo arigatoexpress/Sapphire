@@ -10,10 +10,10 @@ import json
 import os
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import urljoin
-
 
 DEFAULT_BRIDGE_URL = "http://127.0.0.1:19998"
 TRANSPORT_ORDER = ("mac-bridge", "oidc", "api-key", "sim")
@@ -85,7 +85,11 @@ def pick_transport(
         return TransportPick("api-key", None, "XAI_API_KEY/GROK_API_KEY present")
 
     if mode == "away-sim" or h.get("status") == "error":
-        return TransportPick("sim", url if mode == "away-sim" else None, f"fallback sim (health mode={mode or 'n/a'})")
+        return TransportPick(
+            "sim",
+            url if mode == "away-sim" else None,
+            f"fallback sim (health mode={mode or 'n/a'})",
+        )
 
     return TransportPick("sim", None, "no healthy mac-bridge / oidc / api key")
 

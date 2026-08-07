@@ -65,10 +65,10 @@ _ALLOWED_PRIORITIES: frozenset[str] = frozenset({"p2", "p3"})
 class DigestEntry:
     """One queued line, JSON-serializable via ``asdict``."""
 
-    ts: str          # ISO8601 UTC
-    kind: str        # e.g. "portfolio_mover", "signal", "chain_delta"
-    body: str        # short, one-line summary — NOT pre-escaped
-    priority: str    # "p2" | "p3"
+    ts: str  # ISO8601 UTC
+    kind: str  # e.g. "portfolio_mover", "signal", "chain_delta"
+    body: str  # short, one-line summary — NOT pre-escaped
+    priority: str  # "p2" | "p3"
     metadata: dict = field(default_factory=dict)
 
 
@@ -132,9 +132,7 @@ def enqueue(
     return True
 
 
-def peek(
-    *, journal: Path | None = None, max_age_hours: float = MAX_AGE_HOURS
-) -> list[DigestEntry]:
+def peek(*, journal: Path | None = None, max_age_hours: float = MAX_AGE_HOURS) -> list[DigestEntry]:
     """Return the queued (non-stale) entries without draining the journal.
 
     Callers use this when they want to render the digest text before
@@ -203,9 +201,7 @@ def format_digest(
 
     window_seconds = _window_seconds(entries_list, now=now)
     header = fmt.bold(banner)
-    subtitle = fmt.esc(
-        f"{len(entries_list)} items · window {fmt.fmt_duration(window_seconds)}"
-    )
+    subtitle = fmt.esc(f"{len(entries_list)} items · window {fmt.fmt_duration(window_seconds)}")
 
     sections: list[str] = []
     for kind in order:
@@ -224,9 +220,7 @@ def format_digest(
     return f"{header}\n_{subtitle}_\n\n" + "\n\n".join(sections)
 
 
-def stats(
-    *, journal: Path | None = None, max_age_hours: float = MAX_AGE_HOURS
-) -> dict:
+def stats(*, journal: Path | None = None, max_age_hours: float = MAX_AGE_HOURS) -> dict:
     """One-shot introspection for the /status card + doctor."""
     journal = journal or DEFAULT_JOURNAL
     entries = list(_iter_entries(journal, max_age_hours=max_age_hours))
@@ -259,9 +253,7 @@ def _write_line(journal: Path, entry: DigestEntry) -> None:
         handle.write(json.dumps(payload) + "\n")
 
 
-def _iter_entries(
-    journal: Path, *, max_age_hours: float
-) -> Iterable[DigestEntry]:
+def _iter_entries(journal: Path, *, max_age_hours: float) -> Iterable[DigestEntry]:
     if not journal.exists():
         return
     cutoff = datetime.now(UTC).timestamp() - max_age_hours * 3600
@@ -355,9 +347,7 @@ def _archive(
         logger.warning("digest_queue: reset failed: %s", exc)
 
 
-def _window_seconds(
-    entries: list[DigestEntry], *, now: datetime | None = None
-) -> int:
+def _window_seconds(entries: list[DigestEntry], *, now: datetime | None = None) -> int:
     """Age of the oldest entry, in whole seconds. 0 if empty."""
     if not entries:
         return 0

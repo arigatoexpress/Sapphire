@@ -6,7 +6,10 @@ Plant/Claude wires it later. Cloud Shell / Grok web densify against it.
 
 from __future__ import annotations
 
+from lib.grok.bridge_client import bridge_url_from_env, pick_transport, smart_query
+from lib.grok.free_reign_gate import GateRequest, GateResult, gate_order
 from lib.grok.genome import GenomeLesson, LessonBook, lesson_from_closed_trade
+from lib.grok.plant_outcomes import record_closed_trade
 from lib.grok.policy import (
     FREE_REIGN_DEFAULTS,
     Decision,
@@ -16,11 +19,8 @@ from lib.grok.policy import (
     is_dens_blocked,
 )
 from lib.grok.research_worker import validate_research_manifest
-from lib.grok.windows import evaluate_windows_acceptance
 from lib.grok.system_brief import build_system_brief, write_brief
-from lib.grok.free_reign_gate import GateRequest, GateResult, gate_order
-from lib.grok.plant_outcomes import record_closed_trade
-from lib.grok.bridge_client import pick_transport, smart_query, bridge_url_from_env
+from lib.grok.windows import evaluate_windows_acceptance
 
 __all__ = [
     "FREE_REIGN_DEFAULTS",

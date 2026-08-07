@@ -6,14 +6,15 @@ Plant wires broker-reconciled closes into LessonBook.append. No I/O here.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 
 def _utc_now() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @dataclass
@@ -138,7 +139,7 @@ class LessonBook:
         path.write_text(json.dumps(self.as_dict(), indent=2) + "\n", encoding="utf-8")
 
     @classmethod
-    def load(cls, path: Path) -> "LessonBook":
+    def load(cls, path: Path) -> LessonBook:
         if not path.is_file():
             return cls()
         raw = json.loads(path.read_text(encoding="utf-8"))
