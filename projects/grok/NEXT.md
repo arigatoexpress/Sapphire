@@ -1,17 +1,17 @@
-# What next — Option A RH re-auth live
+# What next — Claude tokens out
 
-## Claude Dispatch
+## Plant seat → Grok CLI on Mac
 
-1. Spawn **Mac code agent** for remote RH re-auth (Option A)  
-2. Wait for Ari: **`APPROVE RH REAUTH`**  
-3. Pause for MFA code when needed  
-4. Parallel: desk P0 agent  
+`docs/handoffs/GROK-CLI-PLANT-DISPATCH-RH-REAUTH-2026-08-07.md`
 
-## Ari (phone)
+1. P0 RH remote re-auth (Option A already approved)  
+2. P1 desk export if needed  
+3. MFA: Ari on phone when prompted  
 
-Send Claude: **`APPROVE RH REAUTH`**  
-Then MFA when asked. Prefer not sending RH password over chat.
+## Not Gemini for this
 
-## Gemini
+Cloud Shell cannot Tailscale to home Win for pickle login.
 
-Credits out — paused  
+## Gemini later
+
+Data-truth UI only when credits return.
