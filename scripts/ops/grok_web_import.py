@@ -254,7 +254,7 @@ def _validate_candidate(path: str, data: bytes) -> str:
             raise ImportRejected("missing_frontmatter", path)
         try:
             frontmatter = yaml.safe_load(match.group("body"))
-        except yaml.YAMLError:
+        except (yaml.YAMLError, ValueError):
             raise ImportRejected("invalid_yaml", path)
         _validate_provenance(frontmatter, path)
         return "text/markdown"

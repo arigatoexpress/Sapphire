@@ -171,6 +171,11 @@ def test_fetch_failure_is_non_mutating(tmp_path: Path):
             "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\ntitle: local-export: bad\n---\n",
             "invalid_yaml",
         ),
+        (
+            "2026-08-08_bad-timestamp.md",
+            "---\nsource: grok-web\ndate: 2026-99-99\ntype: note\ntitle: Bad date\n---\n",
+            "invalid_yaml",
+        ),
         ("2026-08-08_missing.md", "# no frontmatter\n", "missing_frontmatter"),
         (
             "2026-08-08_secret.md",
