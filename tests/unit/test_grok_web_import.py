@@ -385,6 +385,41 @@ def test_destination_aliases_are_rejected_before_materialization(left: str, righ
     assert caught.value.code == "destination_alias"
 
 
+def test_case_only_rename_of_managed_file_is_rejected_before_write(tmp_path: Path):
+    mod = _load()
+    original_name = "2026-08-08_Note.md"
+    renamed_name = "2026-08-08_note.md"
+    _, seed, repo = _fixture_repo(tmp_path, {original_name: _frontmatter()})
+    config = _config(mod, tmp_path, repo)
+    first = mod.import_exports(config)
+    original_target = config.destination / original_name
+    before = original_target.read_bytes()
+    temporary_name = "2026-08-08_case-temp.md"
+    _git(
+        seed,
+        "mv",
+        f"data/grok-web-exports/{original_name}",
+        f"data/grok-web-exports/{temporary_name}",
+    )
+    _git(
+        seed,
+        "mv",
+        f"data/grok-web-exports/{temporary_name}",
+        f"data/grok-web-exports/{renamed_name}",
+    )
+    _git(seed, "commit", "-m", "case-only rename")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "destination_alias_current"
+    assert original_target.read_bytes() == before
+    current = json.loads((config.state_root / "CURRENT.json").read_text())
+    assert current["receipt_sha256"] == first.receipt_sha256
+
+
 def test_dry_run_and_pointer_failure_leave_current_unchanged(tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
@@ -575,12 +610,21 @@ def test_failed_rollback_publisher_retries_for_activated_receipt(tmp_path: Path)
 
     current = json.loads((config.state_root / "CURRENT.json").read_text())
     activated_receipt_sha = current["receipt_sha256"]
-    result = mod.rollback_import(config, activated_receipt_sha, publisher=flaky_publisher)
-    mod.rollback_import(config, activated_receipt_sha, publisher=flaky_publisher)
+    result = mod.rollback_import(config, first.receipt_sha256, publisher=flaky_publisher)
+    mod.rollback_import(config, first.receipt_sha256, publisher=flaky_publisher)
 
     assert result.status == "unchanged"
     assert result.receipt_sha256 == activated_receipt_sha
     assert calls == ["publish", "publish"]
+
+
+def test_missing_operator_publisher_is_retryable(tmp_path: Path):
+    mod = _load()
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod._publish_operator_feeds(tmp_path / "missing-publisher.py")
+
+    assert caught.value.code == "publisher_unavailable"
 
 
 def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):

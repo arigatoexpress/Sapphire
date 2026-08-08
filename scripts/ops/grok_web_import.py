@@ -141,11 +141,15 @@ class Candidate:
     data: bytes
 
 
+def _destination_alias_key(name: str) -> str:
+    return unicodedata.normalize("NFC", name).casefold()
+
+
 def _validate_destination_aliases(candidates: list[Candidate]) -> None:
     seen: dict[str, str] = {}
     for candidate in candidates:
         name = candidate.destination_relpath
-        alias_key = unicodedata.normalize("NFC", name).casefold()
+        alias_key = _destination_alias_key(name)
         if alias_key in seen:
             raise ImportRejected("destination_alias", name)
         seen[alias_key] = name
@@ -524,10 +528,14 @@ def _plan_files(
     manifest_sha: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     current_by_name = _current_files(current)
+    current_by_alias = {_destination_alias_key(name): name for name in current_by_name}
     source_names = {candidate.destination_relpath for candidate in candidates}
     planned: list[dict[str, Any]] = []
     for candidate in candidates:
         name = candidate.destination_relpath
+        aliased_current = current_by_alias.get(_destination_alias_key(name))
+        if aliased_current is not None and aliased_current != name:
+            raise ImportRejected("destination_alias_current", name)
         target = config.destination / name
         current_item = current_by_name.get(name)
         before: str | None = None
@@ -1071,7 +1079,10 @@ def rollback_import(
         current_sha, current = current_pair
         _verify_managed(config, current)
         target = _load_receipt(config, target_receipt_sha256)
-        if current_sha == target_receipt_sha256:
+        if (
+            current_sha == target_receipt_sha256
+            or current["content_manifest_sha256"] == target["content_manifest_sha256"]
+        ):
             _publish_receipt_once(config, current_sha, None if dry_run else publisher)
             return ImportResult(
                 status="unchanged",
@@ -1131,10 +1142,12 @@ def rollback_import(
         )
 
 
-def _publish_operator_feeds() -> None:
-    publisher = Path.home() / "ops-state" / "finish-line" / "scripts" / "publish_operator_feeds.py"
+def _publish_operator_feeds(publisher: Path | None = None) -> None:
+    publisher = publisher or (
+        Path.home() / "ops-state" / "finish-line" / "scripts" / "publish_operator_feeds.py"
+    )
     if not publisher.is_file():
-        return
+        raise ImportRejected("publisher_unavailable")
     result = subprocess.run(
         [sys.executable, str(publisher)],
         check=False,
