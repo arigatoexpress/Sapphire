@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 MOD_PATH = ROOT / "scripts" / "ops" / "grok_bridge_status.py"
 
@@ -58,3 +60,14 @@ def test_build_report_has_plant_sync():
     assert report["count"] >= 5
     assert "monorepo_script" in report["plant_sync"]
     assert "missing_required_hints" in report
+
+
+def test_every_export_frontmatter_is_valid_yaml_mapping():
+    export_dir = ROOT / "data" / "grok-web-exports"
+    for export_path in sorted(export_dir.glob("*.md")):
+        text = export_path.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            continue
+        frontmatter = text.split("---\n", 2)[1]
+        parsed = yaml.safe_load(frontmatter)
+        assert isinstance(parsed, dict), export_path.name

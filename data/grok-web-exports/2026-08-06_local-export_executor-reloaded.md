@@ -3,7 +3,7 @@ source: local-export
 date: 2026-08-06
 type: plant-status
 topics: [executor, reload, free-reign, windows, rh-executor]
-title: local-export: rh-executor reloaded with gate_order
+title: "local-export: rh-executor reloaded with gate_order"
 ---
 
 # rh-executor reloaded with gate_order

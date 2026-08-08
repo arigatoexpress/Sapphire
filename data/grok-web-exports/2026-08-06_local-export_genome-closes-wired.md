@@ -3,7 +3,7 @@ source: local-export
 date: 2026-08-06
 type: plant-status
 topics: [genome, lessons, plant-outcomes, plant-wire, P0-B]
-title: local-export: genome closes wired [2026-08-06]
+title: "local-export: genome closes wired [2026-08-06]"
 ---
 
 # Genome closes wired (P0-B)
