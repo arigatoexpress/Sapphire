@@ -45,9 +45,10 @@ class TestMenuCallbackAnswering:
         assert server.process_update(_callback_update("m:pf")) is True
 
         server.TELEGRAM_API.answer_callback_query.assert_called_once()
-        assert server.TELEGRAM_API.answer_callback_query.call_args.kwargs[
-            "callback_query_id"
-        ] == "cbq-abc"
+        assert (
+            server.TELEGRAM_API.answer_callback_query.call_args.kwargs["callback_query_id"]
+            == "cbq-abc"
+        )
 
         server.TELEGRAM_API.edit_message_text.assert_called_once()
         edit = server.TELEGRAM_API.edit_message_text.call_args.kwargs
@@ -62,9 +63,7 @@ class TestMenuCallbackAnswering:
         server.TELEGRAM_API.send_message.assert_not_called()
 
     def test_edit_failure_is_swallowed(self, server):
-        server.TELEGRAM_API.edit_message_text.side_effect = RuntimeError(
-            "message is not modified"
-        )
+        server.TELEGRAM_API.edit_message_text.side_effect = RuntimeError("message is not modified")
         # Re-tapping the same button must not crash the webhook handler.
         assert server.process_update(_callback_update("m:pf")) is False
 
@@ -110,9 +109,7 @@ class TestSettingsMutationThroughCallback:
         assert settings_store.load(settings_path).heartbeat_enabled is True
 
     def test_toggle_answers_with_confirmation_toast(self, server, tmp_path, monkeypatch):
-        monkeypatch.setenv(
-            "SAPPHIRE_TELEGRAM_SETTINGS_PATH", str(tmp_path / "s.json")
-        )
+        monkeypatch.setenv("SAPPHIRE_TELEGRAM_SETTINGS_PATH", str(tmp_path / "s.json"))
         server.process_update(_callback_update("m:cfg:hb:on"))
         toast = server.TELEGRAM_API.answer_callback_query.call_args.kwargs["text"]
         assert "Heartbeat enabled" in toast
@@ -194,9 +191,7 @@ class TestHeartbeatScheduling:
         monkeypatch.setenv("SAPPHIRE_TELEGRAM_SETTINGS_PATH", str(tmp_path / "s.json"))
         monkeypatch.setattr(heartbeat, "STATE_FILE", tmp_path / "state.json")
         called = []
-        monkeypatch.setattr(
-            heartbeat, "_run_notify", lambda *a, **k: called.append(1) or 0
-        )
+        monkeypatch.setattr(heartbeat, "_run_notify", lambda *a, **k: called.append(1) or 0)
         settings_store.save(settings_store.TelegramSettings(heartbeat_enabled=False))
 
         assert heartbeat.run_once() == 0
@@ -210,9 +205,7 @@ class TestHeartbeatScheduling:
         monkeypatch.setenv("SAPPHIRE_TELEGRAM_SETTINGS_PATH", str(tmp_path / "s.json"))
         monkeypatch.setattr(heartbeat, "STATE_FILE", tmp_path / "state.json")
         sent: list[str] = []
-        monkeypatch.setattr(
-            heartbeat, "_run_notify", lambda text, **k: sent.append(text) or 0
-        )
+        monkeypatch.setattr(heartbeat, "_run_notify", lambda text, **k: sent.append(text) or 0)
         settings_store.save(
             settings_store.TelegramSettings(heartbeat_enabled=True, heartbeat_hours=4)
         )

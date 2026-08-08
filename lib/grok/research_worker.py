@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
-
-REQUIRED_TRUE = (
-    "paper_only",
-)
+REQUIRED_TRUE = ("paper_only",)
 REQUIRED_FALSE = (
     "live_trading_enabled",
     "telegram_sends_enabled",

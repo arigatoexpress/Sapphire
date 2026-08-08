@@ -114,9 +114,7 @@ def _btn(label: str, data: str) -> dict[str, str]:
     """Build a single inline-keyboard button and validate the callback size."""
     payload = f"{CALLBACK_PREFIX}{data}" if not data.startswith(CALLBACK_PREFIX) else data
     if len(payload.encode("utf-8")) > CALLBACK_MAX_BYTES:
-        raise ValueError(
-            f"callback_data exceeds {CALLBACK_MAX_BYTES} bytes: {payload!r}"
-        )
+        raise ValueError(f"callback_data exceeds {CALLBACK_MAX_BYTES} bytes: {payload!r}")
     return {"text": label, "callback_data": payload}
 
 
@@ -135,12 +133,18 @@ def _row(*buttons: dict[str, Any]) -> list[dict[str, Any]]:
 def build_home_keyboard(webapp_url: str | None = None) -> dict[str, Any]:
     """Root menu — 4 rows of 2 buttons + optional web-app footer."""
     rows: list[list[dict[str, Any]]] = [
-        _row(_btn(_MENU_LABELS[MENU_PORTFOLIO], MENU_PORTFOLIO),
-             _btn(_MENU_LABELS[MENU_SIGNALS], MENU_SIGNALS)),
-        _row(_btn(_MENU_LABELS[MENU_SECURITY], MENU_SECURITY),
-             _btn(_MENU_LABELS[MENU_BRIEF], MENU_BRIEF)),
-        _row(_btn(_MENU_LABELS[MENU_STATUS], MENU_STATUS),
-             _btn(_MENU_LABELS[MENU_REPORTS], MENU_REPORTS)),
+        _row(
+            _btn(_MENU_LABELS[MENU_PORTFOLIO], MENU_PORTFOLIO),
+            _btn(_MENU_LABELS[MENU_SIGNALS], MENU_SIGNALS),
+        ),
+        _row(
+            _btn(_MENU_LABELS[MENU_SECURITY], MENU_SECURITY),
+            _btn(_MENU_LABELS[MENU_BRIEF], MENU_BRIEF),
+        ),
+        _row(
+            _btn(_MENU_LABELS[MENU_STATUS], MENU_STATUS),
+            _btn(_MENU_LABELS[MENU_REPORTS], MENU_REPORTS),
+        ),
         _row(_btn(_MENU_LABELS[MENU_SETTINGS], MENU_SETTINGS)),
     ]
     if webapp_url:
@@ -160,8 +164,7 @@ def _nav_row(*, include_refresh: str | None = None) -> list[dict[str, Any]]:
 def build_portfolio_keyboard() -> dict[str, Any]:
     return {
         "inline_keyboard": [
-            _row(_btn("📊 Overview", MENU_PORTFOLIO),
-                 _btn("💰 By Venue", f"{MENU_PORTFOLIO}:v")),
+            _row(_btn("📊 Overview", MENU_PORTFOLIO), _btn("💰 By Venue", f"{MENU_PORTFOLIO}:v")),
             _row(_btn("📈 Movers", f"{MENU_PORTFOLIO}:m")),
             _nav_row(include_refresh=f"{MENU_PORTFOLIO}:r"),
         ]
@@ -171,8 +174,7 @@ def build_portfolio_keyboard() -> dict[str, Any]:
 def build_signals_keyboard() -> dict[str, Any]:
     return {
         "inline_keyboard": [
-            _row(_btn("🟢 Active", f"{MENU_SIGNALS}:a"),
-                 _btn("🕒 Last 24h", f"{MENU_SIGNALS}:r")),
+            _row(_btn("🟢 Active", f"{MENU_SIGNALS}:a"), _btn("🕒 Last 24h", f"{MENU_SIGNALS}:r")),
             _row(_btn("🎯 Accuracy", f"{MENU_SIGNALS}:acc")),
             _nav_row(include_refresh=MENU_SIGNALS),
         ]
@@ -182,8 +184,9 @@ def build_signals_keyboard() -> dict[str, Any]:
 def build_security_keyboard() -> dict[str, Any]:
     return {
         "inline_keyboard": [
-            _row(_btn("🔒 Overview", MENU_SECURITY),
-                 _btn("🐛 Recent CVEs", f"{MENU_SECURITY}:cve")),
+            _row(
+                _btn("🔒 Overview", MENU_SECURITY), _btn("🐛 Recent CVEs", f"{MENU_SECURITY}:cve")
+            ),
             _row(_btn("🛡️ Kill Switch", f"{MENU_SECURITY}:ks")),
             _nav_row(include_refresh=MENU_SECURITY),
         ]
@@ -193,8 +196,7 @@ def build_security_keyboard() -> dict[str, Any]:
 def build_brief_keyboard() -> dict[str, Any]:
     return {
         "inline_keyboard": [
-            _row(_btn("☀️ Today", f"{MENU_BRIEF}:t"),
-                 _btn("📅 Weekly", f"{MENU_BRIEF}:w")),
+            _row(_btn("☀️ Today", f"{MENU_BRIEF}:t"), _btn("📅 Weekly", f"{MENU_BRIEF}:w")),
             _row(_btn("🤖 AI Intel", f"{MENU_BRIEF}:ai")),
             _nav_row(include_refresh=MENU_BRIEF),
         ]
@@ -253,9 +255,7 @@ def build_settings_keyboard(*, heartbeat_enabled: bool, heartbeat_hours: int) ->
 
 def _placeholder(section: str) -> str:
     """Escaped MarkdownV2 placeholder used when a provider isn't wired."""
-    return (
-        f"*{section}*\n\n_This surface is scaffolded but no data provider is wired\\._"
-    )
+    return f"*{section}*\n\n_This surface is scaffolded but no data provider is wired\\._"
 
 
 @dataclass(frozen=True)
@@ -306,8 +306,7 @@ def _text_for(token: str, ctx: MenuContext) -> tuple[str, str]:
             return provider(), "Refreshed"
         except Exception as exc:  # pragma: no cover - provider bug fallback
             return (
-                f"*Data source unavailable*\n\n"
-                f"`{type(exc).__name__}`",
+                f"*Data source unavailable*\n\n`{type(exc).__name__}`",
                 "Data source unavailable",
             )
     head = token.split(":", 1)[0]
@@ -319,7 +318,7 @@ def _handle_settings_change(token: str, ctx: MenuContext) -> str:
     """Interpret ``cfg:hb:*`` mutations and return a toast."""
     if not token.startswith("cfg:hb:"):
         return ""
-    action = token[len("cfg:hb:"):]
+    action = token[len("cfg:hb:") :]
     if ctx.on_setting_change is not None:
         try:
             ctx.on_setting_change("heartbeat", action)
@@ -346,7 +345,7 @@ def dispatch_menu_callback(callback_data: str, ctx: MenuContext) -> MenuRender:
         # Not ours. Caller should route elsewhere.
         raise ValueError(f"not a menu callback: {callback_data!r}")
 
-    token = callback_data[len(CALLBACK_PREFIX):] or MENU_HOME
+    token = callback_data[len(CALLBACK_PREFIX) :] or MENU_HOME
 
     # Settings mutations first — they may change subsequent state.
     setting_toast = ""

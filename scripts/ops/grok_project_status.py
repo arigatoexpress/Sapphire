@@ -25,9 +25,15 @@ def main() -> int:
     dens = evaluate_proposal(
         OrderProposal("SONNY", "buy", "rh_l2", "l2_token", 5.0, contract_address="0x9763abc")
     )
-    good = json.loads((ROOT / "projects/grok/fixtures/research_worker_manifest_good.json").read_text())
-    bad = json.loads((ROOT / "projects/grok/fixtures/research_worker_manifest_bad.json").read_text())
-    win_state = json.loads((ROOT / "projects/grok/data/windows_acceptance.json").read_text())["state"]
+    good = json.loads(
+        (ROOT / "projects/grok/fixtures/research_worker_manifest_good.json").read_text()
+    )
+    bad = json.loads(
+        (ROOT / "projects/grok/fixtures/research_worker_manifest_bad.json").read_text()
+    )
+    win_state = json.loads((ROOT / "projects/grok/data/windows_acceptance.json").read_text())[
+        "state"
+    ]
 
     report = {
         "project": "projects/grok",

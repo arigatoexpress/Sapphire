@@ -7,13 +7,16 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from lib.grok.automations import catalog as automation_catalog
 from lib.grok.automations import summary as automation_summary
+from lib.grok.blindspots import blindspot_scoreboard
 from lib.grok.genome import LessonBook
+from lib.grok.playbooks import playbook_summary
 from lib.grok.policy import (
     FREE_REIGN_DEFAULTS,
     OrderProposal,
@@ -21,8 +24,6 @@ from lib.grok.policy import (
     evaluate_scale_out,
 )
 from lib.grok.windows import evaluate_windows_acceptance
-from lib.grok.blindspots import blindspot_scoreboard
-from lib.grok.playbooks import playbook_summary
 
 ROOT = Path(__file__).resolve().parents[2]
 ALPHA_PATH = ROOT / "data" / "alpha" / "alpha_ledger.json"
@@ -36,7 +37,7 @@ SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
 def _utc() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def load_alpha(path: Path = ALPHA_PATH) -> dict[str, Any]:
@@ -261,8 +262,12 @@ def build_system_brief() -> dict[str, Any]:
     if not bridge.get("gate_scope_accepted"):
         next_actions.append("Operator: accept free_reign-only gate scope")
     next_actions.append("Win: run P0 acceptance before ARM L2")
-    next_actions.append("Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)")
-    next_actions.append("Plant: telemetry desk refresh via lib.grok.desk_projection each publish cycle")
+    next_actions.append(
+        "Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)"
+    )
+    next_actions.append(
+        "Plant: telemetry desk refresh via lib.grok.desk_projection each publish cycle"
+    )
     next_actions.append("GCP: cost posture min-instances=0 + Vertex idle skim")
 
     return {
@@ -320,9 +325,7 @@ def render_brief_markdown(brief: Mapping[str, Any]) -> str:
     ]
     lines += ["", "## Critical alpha ↔ policy links", ""]
     for it in brief.get("alpha_critical") or []:
-        lines.append(
-            f"- `{it.get('id')}` **{it.get('severity')}** — {it.get('title')}"
-        )
+        lines.append(f"- `{it.get('id')}` **{it.get('severity')}** — {it.get('title')}")
         lines.append(f"  - fences: {', '.join(it.get('policy_links') or [])}")
         if it.get("action"):
             lines.append(f"  - action: {it.get('action')}")

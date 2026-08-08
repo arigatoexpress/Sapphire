@@ -18,7 +18,7 @@ import json
 import re
 import sys
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -98,7 +98,7 @@ def inventory(export_dir: Path = EXPORT_DIR) -> list[ExportItem]:
             ExportItem(
                 name=path.name,
                 size=st.st_size,
-                mtime_utc=datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).strftime(
+                mtime_utc=datetime.fromtimestamp(st.st_mtime, tz=UTC).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
                 ),
                 has_frontmatter=bool(fm),
@@ -124,7 +124,7 @@ def build_report(items: list[ExportItem]) -> dict[str, Any]:
     names = " ".join(it.name for it in items)
     missing_hints = [h for h in REQUIRED_HINTS if h not in names]
     return {
-        "generated_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "export_dir": str(EXPORT_DIR.relative_to(ROOT)),
         "count": len(items),
         "issue_count": issue_count,

@@ -12,12 +12,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from lib.grok.genome import LessonBook  # noqa: E402
 from lib.grok.loop import DEFAULT_TASKS, render_markdown, tick  # noqa: E402
 from lib.grok.policy import OrderProposal, evaluate_proposal  # noqa: E402
-from lib.grok.genome import LessonBook  # noqa: E402
 from lib.grok.research_worker import validate_research_manifest  # noqa: E402
-from lib.grok.windows import evaluate_windows_acceptance  # noqa: E402
-from lib.grok.system_brief import policy_smoke, bridge_inventory  # noqa: E402
+from lib.grok.system_brief import bridge_inventory, policy_smoke  # noqa: E402
 
 BOARD_JSON = ROOT / "projects/grok/data/taskboard.json"
 BOARD_MD = ROOT / "projects/grok/TASKBOARD.md"
@@ -27,18 +26,13 @@ AUTO_MD = ROOT / "projects/grok/AUTOMATIONS.md"
 def _detect_signals() -> dict:
     signals = {}
     signals["monorepo_bridge_tools_ok"] = (
-        (ROOT / "scripts/ops/sync_grok_web_exports.sh").is_file()
-        and (ROOT / "scripts/ops/grok_bridge_status.py").is_file()
+        ROOT / "scripts/ops/sync_grok_web_exports.sh"
+    ).is_file() and (ROOT / "scripts/ops/grok_bridge_status.py").is_file()
+    dens = evaluate_proposal(OrderProposal("BINGBONG", "buy", "rh_l2", "l2_token", 1.0))
+    dust = evaluate_proposal(OrderProposal("IBIT", "buy", "rh_agentic", "equity", 10.0))
+    signals["policy_tests_ok"] = (
+        (not dens.allow) and (not dust.allow) and (ROOT / "lib/grok/policy.py").is_file()
     )
-    dens = evaluate_proposal(
-        OrderProposal("BINGBONG", "buy", "rh_l2", "l2_token", 1.0)
-    )
-    dust = evaluate_proposal(
-        OrderProposal("IBIT", "buy", "rh_agentic", "equity", 10.0)
-    )
-    signals["policy_tests_ok"] = (not dens.allow) and (not dust.allow) and (
-        ROOT / "lib/grok/policy.py"
-    ).is_file()
 
     book = LessonBook.load(ROOT / "projects/grok/data/genome_seed_lessons.json")
     if book.summary()["count"] == 0:
@@ -57,8 +51,7 @@ def _detect_signals() -> dict:
     }
     bad = {**good, "paper_only": False, "live_trading_enabled": True}
     signals["research_validator_ok"] = (
-        validate_research_manifest(good)["ok"]
-        and not validate_research_manifest(bad)["ok"]
+        validate_research_manifest(good)["ok"] and not validate_research_manifest(bad)["ok"]
     )
     signals["automations_catalog_ok"] = (ROOT / "lib/grok/automations.py").is_file()
     try:
@@ -129,9 +122,7 @@ def main() -> int:
             "|---|---|---|---|",
         ]
         for a in catalog():
-            lines.append(
-                f"| `{a['id']}` | {a['surface']} | {a['status']} | {a['action']} |"
-            )
+            lines.append(f"| `{a['id']}` | {a['surface']} | {a['status']} | {a['action']} |")
         lines.append("")
         AUTO_MD.write_text("\n".join(lines), encoding="utf-8")
         print(f"wrote {BOARD_MD.relative_to(ROOT)}", file=sys.stderr)

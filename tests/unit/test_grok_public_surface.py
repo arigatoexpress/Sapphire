@@ -14,7 +14,11 @@ def test_diagnose_desk_stale():
         live={
             "status": "live",
             "summary": {"active_agents": 1},
-            "desk": {"posture": "unknown", "execution": "unknown", "updated_at": "2020-01-01T00:00:00Z"},
+            "desk": {
+                "posture": "unknown",
+                "execution": "unknown",
+                "updated_at": "2020-01-01T00:00:00Z",
+            },
             "markets": {"events_per_min": 100, "decision_gate": "unknown", "execution": "unknown"},
         },
         widgets={
