@@ -920,7 +920,12 @@ def _write_receipt_and_pointer(
         "previous_receipt_sha256": receipt["previous_receipt_sha256"],
         "updated_at": receipt["activated_at"],
     }
-    _atomic_write(config.state_root / "CURRENT.json", _canonical_json(pointer), 0o600)
+    _atomic_write(
+        config.state_root / "CURRENT.json",
+        _canonical_json(pointer),
+        0o600,
+        before_replace=lambda: _verify_managed(config, receipt),
+    )
     return receipt_digest
 
 

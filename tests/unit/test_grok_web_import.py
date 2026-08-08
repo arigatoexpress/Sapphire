@@ -592,6 +592,43 @@ def test_edit_during_atomic_write_blocks_managed_replacement(tmp_path: Path, mon
     assert (config.state_root / "RECOVERY.json").exists()
 
 
+def test_edit_before_pointer_swap_blocks_activation(tmp_path: Path, monkeypatch):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Before", body="BEFORE\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_note.md"
+    _write_exports(
+        seed,
+        {"2026-08-08_note.md": _frontmatter("After", body="AFTER\n")},
+    )
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "replace export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    manual_edit = _frontmatter("Manual", body="MANUAL\n").encode()
+    real_atomic_write = mod._atomic_write
+
+    def edit_before_pointer(path, data, mode, **kwargs):
+        if path == config.state_root / "CURRENT.json":
+            target.write_bytes(manual_edit)
+        return real_atomic_write(path, data, mode, **kwargs)
+
+    monkeypatch.setattr(mod, "_atomic_write", edit_before_pointer)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "managed_drift"
+    assert target.read_bytes() == manual_edit
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert (config.state_root / "RECOVERY.json").exists()
+
+
 def test_recovery_journal_repairs_simulated_uncatchable_interruption(tmp_path: Path):
     mod = _load()
     _, seed, repo = _fixture_repo(
