@@ -3,7 +3,7 @@ source: local-export
 date: 2026-08-06
 type: plant-status
 topics: [free-reign, gate_order, policy, plant-wire, P0-A]
-title: local-export: free-reign gate_order wired
+title: "local-export: free-reign gate_order wired"
 ---
 
 # Free-reign gate_order wired (P0-A)
