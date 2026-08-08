@@ -263,7 +263,7 @@ def _validate_structure_depth(
             raise ImportRejected(code, relative_path)
         if depth > MAX_STRUCTURED_DEPTH:
             raise ImportRejected(code, relative_path)
-        if isinstance(current, (dict, list)):
+        if isinstance(current, dict | list):
             identity = id(current)
             if identity in seen_containers:
                 if reject_aliases:
