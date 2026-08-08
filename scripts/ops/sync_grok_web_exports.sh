@@ -7,6 +7,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BIN="${GROK_IMPORT_PYTHON:-/opt/homebrew/bin/python3}"
+if [[ -n "${GROK_IMPORT_PYTHON:-}" ]]; then
+  PYTHON_BIN="$GROK_IMPORT_PYTHON"
+elif ! PYTHON_BIN="$(command -v python3)"; then
+  echo "grok-web-import: python3 not found" >&2
+  exit 127
+fi
 
 exec "$PYTHON_BIN" "$SCRIPT_DIR/grok_web_import.py" "$@"

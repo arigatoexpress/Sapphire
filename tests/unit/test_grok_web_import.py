@@ -291,6 +291,29 @@ def test_removed_managed_file_is_quarantined_and_rollback_restores_it(tmp_path: 
     assert rollback_receipt["operation"] == "rollback"
     assert rollback_receipt["rollback_of_receipt_sha256"] == second.receipt_sha256
 
+    repeated = mod.import_exports(config)
+    assert repeated.status == "imported"
+    assert not (config.destination / "2026-08-08_retire.md").exists()
+
+    pointer_before_failed_rollback = (config.state_root / "CURRENT.json").read_bytes()
+
+    def fail_before_pointer(stage: str) -> None:
+        if stage == "before_pointer":
+            raise RuntimeError("injected")
+
+    with pytest.raises(RuntimeError, match="injected"):
+        mod.rollback_import(
+            config,
+            first.receipt_sha256,
+            fault_injector=fail_before_pointer,
+        )
+
+    assert not (config.destination / "2026-08-08_retire.md").exists()
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before_failed_rollback
+    final_rollback = mod.rollback_import(config, first.receipt_sha256)
+    assert final_rollback.status == "rolled_back"
+    assert (config.destination / "2026-08-08_retire.md").exists()
+
 
 def test_out_of_band_edit_blocks_update_and_rollback(tmp_path: Path):
     mod = _load()
@@ -352,6 +375,42 @@ def test_dry_run_and_pointer_failure_leave_current_unchanged(tmp_path: Path):
     with pytest.raises(RuntimeError, match="injected"):
         mod.import_exports(config, fault_injector=fail_before_pointer)
     assert not (config.state_root / "CURRENT.json").exists()
+    assert not (config.destination / "2026-08-08_note.md").exists()
+
+
+def test_pointer_failure_restores_previous_managed_state(tmp_path: Path):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Before", body="BEFORE\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+    first = mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_note.md"
+    content_before = target.read_bytes()
+
+    _write_exports(
+        seed,
+        {"2026-08-08_note.md": _frontmatter("After", body="AFTER\n")},
+    )
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "replace export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+
+    def fail_before_pointer(stage: str) -> None:
+        if stage == "before_pointer":
+            raise RuntimeError("injected")
+
+    with pytest.raises(RuntimeError, match="injected"):
+        mod.import_exports(config, fault_injector=fail_before_pointer)
+
+    assert target.read_bytes() == content_before
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    retry = mod.import_exports(config)
+    assert retry.status == "imported"
+    assert retry.receipt_sha256 != first.receipt_sha256
 
 
 def test_publisher_runs_only_after_material_change(tmp_path: Path):
@@ -364,3 +423,64 @@ def test_publisher_runs_only_after_material_change(tmp_path: Path):
     mod.import_exports(config, publisher=lambda: calls.append("publish"))
 
     assert calls == ["publish"]
+
+
+def test_failed_publisher_retries_for_unchanged_receipt(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
+    config = _config(mod, tmp_path, repo)
+    calls: list[str] = []
+
+    def flaky_publisher() -> None:
+        calls.append("publish")
+        if len(calls) == 1:
+            raise mod.ImportRejected("publisher_failed")
+
+    with pytest.raises(mod.ImportRejected, match="publisher_failed"):
+        mod.import_exports(config, publisher=flaky_publisher)
+
+    pointer = json.loads((config.state_root / "CURRENT.json").read_text())
+    receipt_sha = pointer["receipt_sha256"]
+    result = mod.import_exports(config, publisher=flaky_publisher)
+    mod.import_exports(config, publisher=flaky_publisher)
+
+    assert result.status == "unchanged"
+    assert result.receipt_sha256 == receipt_sha
+    assert calls == ["publish", "publish"]
+
+
+def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    marker = tmp_path / "python-invoked"
+    fake_python = fake_bin / "python3"
+    fake_python.write_text(
+        f'#!/bin/sh\n: > "{marker}"\nexec "{sys.executable}" "$@"\n',
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+    env = os.environ.copy()
+    env.pop("GROK_IMPORT_PYTHON", None)
+    env["PATH"] = f"{fake_bin}:/opt/homebrew/bin:/usr/bin:/bin"
+
+    subprocess.run(
+        [
+            "bash",
+            str(ROOT / "scripts/ops/sync_grok_web_exports.sh"),
+            "--repo",
+            str(repo),
+            "--destination",
+            str(tmp_path / "destination"),
+            "--state-root",
+            str(tmp_path / "state"),
+            "--dry-run",
+            "--no-publish",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert marker.exists()
