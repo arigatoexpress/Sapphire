@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sapphire.local/schemas/grok-web-import-receipt-v1.schema.json",
+  "title": "Sapphire Grok web import receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "operation",
+    "activated_at",
+    "importer",
+    "source",
+    "destination",
+    "content_manifest_sha256",
+    "previous_receipt_sha256",
+    "rollback_of_receipt_sha256",
+    "files",
+    "retired",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "sapphire.grok-web-import.receipt/v1"},
+    "operation": {"enum": ["import", "rollback"]},
+    "activated_at": {"type": "string", "format": "date-time"},
+    "importer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "policy_sha256"],
+      "properties": {
+        "name": {"const": "grok_web_import"},
+        "version": {"const": "1"},
+        "policy_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo",
+        "remote",
+        "requested_ref",
+        "fetch_attempted",
+        "commit_oid",
+        "tree_oid",
+        "tree_prefix"
+      ],
+      "properties": {
+        "repo": {"type": "string"},
+        "remote": {"const": "origin"},
+        "requested_ref": {"const": "refs/remotes/origin/main"},
+        "fetch_attempted": {"type": "boolean"},
+        "commit_oid": {"$ref": "#/$defs/gitOid"},
+        "tree_oid": {"$ref": "#/$defs/gitOid"},
+        "tree_prefix": {"const": "data/grok-web-exports"}
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "admission_class", "managed_paths_only"],
+      "properties": {
+        "root": {"type": "string"},
+        "admission_class": {"const": "raw-unreviewed-inbox"},
+        "managed_paths_only": {"const": true}
+      }
+    },
+    "content_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "previous_receipt_sha256": {
+      "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+    },
+    "rollback_of_receipt_sha256": {
+      "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+    },
+    "files": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/file"}
+    },
+    "retired": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/retired"}
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_files", "created", "adopted", "replaced", "unchanged", "retired", "bytes"],
+      "properties": {
+        "source_files": {"type": "integer", "minimum": 0},
+        "created": {"type": "integer", "minimum": 0},
+        "adopted": {"type": "integer", "minimum": 0},
+        "replaced": {"type": "integer", "minimum": 0},
+        "unchanged": {"type": "integer", "minimum": 0},
+        "retired": {"type": "integer", "minimum": 0},
+        "bytes": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitOid": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_relpath",
+        "destination_relpath",
+        "git_blob_oid",
+        "sha256",
+        "bytes",
+        "media_type",
+        "validation_profile",
+        "before_sha256",
+        "after_sha256",
+        "action"
+      ],
+      "properties": {
+        "source_relpath": {"type": "string"},
+        "destination_relpath": {"type": "string"},
+        "git_blob_oid": {"$ref": "#/$defs/gitOid"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "media_type": {"enum": ["text/markdown", "application/json"]},
+        "validation_profile": {"const": "grok-export-v1"},
+        "before_sha256": {
+          "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+        },
+        "after_sha256": {"$ref": "#/$defs/sha256"},
+        "action": {"enum": ["adopted", "created", "replaced", "unchanged"]}
+      }
+    },
+    "retired": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["destination_relpath", "before_sha256", "quarantine_relpath", "action"],
+      "properties": {
+        "destination_relpath": {"type": "string"},
+        "before_sha256": {"$ref": "#/$defs/sha256"},
+        "quarantine_relpath": {"type": "string"},
+        "action": {"const": "retired-to-quarantine"}
+      }
+    }
+  }
+}
