@@ -527,6 +527,49 @@ def test_recovery_journal_repairs_simulated_uncatchable_interruption(tmp_path: P
     assert retry.status == "imported"
 
 
+def test_recovery_journal_refuses_to_overwrite_post_crash_edit(tmp_path: Path):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Before", body="BEFORE\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+    first = mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_note.md"
+    _write_exports(
+        seed,
+        {"2026-08-08_note.md": _frontmatter("After", body="AFTER\n")},
+    )
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "replace export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+
+    class SimulatedCrash(BaseException):
+        pass
+
+    def crash_after_materialize(stage: str) -> None:
+        if stage == "after_materialize":
+            raise SimulatedCrash
+
+    with pytest.raises(SimulatedCrash):
+        mod.import_exports(config, fault_injector=crash_after_materialize)
+
+    manual_edit = _frontmatter("Manual", body="MANUAL\n").encode()
+    target.write_bytes(manual_edit)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "managed_drift"
+    assert target.read_bytes() == manual_edit
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert (config.state_root / "RECOVERY.json").exists()
+    current = json.loads(pointer_before)
+    assert current["receipt_sha256"] == first.receipt_sha256
+
+
 def test_recovery_journal_accepts_activation_completed_before_interruption(tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})

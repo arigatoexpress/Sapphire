@@ -666,6 +666,11 @@ def _restore_materialization(
             before = item["before_sha256"]
             if not isinstance(before, str):
                 raise ImportRejected("activation_recovery_failed", name)
+            actual = _hash_file(destination, "activation_recovery_failed")
+            if actual == before:
+                continue
+            if actual != item["after_sha256"]:
+                raise ImportRejected("managed_drift", name)
             blob = _blob_path(config, before)
             data = blob.read_bytes() if blob.exists() else b""
             if _sha256(data) != before:
