@@ -205,6 +205,27 @@ def test_strict_validation_rejects_before_copy(tmp_path: Path, name: str, conten
     assert "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456" not in serialized
 
 
+def test_fine_grained_github_pat_is_rejected_without_persisting_secret(tmp_path: Path):
+    mod = _load()
+    token = "github_pat_11ABCDEFGHIJKLMNOP_abcdefghijklmnopqrstuvwxyz0123456789"
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_secret.md": _frontmatter(body=f"{token}\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "secret_detected"
+    assert not config.destination.exists()
+    assert not (config.state_root / "CURRENT.json").exists()
+    serialized = b"".join(
+        path.read_bytes() for path in config.state_root.rglob("*") if path.is_file()
+    )
+    assert token.encode() not in serialized
+
+
 def test_idempotent_import_adopts_identical_and_preserves_unmanaged_files(tmp_path: Path):
     mod = _load()
     content = _frontmatter(body="SAME\n")
@@ -492,6 +513,83 @@ def test_pointer_failure_restores_previous_managed_state(tmp_path: Path):
     retry = mod.import_exports(config)
     assert retry.status == "imported"
     assert retry.receipt_sha256 != first.receipt_sha256
+
+
+def test_edit_after_planning_blocks_managed_replacement(tmp_path: Path, monkeypatch):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Before", body="BEFORE\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_note.md"
+    _write_exports(
+        seed,
+        {"2026-08-08_note.md": _frontmatter("After", body="AFTER\n")},
+    )
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "replace export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    manual_edit = _frontmatter("Manual", body="MANUAL\n").encode()
+    real_store_blob = mod._store_blob
+    edited = False
+
+    def edit_after_plan(*args, **kwargs):
+        nonlocal edited
+        if not edited:
+            target.write_bytes(manual_edit)
+            edited = True
+        return real_store_blob(*args, **kwargs)
+
+    monkeypatch.setattr(mod, "_store_blob", edit_after_plan)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "managed_drift"
+    assert target.read_bytes() == manual_edit
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert not (config.state_root / "RECOVERY.json").exists()
+
+
+def test_edit_during_atomic_write_blocks_managed_replacement(tmp_path: Path, monkeypatch):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Before", body="BEFORE\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_note.md"
+    _write_exports(
+        seed,
+        {"2026-08-08_note.md": _frontmatter("After", body="AFTER\n")},
+    )
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "replace export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    manual_edit = _frontmatter("Manual", body="MANUAL\n").encode()
+    real_atomic_write = mod._atomic_write
+
+    def edit_before_swap(path, data, mode, **kwargs):
+        if path == target:
+            target.write_bytes(manual_edit)
+        return real_atomic_write(path, data, mode, **kwargs)
+
+    monkeypatch.setattr(mod, "_atomic_write", edit_before_swap)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "managed_drift"
+    assert target.read_bytes() == manual_edit
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert (config.state_root / "RECOVERY.json").exists()
 
 
 def test_recovery_journal_repairs_simulated_uncatchable_interruption(tmp_path: Path):

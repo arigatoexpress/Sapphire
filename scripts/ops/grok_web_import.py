@@ -58,7 +58,8 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "known_token_prefix",
         re.compile(
-            rb"(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|"
+            rb"(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
+            rb"gh[pousr]_[A-Za-z0-9]{20,}|"
             rb"xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16})"
         ),
     ),
@@ -398,6 +399,7 @@ def _atomic_write(
     mode: int,
     *,
     preserve_parent_mode: bool = False,
+    before_replace: Callable[[], None] | None = None,
 ) -> None:
     _ensure_dir(
         path.parent,
@@ -412,6 +414,8 @@ def _atomic_write(
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(temporary, mode)
+        if before_replace:
+            before_replace()
         os.replace(temporary, path)
         _fsync_dir(path.parent)
     except Exception:
@@ -613,6 +617,41 @@ def _store_blob(config: ImportConfig, candidate: Candidate) -> None:
     _atomic_write(path, candidate.data, 0o600)
 
 
+def _verify_file_precondition(config: ImportConfig, item: dict[str, Any]) -> None:
+    name = item["destination_relpath"]
+    destination = config.destination / name
+    action = item["action"]
+    if action == "created":
+        if destination.exists() or destination.is_symlink():
+            raise ImportRejected("unmanaged_collision", name)
+        return
+    expected = item["before_sha256"]
+    code = "unmanaged_collision" if action == "adopted" else "managed_drift"
+    if not isinstance(expected, str) or _hash_file(destination, code) != expected:
+        raise ImportRejected(code, name)
+
+
+def _verify_retired_precondition(config: ImportConfig, item: dict[str, Any]) -> None:
+    name = item["destination_relpath"]
+    expected = item["before_sha256"]
+    if (
+        not isinstance(expected, str)
+        or _hash_file(config.destination / name, "managed_drift") != expected
+    ):
+        raise ImportRejected("managed_drift", name)
+
+
+def _verify_materialize_preconditions(
+    config: ImportConfig,
+    files: list[dict[str, Any]],
+    retired: list[dict[str, Any]],
+) -> None:
+    for item in files:
+        _verify_file_precondition(config, item)
+    for item in retired:
+        _verify_retired_precondition(config, item)
+
+
 def _materialize(
     config: ImportConfig,
     candidates: list[Candidate],
@@ -623,14 +662,17 @@ def _materialize(
     by_name = {candidate.destination_relpath: candidate for candidate in candidates}
     for item in files:
         if item["action"] in {"created", "replaced"}:
+            _verify_file_precondition(config, item)
             candidate = by_name[item["destination_relpath"]]
             _atomic_write(
                 config.destination / candidate.destination_relpath,
                 candidate.data,
                 0o644,
                 preserve_parent_mode=True,
+                before_replace=lambda item=item: _verify_file_precondition(config, item),
             )
     for item in retired:
+        _verify_retired_precondition(config, item)
         source = config.destination / item["destination_relpath"]
         quarantine = config.state_root / "quarantine" / item["quarantine_relpath"]
         _ensure_dir(quarantine.parent, 0o700)
@@ -890,6 +932,7 @@ def _activate_receipt(
     receipt: dict[str, Any],
     fault_injector: Callable[[str], None] | None,
 ) -> str:
+    _verify_materialize_preconditions(config, files, retired)
     _begin_recovery_journal(config, receipt, files, retired)
     try:
         _materialize(config, candidates, files, retired)
