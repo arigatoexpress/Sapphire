@@ -35,6 +35,7 @@ IMPORTER_NAME = "grok_web_import"
 IMPORTER_VERSION = "1"
 VALIDATION_PROFILE = "grok-export-v1"
 MAX_STRUCTURED_DEPTH = 100
+MAX_STRUCTURED_NODES = 10_000
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -84,6 +85,7 @@ POLICY = {
     "excluded_names": sorted(EXCLUDED_NAMES),
     "required_provenance": list(REQUIRED_PROVENANCE),
     "max_structured_depth": MAX_STRUCTURED_DEPTH,
+    "max_structured_nodes": MAX_STRUCTURED_NODES,
     "regular_blob_mode": "100644",
     "validation_profile": VALIDATION_PROFILE,
 }
@@ -244,16 +246,38 @@ def _validate_provenance(value: Any, relative_path: str) -> None:
             raise ImportRejected(f"missing_{key}", relative_path)
 
 
-def _validate_structure_depth(value: Any, relative_path: str, code: str) -> None:
+def _validate_structure_depth(
+    value: Any,
+    relative_path: str,
+    code: str,
+    *,
+    reject_aliases: bool = False,
+) -> None:
     stack = [(value, 1)]
+    seen_containers: set[int] = set()
+    visited = 0
     while stack:
         current, depth = stack.pop()
+        visited += 1
+        if visited > MAX_STRUCTURED_NODES:
+            raise ImportRejected(code, relative_path)
         if depth > MAX_STRUCTURED_DEPTH:
             raise ImportRejected(code, relative_path)
+        if isinstance(current, (dict, list)):
+            identity = id(current)
+            if identity in seen_containers:
+                if reject_aliases:
+                    raise ImportRejected(code, relative_path)
+                continue
+            seen_containers.add(identity)
         if isinstance(current, dict):
             stack.extend((item, depth + 1) for item in current.values())
         elif isinstance(current, list):
             stack.extend((item, depth + 1) for item in current)
+
+
+def _reject_json_constant(_: str) -> Any:
+    raise ValueError
 
 
 def _validate_candidate(path: str, data: bytes) -> str:
@@ -272,13 +296,18 @@ def _validate_candidate(path: str, data: bytes) -> str:
             frontmatter = yaml.safe_load(match.group("body"))
         except (yaml.YAMLError, ValueError, RecursionError):
             raise ImportRejected("invalid_yaml", path)
-        _validate_structure_depth(frontmatter, path, "invalid_yaml")
+        _validate_structure_depth(
+            frontmatter,
+            path,
+            "invalid_yaml",
+            reject_aliases=True,
+        )
         _validate_provenance(frontmatter, path)
         return "text/markdown"
     if suffix == ".json":
         try:
-            value = json.loads(text)
-        except (json.JSONDecodeError, RecursionError):
+            value = json.loads(text, parse_constant=_reject_json_constant)
+        except (json.JSONDecodeError, ValueError, RecursionError):
             raise ImportRejected("invalid_json", path)
         _validate_structure_depth(value, path, "invalid_json")
         _validate_provenance(value, path)

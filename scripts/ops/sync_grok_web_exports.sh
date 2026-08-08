@@ -22,4 +22,24 @@ if [[ -n "${KNOWLEDGE_INBOX:-}" ]]; then
   LEGACY_ARGS+=(--destination "$KNOWLEDGE_INBOX")
 fi
 
-exec "$PYTHON_BIN" "$SCRIPT_DIR/grok_web_import.py" "${LEGACY_ARGS[@]}" "$@"
+LOG_DIR="${SAPPHIRE_BRIDGE_LOG_DIR:-$HOME/ops-state/logs}"
+LOG_FILE="$LOG_DIR/grok-web-bridge.log"
+STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+set +e
+IMPORT_OUTPUT="$("$PYTHON_BIN" "$SCRIPT_DIR/grok_web_import.py" "${LEGACY_ARGS[@]}" "$@" 2>&1)"
+IMPORT_STATUS=$?
+set -e
+
+if [[ "$IMPORT_STATUS" -eq 0 ]]; then
+  printf '%s\n' "$IMPORT_OUTPUT"
+else
+  printf '%s\n' "$IMPORT_OUTPUT" >&2
+fi
+
+if [[ -d "$LOG_DIR" ]] || mkdir -m 700 -p "$LOG_DIR" 2>/dev/null; then
+  LOG_OUTPUT="${IMPORT_OUTPUT//$'\n'/ }"
+  printf '%s exit=%d %s\n' "$STAMP" "$IMPORT_STATUS" "$LOG_OUTPUT" >>"$LOG_FILE" || true
+fi
+
+exit "$IMPORT_STATUS"

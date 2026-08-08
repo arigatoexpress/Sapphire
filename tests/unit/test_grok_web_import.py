@@ -271,6 +271,63 @@ def test_deeply_nested_input_is_structurally_rejected(
     assert not (config.state_root / "CURRENT.json").exists()
 
 
+def test_yaml_aliases_are_rejected_before_traversal_amplification(tmp_path: Path):
+    mod = _load()
+    content = (
+        "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\n"
+        'title: "Aliases"\nbase: &base [0]\naliases: [*base, *base]\n---\n'
+    )
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_aliases.md": content})
+    config = _config(mod, tmp_path, repo)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "invalid_yaml"
+    assert not config.destination.exists()
+    assert not (config.state_root / "CURRENT.json").exists()
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_nonstandard_json_constants_are_rejected(tmp_path: Path, constant: str):
+    mod = _load()
+    content = (
+        '{"source":"grok-web","date":"2026-08-08","type":"note",'
+        f'"title":"Constants","value":{constant}}}'
+    )
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_constant.json": content})
+    config = _config(mod, tmp_path, repo)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "invalid_json"
+    assert not config.destination.exists()
+    assert not (config.state_root / "CURRENT.json").exists()
+
+
+def test_excessive_structured_nodes_are_rejected(tmp_path: Path):
+    mod = _load()
+    content = json.dumps(
+        {
+            "source": "grok-web",
+            "date": "2026-08-08",
+            "type": "note",
+            "title": "Wide",
+            "values": [0] * 10_001,
+        }
+    )
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_wide.json": content})
+    config = _config(mod, tmp_path, repo)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "invalid_json"
+    assert not config.destination.exists()
+    assert not (config.state_root / "CURRENT.json").exists()
+
+
 def test_idempotent_import_adopts_identical_and_preserves_unmanaged_files(tmp_path: Path):
     mod = _load()
     content = _frontmatter(body="SAME\n")
@@ -892,8 +949,10 @@ def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
     env.pop("GROK_IMPORT_PYTHON", None)
     env["PATH"] = f"{fake_bin}:/opt/homebrew/bin:/usr/bin:/bin"
     legacy_destination = tmp_path / "legacy-destination"
+    legacy_log_dir = tmp_path / "legacy-logs"
     env["SAPPHIRE_DIR"] = str(repo)
     env["KNOWLEDGE_INBOX"] = str(legacy_destination)
+    env["SAPPHIRE_BRIDGE_LOG_DIR"] = str(legacy_log_dir)
 
     subprocess.run(
         [
@@ -911,3 +970,5 @@ def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
 
     assert marker.exists()
     assert (legacy_destination / "2026-08-08_note.md").exists()
+    bridge_log = legacy_log_dir / "grok-web-bridge.log"
+    assert '"ok": true' in bridge_log.read_text(encoding="utf-8")
