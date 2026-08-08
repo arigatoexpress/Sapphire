@@ -34,6 +34,7 @@ RECOVERY_SCHEMA = "sapphire.grok-web-import.recovery/v1"
 IMPORTER_NAME = "grok_web_import"
 IMPORTER_VERSION = "1"
 VALIDATION_PROFILE = "grok-export-v1"
+MAX_STRUCTURED_DEPTH = 100
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -60,7 +61,8 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
         re.compile(
             rb"(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
             rb"gh[pousr]_[A-Za-z0-9]{20,}|"
-            rb"xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16})"
+            rb"xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|"
+            rb"AIza[0-9A-Za-z_-]{20,}|ya29\.[A-Za-z0-9._/-]{12,})"
         ),
     ),
     (
@@ -81,6 +83,7 @@ POLICY = {
     "allowed_suffixes": sorted(ALLOWED_SUFFIXES),
     "excluded_names": sorted(EXCLUDED_NAMES),
     "required_provenance": list(REQUIRED_PROVENANCE),
+    "max_structured_depth": MAX_STRUCTURED_DEPTH,
     "regular_blob_mode": "100644",
     "validation_profile": VALIDATION_PROFILE,
 }
@@ -241,6 +244,18 @@ def _validate_provenance(value: Any, relative_path: str) -> None:
             raise ImportRejected(f"missing_{key}", relative_path)
 
 
+def _validate_structure_depth(value: Any, relative_path: str, code: str) -> None:
+    stack = [(value, 1)]
+    while stack:
+        current, depth = stack.pop()
+        if depth > MAX_STRUCTURED_DEPTH:
+            raise ImportRejected(code, relative_path)
+        if isinstance(current, dict):
+            stack.extend((item, depth + 1) for item in current.values())
+        elif isinstance(current, list):
+            stack.extend((item, depth + 1) for item in current)
+
+
 def _validate_candidate(path: str, data: bytes) -> str:
     if _secret_path(path):
         raise ImportRejected("secret_path", path)
@@ -255,15 +270,17 @@ def _validate_candidate(path: str, data: bytes) -> str:
             raise ImportRejected("missing_frontmatter", path)
         try:
             frontmatter = yaml.safe_load(match.group("body"))
-        except (yaml.YAMLError, ValueError):
+        except (yaml.YAMLError, ValueError, RecursionError):
             raise ImportRejected("invalid_yaml", path)
+        _validate_structure_depth(frontmatter, path, "invalid_yaml")
         _validate_provenance(frontmatter, path)
         return "text/markdown"
     if suffix == ".json":
         try:
             value = json.loads(text)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, RecursionError):
             raise ImportRejected("invalid_json", path)
+        _validate_structure_depth(value, path, "invalid_json")
         _validate_provenance(value, path)
         return "application/json"
     raise ImportRejected("unsupported_extension", path)

@@ -205,9 +205,19 @@ def test_strict_validation_rejects_before_copy(tmp_path: Path, name: str, conten
     assert "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456" not in serialized
 
 
-def test_fine_grained_github_pat_is_rejected_without_persisting_secret(tmp_path: Path):
+@pytest.mark.parametrize(
+    "token",
+    [
+        "github_pat_11ABCDEFGHIJKLMNOP_abcdefghijklmnopqrstuvwxyz0123456789",
+        "AIza" + "A" * 35,
+        "ya29." + "A" * 40,
+    ],
+)
+def test_bare_known_token_is_rejected_without_persisting_secret(
+    tmp_path: Path,
+    token: str,
+):
     mod = _load()
-    token = "github_pat_11ABCDEFGHIJKLMNOP_abcdefghijklmnopqrstuvwxyz0123456789"
     _, _, repo = _fixture_repo(
         tmp_path,
         {"2026-08-08_secret.md": _frontmatter(body=f"{token}\n")},
@@ -224,6 +234,41 @@ def test_fine_grained_github_pat_is_rejected_without_persisting_secret(tmp_path:
         path.read_bytes() for path in config.state_root.rglob("*") if path.is_file()
     )
     assert token.encode() not in serialized
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "code"),
+    [
+        (
+            "2026-08-08_deep.md",
+            "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\n"
+            'title: "Deep"\nx: ' + "[" * 600 + "0" + "]" * 600 + "\n---\n",
+            "invalid_yaml",
+        ),
+        (
+            "2026-08-08_deep.json",
+            '{"source":"grok-web","date":"2026-08-08","type":"note",'
+            '"title":"Deep","x":' + "[" * 1200 + "0" + "]" * 1200 + "}",
+            "invalid_json",
+        ),
+    ],
+)
+def test_deeply_nested_input_is_structurally_rejected(
+    tmp_path: Path,
+    name: str,
+    content: str,
+    code: str,
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {name: content})
+    config = _config(mod, tmp_path, repo)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == code
+    assert not config.destination.exists()
+    assert not (config.state_root / "CURRENT.json").exists()
 
 
 def test_idempotent_import_adopts_identical_and_preserves_unmanaged_files(tmp_path: Path):
