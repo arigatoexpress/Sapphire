@@ -55,7 +55,7 @@ SECRET_PATH_NAMES = frozenset(
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "private_key_block",
-        re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----", re.IGNORECASE),
+        re.compile(rb"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----", re.IGNORECASE),
     ),
     (
         "known_token_prefix",

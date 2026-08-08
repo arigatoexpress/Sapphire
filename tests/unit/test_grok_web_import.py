@@ -183,6 +183,11 @@ def test_fetch_failure_is_non_mutating(tmp_path: Path):
             _frontmatter(body="api_key: sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456\n"),
             "secret_detected",
         ),
+        (
+            "2026-08-08_encrypted-key.md",
+            _frontmatter(body="-----BEGIN ENCRYPTED PRIVATE KEY-----\nFAKE\n"),
+            "secret_detected",
+        ),
         ("credentials.md", _frontmatter(), "secret_path"),
     ],
 )
