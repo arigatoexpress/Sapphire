@@ -16,6 +16,7 @@ import re
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import unicodedata
 from collections.abc import Callable
@@ -452,8 +453,8 @@ def _atomic_write(
         0o700 if mode == 0o600 else 0o755,
         preserve_existing_mode=preserve_parent_mode,
     )
-    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}.{time.time_ns()}")
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".grok-import-", dir=path.parent)
+    temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(data)

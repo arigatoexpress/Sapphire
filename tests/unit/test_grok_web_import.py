@@ -409,6 +409,16 @@ def test_update_writes_content_addressed_blob_receipt_and_atomic_pointer(tmp_pat
     assert (blob.stat().st_mode & 0o777) == 0o600
 
 
+def test_atomic_write_uses_bounded_temporary_name_for_long_destination(tmp_path: Path):
+    mod = _load()
+    target = tmp_path / f"{'x' * 240}.md"
+
+    mod._atomic_write(target, b"bounded\n", 0o600)
+
+    assert target.read_bytes() == b"bounded\n"
+    assert list(tmp_path.iterdir()) == [target]
+
+
 def test_removed_managed_file_is_quarantined_and_rollback_restores_it(tmp_path: Path):
     mod = _load()
     _, seed, repo = _fixture_repo(
