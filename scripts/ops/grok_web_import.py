@@ -17,6 +17,7 @@ import stat
 import subprocess
 import sys
 import time
+import unicodedata
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
@@ -29,6 +30,7 @@ import yaml
 SCHEMA_NAME = "sapphire.grok-web-import.receipt/v1"
 POINTER_SCHEMA = "sapphire.grok-web-import.pointer/v1"
 PUBLISH_MARKER_SCHEMA = "sapphire.grok-web-import.published/v1"
+RECOVERY_SCHEMA = "sapphire.grok-web-import.recovery/v1"
 IMPORTER_NAME = "grok_web_import"
 IMPORTER_VERSION = "1"
 VALIDATION_PROFILE = "grok-export-v1"
@@ -137,6 +139,16 @@ class Candidate:
     size: int
     media_type: str
     data: bytes
+
+
+def _validate_destination_aliases(candidates: list[Candidate]) -> None:
+    seen: dict[str, str] = {}
+    for candidate in candidates:
+        name = candidate.destination_relpath
+        alias_key = unicodedata.normalize("NFC", name).casefold()
+        if alias_key in seen:
+            raise ImportRejected("destination_alias", name)
+        seen[alias_key] = name
 
 
 def _canonical_json(value: Any) -> bytes:
@@ -342,6 +354,7 @@ def _source_snapshot(config: ImportConfig, *, fetch: bool) -> tuple[str, str, li
     candidates.sort(key=lambda item: item.source_relpath)
     if not candidates:
         raise ImportRejected("empty_source")
+    _validate_destination_aliases(candidates)
     return commit, tree, candidates
 
 
@@ -683,6 +696,134 @@ def _publish_receipt_once(
     _atomic_write(marker, expected, 0o600)
 
 
+def _recovery_path(config: ImportConfig) -> Path:
+    return config.state_root / "RECOVERY.json"
+
+
+def _validate_recovery_name(name: Any) -> str:
+    if not isinstance(name, str) or not name or Path(name).name != name or name in {".", ".."}:
+        raise ImportRejected("recovery_journal_invalid")
+    return name
+
+
+def _validate_recovery_journal(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or value.get("schema") != RECOVERY_SCHEMA:
+        raise ImportRejected("recovery_journal_invalid")
+    payload = value.get("payload")
+    payload_sha = value.get("payload_sha256")
+    if not isinstance(payload, dict) or not SHA256_RE.fullmatch(str(payload_sha or "")):
+        raise ImportRejected("recovery_journal_invalid")
+    if _sha256(_canonical_json(payload)) != payload_sha:
+        raise ImportRejected("recovery_journal_digest")
+    if payload.get("operation") not in {"import", "rollback"}:
+        raise ImportRejected("recovery_journal_invalid")
+    for field in ("target_receipt_sha256",):
+        if not SHA256_RE.fullmatch(str(payload.get(field, ""))):
+            raise ImportRejected("recovery_journal_invalid")
+    previous = payload.get("previous_receipt_sha256")
+    if previous is not None and not SHA256_RE.fullmatch(str(previous)):
+        raise ImportRejected("recovery_journal_invalid")
+    files = payload.get("files")
+    retired = payload.get("retired")
+    if not isinstance(files, list) or not isinstance(retired, list):
+        raise ImportRejected("recovery_journal_invalid")
+    for item in files:
+        if not isinstance(item, dict):
+            raise ImportRejected("recovery_journal_invalid")
+        _validate_recovery_name(item.get("destination_relpath"))
+        if item.get("action") not in {"adopted", "created", "replaced", "unchanged"}:
+            raise ImportRejected("recovery_journal_invalid")
+        if not SHA256_RE.fullmatch(str(item.get("after_sha256", ""))):
+            raise ImportRejected("recovery_journal_invalid")
+        before = item.get("before_sha256")
+        if before is not None and not SHA256_RE.fullmatch(str(before)):
+            raise ImportRejected("recovery_journal_invalid")
+    for item in retired:
+        if not isinstance(item, dict) or item.get("action") != "retired-to-quarantine":
+            raise ImportRejected("recovery_journal_invalid")
+        name = _validate_recovery_name(item.get("destination_relpath"))
+        if not SHA256_RE.fullmatch(str(item.get("before_sha256", ""))):
+            raise ImportRejected("recovery_journal_invalid")
+        quarantine = item.get("quarantine_relpath")
+        if not isinstance(quarantine, str):
+            raise ImportRejected("recovery_journal_invalid")
+        quarantine_path = Path(quarantine)
+        if (
+            quarantine_path.is_absolute()
+            or ".." in quarantine_path.parts
+            or quarantine_path.name != name
+        ):
+            raise ImportRejected("recovery_journal_invalid")
+    return payload
+
+
+def _load_recovery_journal(config: ImportConfig) -> dict[str, Any] | None:
+    path = _recovery_path(config)
+    if not path.exists() and not path.is_symlink():
+        return None
+    metadata = path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ImportRejected("recovery_journal_invalid")
+    try:
+        raw = path.read_bytes()
+        value = json.loads(raw)
+    except (OSError, json.JSONDecodeError):
+        raise ImportRejected("recovery_journal_invalid")
+    return _validate_recovery_journal(value)
+
+
+def _begin_recovery_journal(
+    config: ImportConfig,
+    receipt: dict[str, Any],
+    files: list[dict[str, Any]],
+    retired: list[dict[str, Any]],
+) -> None:
+    path = _recovery_path(config)
+    if path.exists() or path.is_symlink():
+        raise ImportRejected("recovery_pending")
+    payload = {
+        "operation": receipt["operation"],
+        "previous_receipt_sha256": receipt["previous_receipt_sha256"],
+        "target_receipt_sha256": _sha256(_canonical_json(receipt)),
+        "files": files,
+        "retired": retired,
+    }
+    journal = {
+        "schema": RECOVERY_SCHEMA,
+        "payload_sha256": _sha256(_canonical_json(payload)),
+        "payload": payload,
+    }
+    _atomic_write(path, _canonical_json(journal), 0o600)
+
+
+def _clear_recovery_journal(config: ImportConfig) -> None:
+    path = _recovery_path(config)
+    if not path.exists() and not path.is_symlink():
+        return
+    metadata = path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ImportRejected("recovery_journal_invalid")
+    path.unlink()
+    _fsync_dir(path.parent)
+
+
+def _recover_interrupted(config: ImportConfig) -> None:
+    journal = _load_recovery_journal(config)
+    if not journal:
+        return
+    current_pair = _load_current(config)
+    current_sha, current = current_pair if current_pair else (None, None)
+    if current_sha == journal["target_receipt_sha256"]:
+        _verify_managed(config, current)
+        _clear_recovery_journal(config)
+        return
+    if current_sha != journal["previous_receipt_sha256"]:
+        raise ImportRejected("recovery_pointer_mismatch")
+    _restore_materialization(config, journal["files"], journal["retired"])
+    _verify_managed(config, current)
+    _clear_recovery_journal(config)
+
+
 def _write_receipt_and_pointer(
     config: ImportConfig,
     receipt: dict[str, Any],
@@ -709,6 +850,41 @@ def _write_receipt_and_pointer(
     }
     _atomic_write(config.state_root / "CURRENT.json", _canonical_json(pointer), 0o600)
     return receipt_digest
+
+
+def _activate_receipt(
+    config: ImportConfig,
+    candidates: list[Candidate],
+    files: list[dict[str, Any]],
+    retired: list[dict[str, Any]],
+    receipt: dict[str, Any],
+    fault_injector: Callable[[str], None] | None,
+) -> str:
+    _begin_recovery_journal(config, receipt, files, retired)
+    try:
+        _materialize(config, candidates, files, retired)
+        if fault_injector:
+            fault_injector("after_materialize")
+    except Exception:
+        _restore_materialization(config, files, retired)
+        _clear_recovery_journal(config)
+        raise
+    try:
+        receipt_sha = _write_receipt_and_pointer(
+            config,
+            receipt,
+            fault_injector=fault_injector,
+        )
+    except Exception:
+        if not _pointer_activates(config, receipt):
+            _restore_materialization(config, files, retired)
+            _clear_recovery_journal(config)
+            raise
+        receipt_sha = _sha256(_canonical_json(receipt))
+    if fault_injector:
+        fault_injector("after_pointer")
+    _clear_recovery_journal(config)
+    return receipt_sha
 
 
 def _build_receipt(
@@ -798,11 +974,6 @@ def _perform_import(
         )
     for candidate in candidates:
         _store_blob(config, candidate)
-    try:
-        _materialize(config, candidates, files, retired)
-    except Exception:
-        _restore_materialization(config, files, retired)
-        raise
     receipt = _build_receipt(
         config,
         operation="import",
@@ -815,17 +986,14 @@ def _perform_import(
         files=files,
         retired=retired,
     )
-    try:
-        receipt_sha = _write_receipt_and_pointer(
-            config,
-            receipt,
-            fault_injector=fault_injector,
-        )
-    except Exception:
-        if not _pointer_activates(config, receipt):
-            _restore_materialization(config, files, retired)
-            raise
-        receipt_sha = _sha256(_canonical_json(receipt))
+    receipt_sha = _activate_receipt(
+        config,
+        candidates,
+        files,
+        retired,
+        receipt,
+        fault_injector,
+    )
     _publish_receipt_once(config, receipt_sha, publisher)
     return ImportResult(
         status="imported",
@@ -847,6 +1015,8 @@ def import_exports(
 ) -> ImportResult:
     """Import one resolved remote-tree snapshot; never read the checkout."""
     if dry_run:
+        if _recovery_path(config).exists() or _recovery_path(config).is_symlink():
+            raise ImportRejected("recovery_pending")
         return _perform_import(
             config,
             fetch=fetch,
@@ -855,6 +1025,7 @@ def import_exports(
             fault_injector=fault_injector,
         )
     with _import_lock(config):
+        _recover_interrupted(config)
         return _perform_import(
             config,
             fetch=fetch,
@@ -886,10 +1057,14 @@ def rollback_import(
     target_receipt_sha256: str,
     *,
     dry_run: bool = False,
+    publisher: Callable[[], None] | None = None,
     fault_injector: Callable[[str], None] | None = None,
 ) -> ImportResult:
     """Restore the managed set described by a prior verified receipt without network I/O."""
+    if dry_run and (_recovery_path(config).exists() or _recovery_path(config).is_symlink()):
+        raise ImportRejected("recovery_pending")
     with _import_lock(config):
+        _recover_interrupted(config)
         current_pair = _load_current(config)
         if not current_pair:
             raise ImportRejected("current_pointer_missing")
@@ -897,6 +1072,7 @@ def rollback_import(
         _verify_managed(config, current)
         target = _load_receipt(config, target_receipt_sha256)
         if current_sha == target_receipt_sha256:
+            _publish_receipt_once(config, current_sha, None if dry_run else publisher)
             return ImportResult(
                 status="unchanged",
                 changed=False,
@@ -906,6 +1082,7 @@ def rollback_import(
                 source_files=len(current["files"]),
             )
         candidates = [_candidate_from_receipt(config, item) for item in target["files"]]
+        _validate_destination_aliases(candidates)
         manifest_sha = target["content_manifest_sha256"]
         files, retired = _plan_files(
             config,
@@ -923,11 +1100,6 @@ def rollback_import(
                 source_commit=target["source"]["commit_oid"],
                 source_files=len(candidates),
             )
-        try:
-            _materialize(config, candidates, files, retired)
-        except Exception:
-            _restore_materialization(config, files, retired)
-            raise
         receipt = _build_receipt(
             config,
             operation="rollback",
@@ -940,17 +1112,15 @@ def rollback_import(
             files=files,
             retired=retired,
         )
-        try:
-            receipt_sha = _write_receipt_and_pointer(
-                config,
-                receipt,
-                fault_injector=fault_injector,
-            )
-        except Exception:
-            if not _pointer_activates(config, receipt):
-                _restore_materialization(config, files, retired)
-                raise
-            receipt_sha = _sha256(_canonical_json(receipt))
+        receipt_sha = _activate_receipt(
+            config,
+            candidates,
+            files,
+            retired,
+            receipt,
+            fault_injector,
+        )
+        _publish_receipt_once(config, receipt_sha, publisher)
         return ImportResult(
             status="rolled_back",
             changed=True,
@@ -1005,10 +1175,15 @@ def main(argv: list[str] | None = None) -> int:
         state_root=args.state_root,
     )
     try:
+        publisher = None if args.no_publish else _publish_operator_feeds
         if args.rollback:
-            result = rollback_import(config, args.rollback, dry_run=args.dry_run)
+            result = rollback_import(
+                config,
+                args.rollback,
+                dry_run=args.dry_run,
+                publisher=publisher,
+            )
         else:
-            publisher = None if args.no_publish else _publish_operator_feeds
             result = import_exports(
                 config,
                 fetch=args.fetch or args.pull,

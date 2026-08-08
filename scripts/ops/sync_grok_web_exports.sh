@@ -14,4 +14,12 @@ elif ! PYTHON_BIN="$(command -v python3)"; then
   exit 127
 fi
 
-exec "$PYTHON_BIN" "$SCRIPT_DIR/grok_web_import.py" "$@"
+LEGACY_ARGS=()
+if [[ -n "${SAPPHIRE_DIR:-}" ]]; then
+  LEGACY_ARGS+=(--repo "$SAPPHIRE_DIR")
+fi
+if [[ -n "${KNOWLEDGE_INBOX:-}" ]]; then
+  LEGACY_ARGS+=(--destination "$KNOWLEDGE_INBOX")
+fi
+
+exec "$PYTHON_BIN" "$SCRIPT_DIR/grok_web_import.py" "${LEGACY_ARGS[@]}" "$@"

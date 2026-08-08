@@ -358,6 +358,33 @@ def test_tree_boundary_rejects_nested_and_symlink_entries(tmp_path: Path):
     assert link_error.value.code == "forbidden_tree_entry"
 
 
+@pytest.mark.parametrize(
+    ("left", "right"),
+    [
+        ("Note.md", "note.md"),
+        ("caf\u00e9.md", "cafe\u0301.md"),
+    ],
+)
+def test_destination_aliases_are_rejected_before_materialization(left: str, right: str):
+    mod = _load()
+
+    def candidate(name: str, digest: str):
+        return mod.Candidate(
+            source_relpath=f"data/grok-web-exports/{name}",
+            destination_relpath=name,
+            git_blob_oid="a" * 40,
+            sha256=digest,
+            size=1,
+            media_type="text/markdown",
+            data=b"x",
+        )
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod._validate_destination_aliases([candidate(left, "1" * 64), candidate(right, "2" * 64)])
+
+    assert caught.value.code == "destination_alias"
+
+
 def test_dry_run_and_pointer_failure_leave_current_unchanged(tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
@@ -413,6 +440,79 @@ def test_pointer_failure_restores_previous_managed_state(tmp_path: Path):
     assert retry.receipt_sha256 != first.receipt_sha256
 
 
+def test_recovery_journal_repairs_simulated_uncatchable_interruption(tmp_path: Path):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Before", body="BEFORE\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+    first = mod.import_exports(config)
+    target = config.destination / "2026-08-08_note.md"
+    before = target.read_bytes()
+    _write_exports(
+        seed,
+        {"2026-08-08_note.md": _frontmatter("After", body="AFTER\n")},
+    )
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "replace export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    replacement_commit = _git(repo, "rev-parse", "origin/main^{commit}")
+
+    class SimulatedCrash(BaseException):
+        pass
+
+    def crash_after_materialize(stage: str) -> None:
+        if stage == "after_materialize":
+            raise SimulatedCrash
+
+    with pytest.raises(SimulatedCrash):
+        mod.import_exports(config, fault_injector=crash_after_materialize)
+
+    assert target.read_bytes() != before
+    assert (config.state_root / "RECOVERY.json").exists()
+    current = json.loads((config.state_root / "CURRENT.json").read_text())
+    assert current["receipt_sha256"] == first.receipt_sha256
+
+    _git(repo, "update-ref", "refs/remotes/origin/main", first.source_commit)
+    recovered = mod.import_exports(config)
+
+    assert recovered.status == "unchanged"
+    assert target.read_bytes() == before
+    assert not (config.state_root / "RECOVERY.json").exists()
+    _git(repo, "update-ref", "refs/remotes/origin/main", replacement_commit)
+    retry = mod.import_exports(config)
+    assert retry.status == "imported"
+
+
+def test_recovery_journal_accepts_activation_completed_before_interruption(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
+    config = _config(mod, tmp_path, repo)
+
+    class SimulatedCrash(BaseException):
+        pass
+
+    def crash_after_pointer(stage: str) -> None:
+        if stage == "after_pointer":
+            raise SimulatedCrash
+
+    with pytest.raises(SimulatedCrash):
+        mod.import_exports(config, fault_injector=crash_after_pointer)
+
+    pointer_before_recovery = (config.state_root / "CURRENT.json").read_bytes()
+    target_before_recovery = (config.destination / "2026-08-08_note.md").read_bytes()
+    assert (config.state_root / "RECOVERY.json").exists()
+
+    recovered = mod.import_exports(config)
+
+    assert recovered.status == "unchanged"
+    assert not (config.state_root / "RECOVERY.json").exists()
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before_recovery
+    assert (config.destination / "2026-08-08_note.md").read_bytes() == target_before_recovery
+
+
 def test_publisher_runs_only_after_material_change(tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
@@ -449,6 +549,40 @@ def test_failed_publisher_retries_for_unchanged_receipt(tmp_path: Path):
     assert calls == ["publish", "publish"]
 
 
+def test_failed_rollback_publisher_retries_for_activated_receipt(tmp_path: Path):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Before")},
+    )
+    config = _config(mod, tmp_path, repo)
+    first = mod.import_exports(config)
+    _write_exports(seed, {"2026-08-08_note.md": _frontmatter("After")})
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "replace export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    mod.import_exports(config)
+    calls: list[str] = []
+
+    def flaky_publisher() -> None:
+        calls.append("publish")
+        if len(calls) == 1:
+            raise mod.ImportRejected("publisher_failed")
+
+    with pytest.raises(mod.ImportRejected, match="publisher_failed"):
+        mod.rollback_import(config, first.receipt_sha256, publisher=flaky_publisher)
+
+    current = json.loads((config.state_root / "CURRENT.json").read_text())
+    activated_receipt_sha = current["receipt_sha256"]
+    result = mod.rollback_import(config, activated_receipt_sha, publisher=flaky_publisher)
+    mod.rollback_import(config, activated_receipt_sha, publisher=flaky_publisher)
+
+    assert result.status == "unchanged"
+    assert result.receipt_sha256 == activated_receipt_sha
+    assert calls == ["publish", "publish"]
+
+
 def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
     fake_bin = tmp_path / "fake-bin"
@@ -463,18 +597,16 @@ def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
     env = os.environ.copy()
     env.pop("GROK_IMPORT_PYTHON", None)
     env["PATH"] = f"{fake_bin}:/opt/homebrew/bin:/usr/bin:/bin"
+    legacy_destination = tmp_path / "legacy-destination"
+    env["SAPPHIRE_DIR"] = str(repo)
+    env["KNOWLEDGE_INBOX"] = str(legacy_destination)
 
     subprocess.run(
         [
             "bash",
             str(ROOT / "scripts/ops/sync_grok_web_exports.sh"),
-            "--repo",
-            str(repo),
-            "--destination",
-            str(tmp_path / "destination"),
             "--state-root",
             str(tmp_path / "state"),
-            "--dry-run",
             "--no-publish",
         ],
         check=True,
@@ -484,3 +616,4 @@ def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
     )
 
     assert marker.exists()
+    assert (legacy_destination / "2026-08-08_note.md").exists()
