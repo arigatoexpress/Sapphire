@@ -12,7 +12,7 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "area": "plant",
         "title": "Windows rh-executor hung on expired robin_stocks session (interactive login)",
         "impact": "Gated executor cannot process free-reign proposals until re-auth",
-        "fix": "Remote: Claude Mac + Tailscale + Telegram APPROVE RH REAUTH + MFA; see CLAUDE-REMOTE-RH-REAUTH-2026-08-07.md",
+        "fix": "Grok CLI plant + Tailscale + APPROVE RH REAUTH; see GROK-CLI-FULL-PLANT-HANDOFF-2026-08-07",
         "status": "in_progress",
     },
     {
@@ -66,8 +66,8 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "area": "learning",
         "title": "Genome closes use auto_estimate PnL not broker-reconciled prices",
         "impact": "Lesson PnL may slip vs true fill",
-        "fix": "Thread RH/on-chain fill prices into record_closed_trade source=broker",
-        "status": "open",
+        "fix": "Monorepo contract ready (2026-08-08_genome-broker-reconcile-contract); plant: RH MCP fills → record_long_close_from_fills source=broker after re-auth",
+        "status": "encoded",
     },
     {
         "id": "BS-GATE-SCOPE-HUMAN",
@@ -271,10 +271,10 @@ BLINDSPOTS: list[dict[str, Any]] = [
         "id": "BS-HYPE-LIT",
         "severity": "P2",
         "area": "thesis",
-        "title": "HYPE unlock / LIT Dec cliffs under-researched",
-        "impact": "Narrative size-up risk",
-        "fix": "TH-02/TH-03 calendars; no size-up until re-underwrite",
-        "status": "research",
+        "title": "HYPE monthly unlocks + LIT Dec-2026 insider cliff under re-underwrite",
+        "impact": "Narrative size-up risk on crypto_risk_perp cluster",
+        "fix": "2026-08-08_hype-lit-unlock-refresh.md; no size-up until checklist; HL signing stays disarmed",
+        "status": "research_refresh",
     },
 ]
 
@@ -337,7 +337,7 @@ def blindspot_scoreboard() -> dict[str, Any]:
     for b in BLINDSPOTS:
         by_sev[b["severity"]] = by_sev.get(b["severity"], 0) + 1
         by_status[b["status"]] = by_status.get(b["status"], 0) + 1
-    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending", "resolved_plant", "needs_operator_decision", "recommended_accept", "needs_operator", "blocked")]
+    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending", "resolved_plant", "needs_operator_decision", "recommended_accept", "needs_operator", "blocked", "research_refresh")]
     return {
         "count": len(BLINDSPOTS),
         "by_severity": by_sev,
