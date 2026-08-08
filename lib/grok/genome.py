@@ -7,10 +7,11 @@ See data/grok-web-exports/2026-08-08_genome-broker-reconcile-contract.md.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 # Canonical lesson sources (plant + seeds). Prefer broker over auto_estimate.
 SOURCE_BROKER = "broker"
@@ -37,7 +38,7 @@ KNOWN_SOURCES: frozenset[str] = frozenset(
 
 
 def _utc_now() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def realized_pnl_long(
@@ -191,7 +192,7 @@ class LessonBook:
         path.write_text(json.dumps(self.as_dict(), indent=2) + "\n", encoding="utf-8")
 
     @classmethod
-    def load(cls, path: Path) -> "LessonBook":
+    def load(cls, path: Path) -> LessonBook:
         if not path.is_file():
             return cls()
         raw = json.loads(path.read_text(encoding="utf-8"))

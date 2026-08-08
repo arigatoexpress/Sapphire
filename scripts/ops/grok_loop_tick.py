@@ -12,12 +12,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from lib.grok.genome import LessonBook  # noqa: E402
 from lib.grok.loop import DEFAULT_TASKS, render_markdown, tick  # noqa: E402
 from lib.grok.policy import OrderProposal, evaluate_proposal  # noqa: E402
-from lib.grok.genome import LessonBook  # noqa: E402
 from lib.grok.research_worker import validate_research_manifest  # noqa: E402
-from lib.grok.windows import evaluate_windows_acceptance  # noqa: E402
-from lib.grok.system_brief import policy_smoke, bridge_inventory  # noqa: E402
+from lib.grok.system_brief import bridge_inventory, policy_smoke  # noqa: E402
 
 BOARD_JSON = ROOT / "projects/grok/data/taskboard.json"
 BOARD_MD = ROOT / "projects/grok/TASKBOARD.md"

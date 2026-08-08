@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 AUTOMATIONS: list[dict[str, Any]] = [
     {
         "id": "grok-drive-pack",

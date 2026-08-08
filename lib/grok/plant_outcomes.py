@@ -5,8 +5,9 @@ Contract: data/grok-web-exports/2026-08-08_genome-broker-reconcile-contract.md
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from lib.grok.genome import (
     SOURCE_AUTO_ESTIMATE,
