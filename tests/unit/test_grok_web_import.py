@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -625,6 +626,14 @@ def test_missing_operator_publisher_is_retryable(tmp_path: Path):
         mod._publish_operator_feeds(tmp_path / "missing-publisher.py")
 
     assert caught.value.code == "publisher_unavailable"
+
+
+def test_live_importer_declares_yaml_runtime_dependency():
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert "pyyaml==6.0.3" in [
+        dependency.casefold() for dependency in metadata["project"]["dependencies"]
+    ]
 
 
 def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):

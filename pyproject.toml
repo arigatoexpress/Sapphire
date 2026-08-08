@@ -3,6 +3,10 @@ name = "sapphire-os"
 version = "0.1.0"
 description = "Sapphire OS — autonomous trading + PM + intelligence system"
 requires-python = ">=3.11"
+dependencies = [
+    # Required by the live hash-addressed Grok import boundary.
+    "pyyaml==6.0.3",
+]
 
 [project.optional-dependencies]
 # `pip install -e '.[dev]'` sets up the lint + test toolchain.
