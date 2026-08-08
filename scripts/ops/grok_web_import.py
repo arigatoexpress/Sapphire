@@ -377,9 +377,11 @@ def _manifest_sha256(candidates: list[Candidate]) -> str:
     return _sha256(_canonical_json(manifest))
 
 
-def _ensure_dir(path: Path, mode: int) -> None:
+def _ensure_dir(path: Path, mode: int, *, preserve_existing_mode: bool = False) -> None:
+    existed = path.is_dir()
     path.mkdir(parents=True, exist_ok=True)
-    os.chmod(path, mode)
+    if not (preserve_existing_mode and existed):
+        os.chmod(path, mode)
 
 
 def _fsync_dir(path: Path) -> None:
@@ -390,8 +392,18 @@ def _fsync_dir(path: Path) -> None:
         os.close(descriptor)
 
 
-def _atomic_write(path: Path, data: bytes, mode: int) -> None:
-    _ensure_dir(path.parent, 0o700 if mode == 0o600 else 0o755)
+def _atomic_write(
+    path: Path,
+    data: bytes,
+    mode: int,
+    *,
+    preserve_parent_mode: bool = False,
+) -> None:
+    _ensure_dir(
+        path.parent,
+        0o700 if mode == 0o600 else 0o755,
+        preserve_existing_mode=preserve_parent_mode,
+    )
     temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}.{time.time_ns()}")
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
     try:
@@ -607,12 +619,17 @@ def _materialize(
     files: list[dict[str, Any]],
     retired: list[dict[str, Any]],
 ) -> None:
-    _ensure_dir(config.destination, 0o755)
+    _ensure_dir(config.destination, 0o755, preserve_existing_mode=True)
     by_name = {candidate.destination_relpath: candidate for candidate in candidates}
     for item in files:
         if item["action"] in {"created", "replaced"}:
             candidate = by_name[item["destination_relpath"]]
-            _atomic_write(config.destination / candidate.destination_relpath, candidate.data, 0o644)
+            _atomic_write(
+                config.destination / candidate.destination_relpath,
+                candidate.data,
+                0o644,
+                preserve_parent_mode=True,
+            )
     for item in retired:
         source = config.destination / item["destination_relpath"]
         quarantine = config.state_root / "quarantine" / item["quarantine_relpath"]
@@ -675,7 +692,7 @@ def _restore_materialization(
             data = blob.read_bytes() if blob.exists() else b""
             if _sha256(data) != before:
                 raise ImportRejected("activation_recovery_failed", name)
-            _atomic_write(destination, data, 0o644)
+            _atomic_write(destination, data, 0o644, preserve_parent_mode=True)
 
 
 def _pointer_activates(config: ImportConfig, receipt: dict[str, Any]) -> bool:

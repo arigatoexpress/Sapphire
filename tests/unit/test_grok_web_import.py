@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import stat
 import subprocess
 import sys
 import tomllib
@@ -225,6 +226,18 @@ def test_idempotent_import_adopts_identical_and_preserves_unmanaged_files(tmp_pa
     assert managed.stat().st_mtime_ns == before_mtime
     assert unmanaged.read_text() == "manual\n"
     assert len(list(config.state_root.glob("receipts/sha256/*/*.json"))) == 1
+
+
+def test_import_preserves_existing_restrictive_destination_mode(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
+    config = _config(mod, tmp_path, repo)
+    config.destination.mkdir(parents=True)
+    config.destination.chmod(0o700)
+
+    mod.import_exports(config)
+
+    assert stat.S_IMODE(config.destination.stat().st_mode) == 0o700
 
 
 def test_unmanaged_collision_aborts_without_overwrite(tmp_path: Path):
