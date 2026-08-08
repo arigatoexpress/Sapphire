@@ -24,7 +24,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -192,7 +192,7 @@ def run_delete(
     execute: bool,
 ) -> None:
     RESULTS_DIR.mkdir(exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     log_path = RESULTS_DIR / f"delete-{stamp}.jsonl"
     results = []
 
@@ -250,7 +250,7 @@ def run_delete(
 def run_scan(data: dict, accounts: list[str] | None, execute: bool) -> None:
     patterns = data.get("auto_scan_patterns") or {}
     RESULTS_DIR.mkdir(exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     scan_out = RESULTS_DIR / f"scan-{stamp}.json"
     found_all = []
 

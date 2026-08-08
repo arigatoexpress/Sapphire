@@ -19,7 +19,8 @@ import time
 from pathlib import Path
 
 try:
-    from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    from playwright.sync_api import TimeoutError as PWTimeout
+    from playwright.sync_api import sync_playwright
 except ImportError:
     print("Install: python3 -m pip install --user playwright && python3 -m playwright install chromium", file=sys.stderr)
     sys.exit(1)
