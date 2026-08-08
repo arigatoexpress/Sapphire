@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -46,7 +46,7 @@ def main() -> int:
         print(f"wrote {paths['md'].relative_to(ROOT)}", file=sys.stderr)
 
     if args.export:
-        day = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+        day = datetime.now(tz=UTC).strftime("%Y-%m-%d")
         exp = ROOT / "data" / "grok-web-exports" / f"{day}_system-brief.md"
         body = render_brief_markdown(brief)
         exp.write_text(
