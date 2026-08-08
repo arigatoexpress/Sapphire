@@ -9,9 +9,9 @@ from __future__ import annotations
 import json
 import re
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPORTS = ROOT / "data" / "grok-web-exports"
@@ -27,7 +27,7 @@ _SECRETISH = re.compile(
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def load_folder_registry() -> dict[str, Any]:
@@ -43,9 +43,7 @@ def _safe_text(path: Path) -> bool:
         return False
     if _SECRETISH.search(text):
         return False
-    if path.suffix.lower() in {".pem", ".p12", ".key", ".env"}:
-        return False
-    return True
+    return path.suffix.lower() not in {".pem", ".p12", ".key", ".env"}
 
 
 def _copy_safe(src: Path, dest: Path) -> bool:
@@ -192,7 +190,7 @@ def _render_index(reg: dict[str, Any], copied: list[str], skipped: list[str]) ->
         lines.append(f"- {f}")
     lines += [
         "",
-        f"## Pack stats",
+        "## Pack stats",
         "",
         f"- copied: **{len(copied)}**",
         f"- skipped: **{len(skipped)}**",

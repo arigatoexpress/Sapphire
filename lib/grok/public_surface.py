@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from lib.grok.policy import FREE_REIGN_DEFAULTS, DEFAULT_DENS_SYMBOLS, DEFAULT_DUST_NO_REBUY
-from lib.grok.playbooks import playbook_summary, TA_STACK
 from lib.grok.blindspots import blindspot_scoreboard
+from lib.grok.playbooks import TA_STACK, playbook_summary
+from lib.grok.policy import DEFAULT_DENS_SYMBOLS, DEFAULT_DUST_NO_REBUY, FREE_REIGN_DEFAULTS
 
 
 def public_operating_rules() -> dict[str, Any]:

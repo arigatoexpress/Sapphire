@@ -7,8 +7,9 @@ Never includes wallets, balances, positions, or order ids.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Mapping
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import Any
 
 from lib.grok.genome import LessonBook
 from lib.grok.policy import FREE_REIGN_DEFAULTS
@@ -17,7 +18,7 @@ from lib.grok.windows import evaluate_windows_acceptance
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def build_desk_projection(

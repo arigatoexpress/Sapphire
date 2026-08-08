@@ -6,8 +6,9 @@ Models propose; this module only evaluates. No network, no broker, no secrets.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 # Permanent dens class (meme/honeypot) — never free-reign spam
 DEFAULT_DENS_SYMBOLS: frozenset[str] = frozenset(
