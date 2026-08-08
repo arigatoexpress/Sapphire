@@ -1,0 +1,188 @@
+{
+  "version": "1.0",
+  "mode": "nuclear",
+  "generated": "2026-08-08",
+  "notes": "Curated from public timeline scan. Review dry-run before --execute. KEEP builder posts (0guard launches, etc).",
+  "accounts": {
+    "rariwrldd": {
+      "username": "rariwrldd",
+      "env_prefix": "X_RARI",
+      "user_id_hint": "1848819457558515715",
+      "posts": [
+        {
+          "id": "2085505182457299251",
+          "priority": "P0",
+          "reason": "self-harm language fused to thesis",
+          "text": "Only thing left stopping me from k*lling myself is seeing if this investment thesis plays out."
+        },
+        {
+          "id": "2085799583339389223",
+          "priority": "P1",
+          "reason": "fraud allegation dunk",
+          "text": "@trmlabs should be looking into the fraud that Mysten Labs allegedly supported..."
+        },
+        {
+          "id": "2085799276056379490",
+          "priority": "P1",
+          "reason": "hostile dunk",
+          "text": "You've had more network outages than successful projects."
+        },
+        {
+          "id": "2085796032118669802",
+          "priority": "P1",
+          "reason": "low-signal cope dunk",
+          "text": "Holy cope"
+        },
+        {
+          "id": "2085189278481682570",
+          "priority": "P1",
+          "reason": "profane hate",
+          "text": "W Sam fuck Mysten"
+        },
+        {
+          "id": "2084686532125004204",
+          "priority": "P1",
+          "reason": "hate dunk",
+          "text": "Everything Sui does is an L man why is this surprising"
+        },
+        {
+          "id": "2082865023022768215",
+          "priority": "P1",
+          "reason": "hostile thesis combat",
+          "text": "None of these matter. Sui is fucked and Ika is the only thing..."
+        },
+        {
+          "id": "2082818704245772764",
+          "priority": "P1",
+          "reason": "profane hate",
+          "text": "This is the way fuck Mysten"
+        },
+        {
+          "id": "2076070595473637520",
+          "priority": "P1",
+          "reason": "clown dunk",
+          "text": "Remember sui play? fake TPS"
+        },
+        {
+          "id": "2076037127456907330",
+          "priority": "P1",
+          "reason": "explicit hate-account brand",
+          "text": "This is still a Sui hate account"
+        },
+        {
+          "id": "2076036581484269707",
+          "priority": "P1",
+          "reason": "crash-out energy",
+          "text": "It's been obvious... I enjoyed this crash out regardless"
+        },
+        {
+          "id": "2073131100277461149",
+          "priority": "P1",
+          "reason": "midwit dunk",
+          "text": "Sui midwits watching Switzerland..."
+        },
+        {
+          "id": "2063316605942317437",
+          "priority": "P1",
+          "reason": "scam allegation dunk",
+          "text": "Realizing Sui is a giant scam."
+        },
+        {
+          "id": "2063316405865648316",
+          "priority": "P1",
+          "reason": "hate-account framing",
+          "text": "I'm not active... dunk on sui and watch the perma bulls cry"
+        },
+        {
+          "id": "2063310272790659331",
+          "priority": "P2",
+          "reason": "hostile ecosystem dig",
+          "text": "the saddest part... he actually got the sui play"
+        },
+        {
+          "id": "2057566519257862514",
+          "priority": "P2",
+          "reason": "wash-trade accusation thread energy",
+          "text": "momentum, bluefin... wash traded to fake volumes"
+        },
+        {
+          "id": "2057554641194545327",
+          "priority": "P2",
+          "reason": "ecosystem drag dunk",
+          "text": "sui and the sui ecosystem are holding you back"
+        },
+        {
+          "id": "2017744400743600540",
+          "priority": "P2",
+          "reason": "hostile Mysten/Sui tone",
+          "text": "Even if this is true this is bearish for Sui... tone deaf"
+        },
+        {
+          "id": "2017739658013380982",
+          "priority": "P2",
+          "reason": "hostile Mysten framing",
+          "text": "Please explain how Mysten is so strategically..."
+        },
+        {
+          "id": "2083761159174500379",
+          "priority": "P2",
+          "reason": "low-signal profanity reply",
+          "text": "What the fuck happened dude"
+        }
+      ]
+    },
+    "0guard_": {
+      "username": "0guard_",
+      "env_prefix": "X_0GUARD",
+      "posts": [
+        {
+          "id": "2073130190612681204",
+          "priority": "P0",
+          "reason": "product account personal insult",
+          "text": "ur a dumbass"
+        },
+        {
+          "id": "2055345519527157781",
+          "priority": "P2",
+          "reason": "noise on product account",
+          "text": "cracked dev"
+        }
+      ]
+    }
+  },
+  "keep_examples": [
+    "0guard / Sapphire launch and hackathon posts",
+    "LETS GO Good for you Sam (positive)",
+    "Just build cool shit",
+    "Neutral research questions without dunks"
+  ],
+  "auto_scan_patterns": {
+    "always_delete": [
+      "(?i)kill(ing)? myself",
+      "(?i)k\\*ll(ing)? myself",
+      "(?i)suicide",
+      "(?i)sui hate account",
+      "(?i)ur a dumbass",
+      "(?i)you'?re a dumbass"
+    ],
+    "likely_delete": [
+      "(?i)fuck mysten",
+      "(?i)sui is fucked",
+      "(?i)giant scam",
+      "(?i)sui midwit",
+      "(?i)holy cope",
+      "(?i)perma bulls cry",
+      "(?i)network outages than successful",
+      "(?i)everything sui does is an l",
+      "(?i)fake tps",
+      "(?i)wash trad"
+    ],
+    "never_auto_delete": [
+      "(?i)0guard",
+      "(?i)hackathon",
+      "(?i)introducing 0guard",
+      "(?i)pre-wallet firewall",
+      "(?i)just build cool"
+    ]
+  }
+}
