@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Validate immutable Grok web exports and emit a hash-addressed receipt.
+"""Apply bounded policy checks to immutable Grok web exports and emit a receipt.
 
 This boundary reads only the configured remote-tracking Git tree. It never reads the
 checkout, mutates the Knowledge vault, activates a pointer, publishes, or rolls back.
+The receipt records source identity and known-policy results; it does not certify
+secret-free content or grant admission, projection, or execution authority.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import re
 import subprocess
 import sys
 import unicodedata
+from collections.abc import Generator
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
@@ -24,14 +27,16 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "13"
-VALIDATION_PROFILE = "grok-export-v13"
-SECRET_POLICY_REVISION = 13
+VALIDATOR_VERSION = "14"
+POLICY_PROFILE = "grok-export-v14"
+SECRET_POLICY_REVISION = 14
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
 MAX_STRUCTURED_DEPTH = 100
 MAX_STRUCTURED_NODES = 10_000
+TREE_STREAM_CHUNK_BYTES = 64 * 1024
+MAX_TREE_ROW_BYTES = 64 * 1024
 EXCLUDED_NAMES = frozenset({"README.md", "MANIFEST.json", ".gitkeep"})
 ALLOWED_SUFFIXES = frozenset({".md", ".json"})
 REQUIRED_PROVENANCE = ("source", "date", "type", "title")
@@ -101,10 +106,10 @@ JSON_SIMPLE_ESCAPES = {
     ord("t"): b"\t",
 }
 SECRET_DECODE_TRANSFORMS = (
-    "markdown_body_json_escape_view_v1",
-    "excluded_text_json_escape_view_v1",
-    "structured_scalar_json_escape_view_v1",
+    "json_escape_view_v1",
+    "yaml_hex_escape_view_v1",
 )
+SECRET_DECODE_SURFACES = ("markdown_body", "excluded_text", "structured_scalar")
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "private_key_block",
@@ -186,19 +191,21 @@ POLICY = {
     "required_provenance": list(REQUIRED_PROVENANCE),
     "max_structured_depth": MAX_STRUCTURED_DEPTH,
     "max_structured_nodes": MAX_STRUCTURED_NODES,
+    "max_tree_row_bytes": MAX_TREE_ROW_BYTES,
     "regular_blob_mode": "100644",
     "json_duplicate_keys": "reject",
     "yaml_duplicate_keys": "reject",
-    "validation_profile": VALIDATION_PROFILE,
+    "policy_profile": POLICY_PROFILE,
     "secret_policy": {
         "revision": SECRET_POLICY_REVISION,
         "decode_transforms": list(SECRET_DECODE_TRANSFORMS),
+        "decode_surfaces": list(SECRET_DECODE_SURFACES),
         "inventory_path_redaction": SECRET_PATH_REDACTION,
         "path_names": sorted(SECRET_PATH_NAMES),
         "scan_filenames": True,
         "structured_scalar_scans": [
             "unstructured_text_rules",
-            "json_escape_view_unstructured_text_rules",
+            "decoded_escape_views_unstructured_text_rules",
         ],
         "structured_key_names": sorted(STRUCTURED_SECRET_KEY_NAMES),
         "structured_key_suffixes": sorted(STRUCTURED_SECRET_KEY_SUFFIXES),
@@ -223,7 +230,7 @@ POLICY = {
 
 
 class SnapshotRejected(RuntimeError):
-    """Stable, content-blind validation refusal."""
+    """Stable, content-blind bounded-policy refusal."""
 
     def __init__(self, code: str, path: str | None = None):
         self.code = code
@@ -254,7 +261,7 @@ class TreeEntry:
 
 
 @dataclass(frozen=True)
-class ValidatedFile:
+class PolicyCheckedFile:
     source_relpath: str
     relative_path: str
     git_blob_oid: str
@@ -282,7 +289,7 @@ class InventoryResult:
     source_commit: str
     source_tree: str
     total: int
-    accepted: int
+    policy_passed: int
     rejected: list[Rejection]
 
 
@@ -381,45 +388,82 @@ def _resolve_source(config: SnapshotConfig, *, fetch: bool) -> tuple[str, str]:
     return commit, tree
 
 
+def _stream_tree_rows(config: SnapshotConfig, commit: str) -> Generator[bytes, None, None]:
+    try:
+        process = subprocess.Popen(
+            [
+                config.git_bin,
+                "--no-replace-objects",
+                "-C",
+                str(config.repo),
+                "ls-tree",
+                "-r",
+                "-z",
+                "--long",
+                commit,
+                "--",
+                config.source_prefix,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        raise SnapshotRejected("git_command_failed")
+    if process.stdout is None:
+        process.wait()
+        raise SnapshotRejected("git_command_failed")
+
+    buffer = bytearray()
+    try:
+        while chunk := process.stdout.read(TREE_STREAM_CHUNK_BYTES):
+            buffer.extend(chunk)
+            while (delimiter := buffer.find(b"\0")) >= 0:
+                raw_row = bytes(buffer[:delimiter])
+                del buffer[: delimiter + 1]
+                if raw_row:
+                    yield raw_row
+            if len(buffer) > MAX_TREE_ROW_BYTES:
+                raise SnapshotRejected("invalid_tree_row")
+        if buffer:
+            raise SnapshotRejected("invalid_tree_row")
+    finally:
+        process.stdout.close()
+        return_code = process.wait()
+    if return_code != 0:
+        raise SnapshotRejected("git_command_failed")
+
+
 def _tree_entries(config: SnapshotConfig, commit: str) -> list[TreeEntry]:
-    raw_rows = _run_git(
-        config,
-        "ls-tree",
-        "-r",
-        "-z",
-        "--long",
-        commit,
-        "--",
-        config.source_prefix,
-        binary=True,
-    )
-    assert isinstance(raw_rows, bytes)
     entries: list[TreeEntry] = []
     prefix = f"{config.source_prefix}/"
-    for raw_row in raw_rows.split(b"\0"):
-        if not raw_row:
-            continue
-        match = TREE_ROW_RE.fullmatch(raw_row)
-        if not match:
-            raise SnapshotRejected("invalid_tree_row")
-        try:
-            source_path = match.group("path").decode("utf-8")
-        except UnicodeDecodeError:
-            raise SnapshotRejected("invalid_tree_path")
-        if not source_path.startswith(prefix):
-            raise SnapshotRejected("path_outside_prefix")
-        relative = source_path[len(prefix) :]
-        size_raw = match.group("size")
-        entries.append(
-            TreeEntry(
-                source_relpath=source_path,
-                relative_path=relative,
-                mode=match.group("mode").decode("ascii"),
-                kind=match.group("kind").decode("ascii"),
-                git_blob_oid=match.group("oid").decode("ascii"),
-                size=None if size_raw == b"-" else int(size_raw),
+    row_stream = _stream_tree_rows(config, commit)
+    try:
+        for raw_row in row_stream:
+            match = TREE_ROW_RE.fullmatch(raw_row)
+            if not match:
+                raise SnapshotRejected("invalid_tree_row")
+            try:
+                source_path = match.group("path").decode("utf-8")
+            except UnicodeDecodeError:
+                raise SnapshotRejected("invalid_tree_path")
+            if not source_path.startswith(prefix):
+                raise SnapshotRejected("path_outside_prefix")
+            relative = source_path[len(prefix) :]
+            size_raw = match.group("size")
+            entries.append(
+                TreeEntry(
+                    source_relpath=source_path,
+                    relative_path=relative,
+                    mode=match.group("mode").decode("ascii"),
+                    kind=match.group("kind").decode("ascii"),
+                    git_blob_oid=match.group("oid").decode("ascii"),
+                    size=None if size_raw == b"-" else int(size_raw),
+                )
             )
-        )
+            if len(entries) > config.max_files:
+                raise SnapshotRejected("too_many_files")
+    finally:
+        row_stream.close()
     entries.sort(key=lambda entry: entry.source_relpath)
     return entries
 
@@ -508,8 +552,40 @@ def _json_escape_view(data: bytes) -> bytes:
     return bytes(decoded)
 
 
-def _detect_json_escape_secret(data: bytes) -> str | None:
-    return _detect_unstructured_text_secret(_json_escape_view(data))
+def _yaml_hex_escape_view(data: bytes) -> bytes:
+    decoded = bytearray()
+    widths = {ord("x"): 2, ord("u"): 4, ord("U"): 8}
+    index = 0
+    while index < len(data):
+        if data[index] != ord("\\") or index + 1 >= len(data):
+            decoded.append(data[index])
+            index += 1
+            continue
+        width = widths.get(data[index + 1])
+        if width is None or index + 2 + width > len(data):
+            decoded.append(data[index])
+            index += 1
+            continue
+        end = index + 2 + width
+        try:
+            codepoint = int(data[index + 2 : end], 16)
+        except ValueError:
+            decoded.append(data[index])
+            index += 1
+            continue
+        if codepoint > 0x10FFFF or 0xD800 <= codepoint <= 0xDFFF:
+            decoded.extend(data[index:end])
+        else:
+            decoded.extend(chr(codepoint).encode("utf-8"))
+        index = end
+    return bytes(decoded)
+
+
+def _detect_decoded_escape_secret(data: bytes) -> str | None:
+    for view in (_json_escape_view, _yaml_hex_escape_view):
+        if rule_id := _detect_unstructured_text_secret(view(data)):
+            return rule_id
+    return None
 
 
 def _decode_utf8(data: bytes, path: str) -> str:
@@ -577,7 +653,7 @@ def _validate_structure(
                 encoded = current.encode("utf-8")
             except UnicodeEncodeError:
                 raise SnapshotRejected(code, path)
-            if _detect_unstructured_text_secret(encoded) or _detect_json_escape_secret(encoded):
+            if _detect_unstructured_text_secret(encoded) or _detect_decoded_escape_secret(encoded):
                 raise SnapshotRejected("secret_detected", path)
         elif isinstance(current, bytes):
             if _detect_secret(current):
@@ -651,7 +727,7 @@ def _validate_content(path: str, data: bytes) -> str:
         match = FRONTMATTER_RE.match(text)
         if not match:
             raise SnapshotRejected("missing_frontmatter", path)
-        if _detect_json_escape_secret(text[match.end() :].encode("utf-8")):
+        if _detect_decoded_escape_secret(text[match.end() :].encode("utf-8")):
             raise SnapshotRejected("secret_detected", path)
         try:
             value = yaml.load(match.group("body"), Loader=_UniqueKeySafeLoader)
@@ -675,14 +751,14 @@ def _validate_content(path: str, data: bytes) -> str:
     raise SnapshotRejected("unsupported_extension", path)
 
 
-def _read_validated_file(config: SnapshotConfig, entry: TreeEntry) -> ValidatedFile:
+def _read_policy_checked_file(config: SnapshotConfig, entry: TreeEntry) -> PolicyCheckedFile:
     _validate_entry(config, entry)
     blob = _run_git(config, "cat-file", "blob", entry.git_blob_oid, binary=True)
     assert isinstance(blob, bytes)
     if entry.size is None or len(blob) != entry.size:
         raise SnapshotRejected("blob_size_mismatch", entry.relative_path)
     media_type = _validate_content(entry.relative_path, blob)
-    return ValidatedFile(
+    return PolicyCheckedFile(
         source_relpath=entry.source_relpath,
         relative_path=entry.relative_path,
         git_blob_oid=entry.git_blob_oid,
@@ -709,7 +785,7 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
     if _detect_secret(blob):
         raise SnapshotRejected("secret_detected", path)
     text = _decode_utf8(blob, path)
-    if _detect_json_escape_secret(text.encode("utf-8")):
+    if _detect_decoded_escape_secret(text.encode("utf-8")):
         raise SnapshotRejected("secret_detected", path)
     if PurePosixPath(path).suffix.casefold() == ".json":
         try:
@@ -729,7 +805,7 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
         _validate_structure(value, path, "invalid_yaml", reject_aliases=True)
 
 
-def _validate_aliases(files: list[ValidatedFile]) -> None:
+def _validate_aliases(files: list[PolicyCheckedFile]) -> None:
     seen: dict[str, str] = {}
     for item in files:
         key = unicodedata.normalize("NFC", item.relative_path).casefold()
@@ -746,7 +822,7 @@ def _validate_limits(config: SnapshotConfig, entries: list[TreeEntry]) -> None:
         raise SnapshotRejected("source_too_large")
 
 
-def _validated_files(config: SnapshotConfig, commit: str) -> list[ValidatedFile]:
+def _policy_checked_files(config: SnapshotConfig, commit: str) -> list[PolicyCheckedFile]:
     entries = _tree_entries(config, commit)
     if not entries:
         raise SnapshotRejected("empty_source")
@@ -757,19 +833,19 @@ def _validated_files(config: SnapshotConfig, commit: str) -> list[ValidatedFile]
         _validate_excluded_metadata(config, entry)
     if not exports:
         raise SnapshotRejected("empty_source")
-    files = [_read_validated_file(config, entry) for entry in exports]
+    files = [_read_policy_checked_file(config, entry) for entry in exports]
     _validate_aliases(files)
     return files
 
 
-def _file_receipt(item: ValidatedFile) -> dict[str, Any]:
+def _file_receipt(item: PolicyCheckedFile) -> dict[str, Any]:
     return {
         "source_relpath": item.source_relpath,
         "git_blob_oid": item.git_blob_oid,
         "sha256": item.sha256,
         "bytes": item.size,
         "media_type": item.media_type,
-        "validation_profile": VALIDATION_PROFILE,
+        "policy_profile": POLICY_PROFILE,
     }
 
 
@@ -777,7 +853,7 @@ def _build_receipt(
     config: SnapshotConfig,
     commit: str,
     tree: str,
-    files: list[ValidatedFile],
+    files: list[PolicyCheckedFile],
 ) -> dict[str, Any]:
     receipt_files = [_file_receipt(item) for item in files]
     manifest_sha = _sha256(_canonical_json(receipt_files))
@@ -786,7 +862,7 @@ def _build_receipt(
         "validator": {
             "name": VALIDATOR_NAME,
             "version": VALIDATOR_VERSION,
-            "validation_profile": VALIDATION_PROFILE,
+            "policy_profile": POLICY_PROFILE,
             "policy_sha256": _policy_sha256(config),
         },
         "source": {
@@ -810,9 +886,9 @@ def snapshot_exports(
     *,
     fetch: bool = False,
 ) -> SnapshotResult:
-    """Validate one immutable source snapshot and return its deterministic receipt."""
+    """Apply the bounded policy to one immutable source and return its receipt."""
     commit, tree = _resolve_source(config, fetch=fetch)
-    files = _validated_files(config, commit)
+    files = _policy_checked_files(config, commit)
     receipt = _build_receipt(config, commit, tree, files)
     receipt_bytes = canonical_receipt(receipt)
     receipt_sha = _sha256(receipt_bytes)
@@ -837,22 +913,22 @@ def inventory_exports(config: SnapshotConfig, *, fetch: bool = False) -> Invento
         _validate_excluded_metadata(config, entry)
     if not entries:
         raise SnapshotRejected("empty_source")
-    validated: list[ValidatedFile] = []
+    policy_checked: list[PolicyCheckedFile] = []
     rejected: list[Rejection] = []
     for entry in entries:
         try:
-            validated.append(_read_validated_file(config, entry))
+            policy_checked.append(_read_policy_checked_file(config, entry))
         except SnapshotRejected as exc:
             rejected.append(Rejection(path=exc.path or SECRET_PATH_REDACTION, code=exc.code))
 
-    by_alias: dict[str, list[ValidatedFile]] = {}
-    for item in validated:
+    by_alias: dict[str, list[PolicyCheckedFile]] = {}
+    for item in policy_checked:
         key = unicodedata.normalize("NFC", item.relative_path).casefold()
         by_alias.setdefault(key, []).append(item)
-    accepted = 0
+    policy_passed = 0
     for items in by_alias.values():
         if len(items) == 1:
-            accepted += 1
+            policy_passed += 1
         else:
             rejected.extend(Rejection(path=item.relative_path, code="path_alias") for item in items)
     rejected.sort(key=lambda item: (item.path, item.code))
@@ -860,7 +936,7 @@ def inventory_exports(config: SnapshotConfig, *, fetch: bool = False) -> Invento
         source_commit=commit,
         source_tree=tree,
         total=len(entries),
-        accepted=accepted,
+        policy_passed=policy_passed,
         rejected=rejected,
     )
 
@@ -880,11 +956,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.inventory:
             inventory = inventory_exports(config, fetch=args.fetch)
-            payload = {"ok": not inventory.rejected, **asdict(inventory)}
+            payload = {"policy_ok": not inventory.rejected, **asdict(inventory)}
         else:
             result = snapshot_exports(config, fetch=args.fetch)
             payload = {
-                "ok": True,
+                "policy_ok": True,
                 "source_commit": result.source_commit,
                 "source_tree": result.source_tree,
                 "receipt_sha256": result.receipt_sha256,
@@ -893,7 +969,7 @@ def main(argv: list[str] | None = None) -> int:
     except SnapshotRejected as exc:
         print(
             json.dumps(
-                {"ok": False, "error": exc.code, "path": exc.path},
+                {"policy_ok": False, "error": exc.code, "path": exc.path},
                 sort_keys=True,
             ),
             file=sys.stderr,

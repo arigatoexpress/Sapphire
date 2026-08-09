@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sapphire.local/schemas/grok-web-snapshot-v1.schema.json",
-  "title": "Sapphire validated Grok web snapshot receipt v1",
+  "title": "Sapphire bounded-policy Grok web source snapshot receipt v1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,11 +17,11 @@
     "validator": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version", "validation_profile", "policy_sha256"],
+      "required": ["name", "version", "policy_profile", "policy_sha256"],
       "properties": {
         "name": {"const": "grok_web_snapshot"},
-        "version": {"const": "13"},
-        "validation_profile": {"const": "grok-export-v13"},
+        "version": {"const": "14"},
+        "policy_profile": {"const": "grok-export-v14"},
         "policy_sha256": {"$ref": "#/$defs/sha256"}
       }
     },
@@ -71,7 +71,7 @@
         "sha256",
         "bytes",
         "media_type",
-        "validation_profile"
+        "policy_profile"
       ],
       "properties": {
         "source_relpath": {"type": "string", "minLength": 1},
@@ -79,7 +79,7 @@
         "sha256": {"$ref": "#/$defs/sha256"},
         "bytes": {"type": "integer", "minimum": 0},
         "media_type": {"enum": ["text/markdown", "application/json"]},
-        "validation_profile": {"const": "grok-export-v13"}
+        "policy_profile": {"const": "grok-export-v14"}
       }
     }
   }

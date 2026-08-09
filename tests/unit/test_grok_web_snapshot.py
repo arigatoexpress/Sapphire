@@ -208,14 +208,63 @@ def test_tree_row_parser_rejects_unconsumed_trailing_newline(
 ):
     mod = _load()
     oid = "a" * 40
-    raw_row = (f"100644 blob {oid} 1\tdata/grok-web-exports/2026-08-08_bad.md\n\0").encode()
+    raw_row = (f"100644 blob {oid} 1\tdata/grok-web-exports/2026-08-08_bad.md\n").encode()
 
-    monkeypatch.setattr(mod, "_run_git", lambda *_args, **_kwargs: raw_row)
+    monkeypatch.setattr(
+        mod,
+        "_stream_tree_rows",
+        lambda *_args, **_kwargs: (row for row in (raw_row,)),
+    )
 
     with pytest.raises(mod.SnapshotRejected) as caught:
         mod._tree_entries(mod.SnapshotConfig(repo=tmp_path), oid)
 
     assert caught.value.code == "invalid_tree_row"
+
+
+def test_tree_stream_stops_immediately_after_file_limit(tmp_path: Path, monkeypatch):
+    mod = _load()
+    oid = "a" * 40
+
+    class ChunkedRows:
+        def __init__(self):
+            self.reads = 0
+            self.closed = False
+
+        def read(self, _size: int) -> bytes:
+            self.reads += 1
+            if self.reads > 3:
+                raise AssertionError("tree stream consumed beyond max_files + 1")
+            name = f"2026-08-08_{self.reads}.md"
+            return f"100644 blob {oid} 1\tdata/grok-web-exports/{name}\0".encode()
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakeProcess:
+        def __init__(self):
+            self.stdout = ChunkedRows()
+            self.waited = False
+
+        def wait(self) -> int:
+            self.waited = True
+            return 0
+
+    process = FakeProcess()
+    monkeypatch.setattr(mod.subprocess, "Popen", lambda *_args, **_kwargs: process)
+
+    def reject_buffered_tree_read(*_args, **_kwargs):
+        raise mod.SnapshotRejected("buffered_tree_read")
+
+    monkeypatch.setattr(mod, "_run_git", reject_buffered_tree_read)
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod._tree_entries(mod.SnapshotConfig(repo=tmp_path, max_files=2), oid)
+
+    assert caught.value.code == "too_many_files"
+    assert process.stdout.reads == 3
+    assert process.stdout.closed is True
+    assert process.waited is True
 
 
 def test_receipt_is_deterministic_content_addressed_and_has_no_projection_state(tmp_path: Path):
@@ -246,6 +295,30 @@ def test_receipt_is_deterministic_content_addressed_and_has_no_projection_state(
     assert "publisher" not in serialized
 
 
+def test_receipt_and_inventory_make_only_bounded_policy_claims(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": _frontmatter()},
+    )
+
+    receipt = mod.snapshot_exports(_config(mod, repo)).receipt
+    inventory = mod.inventory_exports(_config(mod, repo))
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    registry = yaml.safe_load((ROOT / "infra" / "tool-registry.yaml").read_text())
+    entry = next(tool for tool in registry["tools"] if tool["name"] == "grok_web_snapshot")
+
+    assert "policy_profile" in receipt["validator"]
+    assert "validation_profile" not in receipt["validator"]
+    assert all("policy_profile" in item for item in receipt["files"])
+    assert inventory.policy_passed == 1
+    assert not hasattr(inventory, "accepted")
+    assert schema["title"] == "Sapphire bounded-policy Grok web source snapshot receipt v1"
+    assert "known-secret-pattern" in entry["description"]
+    assert "grants no admission or projection authority" in entry["description"]
+    assert "not a secret-free certificate" in entry["description"]
+
+
 def test_snapshot_cli_emits_the_content_addressed_receipt(capsys, tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(
@@ -259,7 +332,7 @@ def test_snapshot_cli_emits_the_content_addressed_receipt(capsys, tmp_path: Path
 
     assert exit_code == 0
     assert output.err == ""
-    assert payload["ok"] is True
+    assert payload["policy_ok"] is True
     assert payload["receipt"]["schema"] == mod.SCHEMA_NAME
     assert (
         hashlib.sha256(mod.canonical_receipt(payload["receipt"])).hexdigest()
@@ -442,6 +515,25 @@ def test_secret_assignments_are_rejected_without_writes(tmp_path: Path, label: s
         tmp_path,
         {"2026-08-08_secret.md": _frontmatter(body=f"{label}: {token}\n")},
     )
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
+@pytest.mark.parametrize("escape", [r"\x5f", r"\U0000005f"])
+def test_yaml_escaped_markdown_body_credentials_are_rejected_without_writes(
+    tmp_path: Path,
+    escape: str,
+):
+    mod = _load()
+    body = f'```yaml\n"api{escape}key": "Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx"\n```\n'
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_yaml-escaped.md": _frontmatter(body=body)},
+    )
+
     with pytest.raises(mod.SnapshotRejected) as caught:
         mod.snapshot_exports(_config(mod, repo))
 
@@ -927,7 +1019,7 @@ def test_content_blind_inventory_reports_paths_and_codes_only(tmp_path: Path):
     serialized = json.dumps(asdict(inventory), sort_keys=True)
 
     assert inventory.total == 2
-    assert inventory.accepted == 1
+    assert inventory.policy_passed == 1
     assert inventory.rejected == [
         mod.Rejection(path="2026-08-08_secret.md", code="secret_detected")
     ]
@@ -996,8 +1088,8 @@ def test_inventory_cli_fails_closed_without_writing(capsys, tmp_path: Path):
     payload = json.loads(output.out)
 
     assert exit_code == 3
-    assert payload["ok"] is False
-    assert payload["accepted"] == 1
+    assert payload["policy_ok"] is False
+    assert payload["policy_passed"] == 1
     assert payload["rejected"] == [{"path": "2026-08-08_secret.md", "code": "secret_detected"}]
     assert token not in output.out
     assert output.err == ""
@@ -1018,15 +1110,20 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     assert mod.POLICY["json_duplicate_keys"] == "reject"
     assert mod.POLICY["yaml_duplicate_keys"] == "reject"
     assert mod.POLICY["secret_policy"]["decode_transforms"] == [
-        "markdown_body_json_escape_view_v1",
-        "excluded_text_json_escape_view_v1",
-        "structured_scalar_json_escape_view_v1",
+        "json_escape_view_v1",
+        "yaml_hex_escape_view_v1",
+    ]
+    assert mod.POLICY["secret_policy"]["decode_surfaces"] == [
+        "markdown_body",
+        "excluded_text",
+        "structured_scalar",
     ]
     assert mod.POLICY["secret_policy"]["scan_filenames"] is True
     assert mod.POLICY["secret_policy"]["structured_scalar_scans"] == [
         "unstructured_text_rules",
-        "json_escape_view_unstructured_text_rules",
+        "decoded_escape_views_unstructured_text_rules",
     ]
+    assert mod.POLICY["max_tree_row_bytes"] == mod.MAX_TREE_ROW_BYTES
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",
@@ -1067,7 +1164,7 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     validator_schema = schema["properties"]["validator"]["properties"]
     file_schema = schema["$defs"]["file"]["properties"]
     assert validator_schema["version"]["const"] == mod.VALIDATOR_VERSION
-    assert file_schema["validation_profile"]["const"] == mod.VALIDATION_PROFILE
+    assert file_schema["policy_profile"]["const"] == mod.POLICY_PROFILE
 
 
 def test_receipt_schema_accepts_only_sha1_or_sha256_git_oid_lengths():
