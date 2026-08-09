@@ -24,9 +24,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "9"
-VALIDATION_PROFILE = "grok-export-v9"
-SECRET_POLICY_REVISION = 9
+VALIDATOR_VERSION = "10"
+VALIDATION_PROFILE = "grok-export-v10"
+SECRET_POLICY_REVISION = 10
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -130,6 +130,20 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
         ),
     ),
 )
+UNSTRUCTURED_TEXT_SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
+    (
+        "yaml_block_credential_assignment",
+        re.compile(
+            rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
+            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*['\"]?\s*[:=][ \t]*"
+            rb"[>|](?:[+-][1-9]?|[1-9][+-]?)?[ \t]*(?:#[^\r\n]*)?\r?\n"
+            rb"(?:(?:[ \t]*\r?\n)|(?:[ \t]+(?:<redacted>|redacted|placeholder|"
+            rb"example|none|null|unset|\$\{[A-Za-z_][A-Za-z0-9_]*\})[ \t]*\r?\n))*"
+            rb"(?![ \t]+(?:<redacted>|redacted|placeholder|example|"
+            rb"none|null|unset)[ \t]*$)(?![ \t]+\$\{)[ \t]+\S[^\r\n]*$"
+        ),
+    ),
+)
 POLICY = {
     "schema": 1,
     "source_ref": DEFAULT_SOURCE_REF,
@@ -158,6 +172,14 @@ POLICY = {
                 "flags": int(pattern.flags),
             }
             for rule_id, pattern in SECRET_PATTERNS
+        ],
+        "unstructured_text_rules": [
+            {
+                "id": rule_id,
+                "pattern": pattern.pattern.decode("ascii"),
+                "flags": int(pattern.flags),
+            }
+            for rule_id, pattern in UNSTRUCTURED_TEXT_SECRET_PATTERNS
         ],
     },
 }
@@ -398,6 +420,15 @@ def _detect_secret(data: bytes) -> str | None:
     return None
 
 
+def _detect_unstructured_text_secret(data: bytes) -> str | None:
+    if rule_id := _detect_secret(data):
+        return rule_id
+    for rule_id, pattern in UNSTRUCTURED_TEXT_SECRET_PATTERNS:
+        if pattern.search(data):
+            return rule_id
+    return None
+
+
 def _json_escape_view(data: bytes) -> bytes:
     decoded = bytearray()
     index = 0
@@ -441,7 +472,7 @@ def _json_escape_view(data: bytes) -> bytes:
 
 
 def _detect_json_escape_secret(data: bytes) -> str | None:
-    return _detect_secret(_json_escape_view(data))
+    return _detect_unstructured_text_secret(_json_escape_view(data))
 
 
 def _decode_utf8(data: bytes, path: str) -> str:

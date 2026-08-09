@@ -681,6 +681,26 @@ def test_unquoted_password_in_markdown_body_is_rejected_without_writes(
     assert not (tmp_path / "receipts").exists()
 
 
+@pytest.mark.parametrize("prefix", ["", "  <redacted>\n", "  ${PASSWORD}\n"])
+def test_multiline_yaml_password_in_markdown_body_is_rejected_without_writes(
+    tmp_path: Path,
+    prefix: str,
+):
+    mod = _load()
+    password = "Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx"
+    body = f"```yaml\npassword: >\n{prefix}  {password}\n```\n"
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_multiline.md": _frontmatter(body=body)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
 def test_redacted_quoted_credential_in_markdown_body_remains_allowed(tmp_path: Path):
     mod = _load()
     body = '```json\n{"api_key": "<redacted>"}\n```\n'
@@ -885,10 +905,12 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
     rule_ids = [rule["id"] for rule in mod.POLICY["secret_policy"]["rules"]]
+    text_rule_ids = [rule["id"] for rule in mod.POLICY["secret_policy"]["unstructured_text_rules"]]
     assert "mnemonic_assignment" in rule_ids
     assert "aws_secret_assignment" in rule_ids
     assert "quoted_credential_assignment" in rule_ids
     assert "unquoted_credential_assignment" in rule_ids
+    assert "yaml_block_credential_assignment" in text_rule_ids
     assert mod.POLICY["json_duplicate_keys"] == "reject"
     assert mod.POLICY["yaml_duplicate_keys"] == "reject"
     assert mod.POLICY["secret_policy"]["decode_transforms"] == [
