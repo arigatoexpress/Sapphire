@@ -27,8 +27,8 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "14"
-POLICY_PROFILE = "grok-export-v14"
+VALIDATOR_VERSION = "15"
+POLICY_PROFILE = "grok-export-v15"
 SECRET_POLICY_REVISION = 14
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
@@ -192,6 +192,7 @@ POLICY = {
     "max_structured_depth": MAX_STRUCTURED_DEPTH,
     "max_structured_nodes": MAX_STRUCTURED_NODES,
     "max_tree_row_bytes": MAX_TREE_ROW_BYTES,
+    "git_blob_identity": "recompute_object_hash_v1",
     "regular_blob_mode": "100644",
     "json_duplicate_keys": "reject",
     "yaml_duplicate_keys": "reject",
@@ -418,6 +419,8 @@ def _stream_tree_rows(config: SnapshotConfig, commit: str) -> Generator[bytes, N
         while chunk := process.stdout.read(TREE_STREAM_CHUNK_BYTES):
             buffer.extend(chunk)
             while (delimiter := buffer.find(b"\0")) >= 0:
+                if delimiter > MAX_TREE_ROW_BYTES:
+                    raise SnapshotRejected("invalid_tree_row")
                 raw_row = bytes(buffer[:delimiter])
                 del buffer[: delimiter + 1]
                 if raw_row:
@@ -597,6 +600,25 @@ def _decode_utf8(data: bytes, path: str) -> str:
         raise SnapshotRejected("invalid_utf8", path)
 
 
+def _git_blob_oid(blob: bytes, recorded_oid: str) -> str:
+    object_bytes = f"blob {len(blob)}\0".encode("ascii") + blob
+    if len(recorded_oid) == 40:
+        return hashlib.sha1(object_bytes, usedforsecurity=False).hexdigest()
+    if len(recorded_oid) == 64:
+        return hashlib.sha256(object_bytes).hexdigest()
+    raise SnapshotRejected("invalid_blob_oid")
+
+
+def _read_verified_blob(config: SnapshotConfig, entry: TreeEntry) -> bytes:
+    blob = _run_git(config, "cat-file", "blob", entry.git_blob_oid, binary=True)
+    assert isinstance(blob, bytes)
+    if entry.size is None or len(blob) != entry.size:
+        raise SnapshotRejected("blob_size_mismatch", entry.relative_path)
+    if _git_blob_oid(blob, entry.git_blob_oid) != entry.git_blob_oid:
+        raise SnapshotRejected("blob_oid_mismatch", entry.relative_path)
+    return blob
+
+
 def _normalized_key(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
@@ -753,10 +775,7 @@ def _validate_content(path: str, data: bytes) -> str:
 
 def _read_policy_checked_file(config: SnapshotConfig, entry: TreeEntry) -> PolicyCheckedFile:
     _validate_entry(config, entry)
-    blob = _run_git(config, "cat-file", "blob", entry.git_blob_oid, binary=True)
-    assert isinstance(blob, bytes)
-    if entry.size is None or len(blob) != entry.size:
-        raise SnapshotRejected("blob_size_mismatch", entry.relative_path)
+    blob = _read_verified_blob(config, entry)
     media_type = _validate_content(entry.relative_path, blob)
     return PolicyCheckedFile(
         source_relpath=entry.source_relpath,
@@ -778,10 +797,7 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
         raise SnapshotRejected("missing_blob_size", path)
     if entry.size > config.max_file_bytes:
         raise SnapshotRejected("file_too_large", path)
-    blob = _run_git(config, "cat-file", "blob", entry.git_blob_oid, binary=True)
-    assert isinstance(blob, bytes)
-    if len(blob) != entry.size:
-        raise SnapshotRejected("blob_size_mismatch", path)
+    blob = _read_verified_blob(config, entry)
     if _detect_secret(blob):
         raise SnapshotRejected("secret_detected", path)
     text = _decode_utf8(blob, path)

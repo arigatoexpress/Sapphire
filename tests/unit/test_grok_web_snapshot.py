@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import tomllib
+import zlib
 from dataclasses import asdict
 from pathlib import Path, PureWindowsPath
 
@@ -138,6 +139,39 @@ def test_snapshot_ignores_local_git_blob_replacement_refs(tmp_path: Path):
     assert result.receipt["files"][0]["sha256"] == hashlib.sha256(original.encode()).hexdigest()
 
 
+def test_snapshot_rejects_same_size_loose_blob_with_wrong_object_hash(tmp_path: Path):
+    mod = _load()
+    original = _frontmatter(body="ORIGINAL\n").encode()
+    replacement = _frontmatter(body="REPLACED\n").encode()
+    assert len(original) == len(replacement)
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": original},
+    )
+    original_oid = _git(
+        repo,
+        "rev-parse",
+        "origin/main:data/grok-web-exports/2026-08-08_clean.md",
+    )
+    loose_object = repo / ".git" / "objects" / original_oid[:2] / original_oid[2:]
+    loose_object.unlink()
+    loose_object.write_bytes(zlib.compress(f"blob {len(replacement)}\0".encode() + replacement))
+    corrupted = subprocess.run(
+        ["git", "cat-file", "blob", original_oid],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    assert corrupted.stdout == replacement
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "blob_oid_mismatch"
+    assert caught.value.path == "2026-08-08_clean.md"
+    assert not (tmp_path / "receipts").exists()
+
+
 def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, monkeypatch):
     mod = _load()
     _, seed, repo = _fixture_repo(
@@ -263,6 +297,40 @@ def test_tree_stream_stops_immediately_after_file_limit(tmp_path: Path, monkeypa
 
     assert caught.value.code == "too_many_files"
     assert process.stdout.reads == 3
+    assert process.stdout.closed is True
+    assert process.waited is True
+
+
+def test_tree_stream_rejects_oversized_row_before_yield(tmp_path: Path, monkeypatch):
+    mod = _load()
+
+    class ChunkedRow:
+        def __init__(self):
+            self.chunks = iter((b"x" * mod.MAX_TREE_ROW_BYTES, b"x\0", b""))
+            self.closed = False
+
+        def read(self, _size: int) -> bytes:
+            return next(self.chunks)
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakeProcess:
+        def __init__(self):
+            self.stdout = ChunkedRow()
+            self.waited = False
+
+        def wait(self) -> int:
+            self.waited = True
+            return 0
+
+    process = FakeProcess()
+    monkeypatch.setattr(mod.subprocess, "Popen", lambda *_args, **_kwargs: process)
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        list(mod._stream_tree_rows(mod.SnapshotConfig(repo=tmp_path), "a" * 40))
+
+    assert caught.value.code == "invalid_tree_row"
     assert process.stdout.closed is True
     assert process.waited is True
 
@@ -1124,6 +1192,7 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
         "decoded_escape_views_unstructured_text_rules",
     ]
     assert mod.POLICY["max_tree_row_bytes"] == mod.MAX_TREE_ROW_BYTES
+    assert mod.POLICY["git_blob_identity"] == "recompute_object_hash_v1"
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",
