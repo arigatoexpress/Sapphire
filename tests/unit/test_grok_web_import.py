@@ -357,6 +357,32 @@ def test_idempotent_import_adopts_identical_and_preserves_unmanaged_files(tmp_pa
     assert len(list(config.state_root.glob("receipts/sha256/*/*.json"))) == 1
 
 
+def test_current_receipt_rejects_reused_state_root_with_new_destination(tmp_path: Path):
+    mod = _load()
+    content = _frontmatter(body="BOUND\n")
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": content})
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    new_destination = tmp_path / "Knowledge" / "other-inbox"
+    new_destination.mkdir(parents=True)
+    new_target = new_destination / "2026-08-08_note.md"
+    new_target.write_text(content)
+    rebound = mod.ImportConfig(
+        repo=repo,
+        destination=new_destination,
+        state_root=config.state_root,
+    )
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(rebound)
+
+    assert caught.value.code == "destination_mismatch"
+    assert new_target.read_text() == content
+    assert (config.destination / "2026-08-08_note.md").read_text() == content
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+
+
 def test_import_preserves_existing_restrictive_destination_mode(tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})

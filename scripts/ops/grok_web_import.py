@@ -558,7 +558,11 @@ def _load_current(config: ImportConfig) -> tuple[str, dict[str, Any]] | None:
     digest = pointer.get("receipt_sha256")
     if not isinstance(digest, str):
         raise ImportRejected("current_pointer_digest")
-    return digest, _load_receipt(config, digest)
+    receipt = _load_receipt(config, digest)
+    destination = receipt.get("destination")
+    if not isinstance(destination, dict) or destination.get("root") != str(config.destination):
+        raise ImportRejected("destination_mismatch")
+    return digest, receipt
 
 
 def _hash_file(path: Path, code: str) -> str:
