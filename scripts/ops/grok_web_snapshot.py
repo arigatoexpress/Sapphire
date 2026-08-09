@@ -27,8 +27,8 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "15"
-POLICY_PROFILE = "grok-export-v15"
+VALIDATOR_VERSION = "16"
+POLICY_PROFILE = "grok-export-v16"
 SECRET_POLICY_REVISION = 14
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
@@ -192,7 +192,7 @@ POLICY = {
     "max_structured_depth": MAX_STRUCTURED_DEPTH,
     "max_structured_nodes": MAX_STRUCTURED_NODES,
     "max_tree_row_bytes": MAX_TREE_ROW_BYTES,
-    "git_blob_identity": "recompute_object_hash_v1",
+    "git_object_identity": "verify_commit_tree_blob_chain_v1",
     "regular_blob_mode": "100644",
     "json_duplicate_keys": "reject",
     "yaml_duplicate_keys": "reject",
@@ -367,25 +367,77 @@ def _validate_source_contract(config: SnapshotConfig) -> None:
         raise SnapshotRejected("source_contract")
 
 
+def _git_object_oid(kind: str, content: bytes, recorded_oid: str) -> str:
+    object_bytes = f"{kind} {len(content)}\0".encode("ascii") + content
+    if len(recorded_oid) == 40:
+        return hashlib.sha1(object_bytes, usedforsecurity=False).hexdigest()
+    if len(recorded_oid) == 64:
+        return hashlib.sha256(object_bytes).hexdigest()
+    raise SnapshotRejected(f"invalid_{kind}_oid")
+
+
+def _read_verified_git_object(
+    config: SnapshotConfig,
+    kind: str,
+    recorded_oid: str,
+) -> bytes:
+    content = _run_git(config, "cat-file", kind, recorded_oid, binary=True)
+    assert isinstance(content, bytes)
+    if _git_object_oid(kind, content, recorded_oid) != recorded_oid:
+        raise SnapshotRejected(f"{kind}_oid_mismatch")
+    return content
+
+
+def _commit_root_tree_oid(commit: bytes, commit_oid: str) -> str:
+    first_line, delimiter, _ = commit.partition(b"\n")
+    if delimiter != b"\n" or not first_line.startswith(b"tree "):
+        raise SnapshotRejected("invalid_commit_object")
+    try:
+        tree_oid = first_line.removeprefix(b"tree ").decode("ascii")
+    except UnicodeDecodeError:
+        raise SnapshotRejected("invalid_commit_object")
+    if len(tree_oid) != len(commit_oid) or not GIT_OID_RE.fullmatch(tree_oid):
+        raise SnapshotRejected("invalid_commit_object")
+    return tree_oid
+
+
+def _tree_child_oid(tree: bytes, tree_oid: str, component: str) -> str:
+    wanted = component.encode("utf-8")
+    raw_oid_bytes = len(tree_oid) // 2
+    found: str | None = None
+    cursor = 0
+    while cursor < len(tree):
+        mode_end = tree.find(b" ", cursor)
+        name_end = tree.find(b"\0", mode_end + 1)
+        oid_start = name_end + 1
+        oid_end = oid_start + raw_oid_bytes
+        if mode_end <= cursor or name_end <= mode_end + 1 or oid_end > len(tree):
+            raise SnapshotRejected("invalid_tree_object")
+        if tree[mode_end + 1 : name_end] == wanted:
+            if tree[cursor:mode_end] not in {b"40000", b"040000"} or found is not None:
+                raise SnapshotRejected("source_tree_missing")
+            found = tree[oid_start:oid_end].hex()
+        cursor = oid_end
+    if cursor != len(tree):
+        raise SnapshotRejected("invalid_tree_object")
+    if found is None:
+        raise SnapshotRejected("source_tree_missing")
+    return found
+
+
 def _resolve_source(config: SnapshotConfig, *, fetch: bool) -> tuple[str, str]:
     _validate_source_contract(config)
     if fetch:
         _fetch(config)
-    commit = str(
-        _run_git(config, "rev-parse", "--verify", f"{config.source_ref}^{{commit}}")
-    ).strip()
+    commit = str(_run_git(config, "rev-parse", "--verify", config.source_ref)).strip()
     if not GIT_OID_RE.fullmatch(commit):
         raise SnapshotRejected("invalid_commit_oid")
-    tree = str(
-        _run_git(
-            config,
-            "rev-parse",
-            "--verify",
-            f"{commit}:{config.source_prefix}",
-        )
-    ).strip()
-    if not GIT_OID_RE.fullmatch(tree):
-        raise SnapshotRejected("invalid_tree_oid")
+    commit_content = _read_verified_git_object(config, "commit", commit)
+    tree = _commit_root_tree_oid(commit_content, commit)
+    for component in PurePosixPath(config.source_prefix).parts:
+        tree_content = _read_verified_git_object(config, "tree", tree)
+        tree = _tree_child_oid(tree_content, tree, component)
+    _read_verified_git_object(config, "tree", tree)
     return commit, tree
 
 
@@ -600,21 +652,12 @@ def _decode_utf8(data: bytes, path: str) -> str:
         raise SnapshotRejected("invalid_utf8", path)
 
 
-def _git_blob_oid(blob: bytes, recorded_oid: str) -> str:
-    object_bytes = f"blob {len(blob)}\0".encode("ascii") + blob
-    if len(recorded_oid) == 40:
-        return hashlib.sha1(object_bytes, usedforsecurity=False).hexdigest()
-    if len(recorded_oid) == 64:
-        return hashlib.sha256(object_bytes).hexdigest()
-    raise SnapshotRejected("invalid_blob_oid")
-
-
 def _read_verified_blob(config: SnapshotConfig, entry: TreeEntry) -> bytes:
     blob = _run_git(config, "cat-file", "blob", entry.git_blob_oid, binary=True)
     assert isinstance(blob, bytes)
     if entry.size is None or len(blob) != entry.size:
         raise SnapshotRejected("blob_size_mismatch", entry.relative_path)
-    if _git_blob_oid(blob, entry.git_blob_oid) != entry.git_blob_oid:
+    if _git_object_oid("blob", blob, entry.git_blob_oid) != entry.git_blob_oid:
         raise SnapshotRejected("blob_oid_mismatch", entry.relative_path)
     return blob
 

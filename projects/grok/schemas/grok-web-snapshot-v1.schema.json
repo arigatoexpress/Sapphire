@@ -20,8 +20,8 @@
       "required": ["name", "version", "policy_profile", "policy_sha256"],
       "properties": {
         "name": {"const": "grok_web_snapshot"},
-        "version": {"const": "15"},
-        "policy_profile": {"const": "grok-export-v15"},
+        "version": {"const": "16"},
+        "policy_profile": {"const": "grok-export-v16"},
         "policy_sha256": {"$ref": "#/$defs/sha256"}
       }
     },
@@ -79,7 +79,7 @@
         "sha256": {"$ref": "#/$defs/sha256"},
         "bytes": {"type": "integer", "minimum": 0},
         "media_type": {"enum": ["text/markdown", "application/json"]},
-        "policy_profile": {"const": "grok-export-v15"}
+        "policy_profile": {"const": "grok-export-v16"}
       }
     }
   }

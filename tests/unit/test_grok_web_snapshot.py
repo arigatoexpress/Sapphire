@@ -41,6 +41,22 @@ def _git(cwd: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def _git_bytes(cwd: Path, *args: str) -> bytes:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+    )
+    return result.stdout
+
+
+def _replace_loose_git_object(repo: Path, oid: str, kind: str, content: bytes) -> None:
+    loose_object = repo / ".git" / "objects" / oid[:2] / oid[2:]
+    loose_object.unlink()
+    loose_object.write_bytes(zlib.compress(f"{kind} {len(content)}\0".encode() + content))
+
+
 def _frontmatter(title: str = "Validated snapshot", body: str = "# Body\n") -> str:
     return (
         "---\n"
@@ -153,22 +169,70 @@ def test_snapshot_rejects_same_size_loose_blob_with_wrong_object_hash(tmp_path: 
         "rev-parse",
         "origin/main:data/grok-web-exports/2026-08-08_clean.md",
     )
-    loose_object = repo / ".git" / "objects" / original_oid[:2] / original_oid[2:]
-    loose_object.unlink()
-    loose_object.write_bytes(zlib.compress(f"blob {len(replacement)}\0".encode() + replacement))
-    corrupted = subprocess.run(
-        ["git", "cat-file", "blob", original_oid],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-    )
-    assert corrupted.stdout == replacement
+    _replace_loose_git_object(repo, original_oid, "blob", replacement)
+    assert _git_bytes(repo, "cat-file", "blob", original_oid) == replacement
 
     with pytest.raises(mod.SnapshotRejected) as caught:
         mod.snapshot_exports(_config(mod, repo))
 
     assert caught.value.code == "blob_oid_mismatch"
     assert caught.value.path == "2026-08-08_clean.md"
+    assert not (tmp_path / "receipts").exists()
+
+
+def test_snapshot_rejects_commit_with_wrong_object_hash(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": _frontmatter()},
+    )
+    commit_oid = _git(repo, "rev-parse", "origin/main^{commit}")
+    original = _git_bytes(repo, "cat-file", "commit", commit_oid)
+    replacement = original.replace(b"fixture exports", b"fixture exportz")
+    assert replacement != original
+    assert len(replacement) == len(original)
+    _replace_loose_git_object(repo, commit_oid, "commit", replacement)
+    assert _git_bytes(repo, "cat-file", "commit", commit_oid) == replacement
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "commit_oid_mismatch"
+    assert not (tmp_path / "receipts").exists()
+
+
+def test_snapshot_rejects_source_tree_with_wrong_object_hash(tmp_path: Path):
+    mod = _load()
+    original = _frontmatter(body="ORIGINAL\n").encode()
+    replacement = _frontmatter(body="REPLACED\n").encode()
+    assert len(original) == len(replacement)
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": original},
+    )
+    original_blob_oid = _git(
+        repo,
+        "rev-parse",
+        "origin/main:data/grok-web-exports/2026-08-08_clean.md",
+    )
+    replacement_path = repo / "replacement.tmp"
+    replacement_path.write_bytes(replacement)
+    replacement_blob_oid = _git(repo, "hash-object", "-w", str(replacement_path))
+    tree_oid = _git(repo, "rev-parse", "origin/main:data/grok-web-exports")
+    original_tree = _git_bytes(repo, "cat-file", "tree", tree_oid)
+    replacement_tree = original_tree.replace(
+        bytes.fromhex(original_blob_oid),
+        bytes.fromhex(replacement_blob_oid),
+    )
+    assert replacement_tree != original_tree
+    assert len(replacement_tree) == len(original_tree)
+    _replace_loose_git_object(repo, tree_oid, "tree", replacement_tree)
+    assert _git_bytes(repo, "cat-file", "tree", tree_oid) == replacement_tree
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "tree_oid_mismatch"
     assert not (tmp_path / "receipts").exists()
 
 
@@ -1192,7 +1256,7 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
         "decoded_escape_views_unstructured_text_rules",
     ]
     assert mod.POLICY["max_tree_row_bytes"] == mod.MAX_TREE_ROW_BYTES
-    assert mod.POLICY["git_blob_identity"] == "recompute_object_hash_v1"
+    assert mod.POLICY["git_object_identity"] == "verify_commit_tree_blob_chain_v1"
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",
