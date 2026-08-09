@@ -618,6 +618,27 @@ def test_decoded_scalar_credential_snippets_are_rejected_without_writes(
     assert not (tmp_path / "receipts").exists()
 
 
+def test_nested_serialized_escaped_credential_is_rejected_without_writes(tmp_path: Path):
+    mod = _load()
+    payload = {
+        "source": "grok-web",
+        "date": "2026-08-08",
+        "type": "note",
+        "title": "Nested serialized credential",
+        "note": r'{"api\u005fkey":"Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx"}',
+    }
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_nested-serialized.json": json.dumps(payload)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
 def test_duplicate_json_keys_cannot_hide_a_decoded_secret(tmp_path: Path):
     mod = _load()
     encoded_token = "sk" + r"\u002d" + "proj-" + "A" * 24
@@ -999,9 +1020,13 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     assert mod.POLICY["secret_policy"]["decode_transforms"] == [
         "markdown_body_json_escape_view_v1",
         "excluded_text_json_escape_view_v1",
+        "structured_scalar_json_escape_view_v1",
     ]
     assert mod.POLICY["secret_policy"]["scan_filenames"] is True
-    assert mod.POLICY["secret_policy"]["structured_scalar_scan"] == "unstructured_text_rules"
+    assert mod.POLICY["secret_policy"]["structured_scalar_scans"] == [
+        "unstructured_text_rules",
+        "json_escape_view_unstructured_text_rules",
+    ]
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",

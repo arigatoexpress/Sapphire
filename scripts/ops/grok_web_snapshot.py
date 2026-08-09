@@ -24,9 +24,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "12"
-VALIDATION_PROFILE = "grok-export-v12"
-SECRET_POLICY_REVISION = 12
+VALIDATOR_VERSION = "13"
+VALIDATION_PROFILE = "grok-export-v13"
+SECRET_POLICY_REVISION = 13
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -103,6 +103,7 @@ JSON_SIMPLE_ESCAPES = {
 SECRET_DECODE_TRANSFORMS = (
     "markdown_body_json_escape_view_v1",
     "excluded_text_json_escape_view_v1",
+    "structured_scalar_json_escape_view_v1",
 )
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
@@ -195,7 +196,10 @@ POLICY = {
         "inventory_path_redaction": SECRET_PATH_REDACTION,
         "path_names": sorted(SECRET_PATH_NAMES),
         "scan_filenames": True,
-        "structured_scalar_scan": "unstructured_text_rules",
+        "structured_scalar_scans": [
+            "unstructured_text_rules",
+            "json_escape_view_unstructured_text_rules",
+        ],
         "structured_key_names": sorted(STRUCTURED_SECRET_KEY_NAMES),
         "structured_key_suffixes": sorted(STRUCTURED_SECRET_KEY_SUFFIXES),
         "rules": [
@@ -573,7 +577,7 @@ def _validate_structure(
                 encoded = current.encode("utf-8")
             except UnicodeEncodeError:
                 raise SnapshotRejected(code, path)
-            if _detect_unstructured_text_secret(encoded):
+            if _detect_unstructured_text_secret(encoded) or _detect_json_escape_secret(encoded):
                 raise SnapshotRejected("secret_detected", path)
         elif isinstance(current, bytes):
             if _detect_secret(current):
