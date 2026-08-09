@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-7%2C941%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
+[![Tests](https://img.shields.io/badge/tests-7%2C943%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
 [![License](https://img.shields.io/badge/license-proprietary-0A2540)](LICENSE)
 
 **Self-sovereign capital intelligence OS** — a private plant that earns on designated rails, publishes real research, and self-improves through agent harnesses.
@@ -17,7 +17,7 @@
 
 > **Not financial advice.** Designated test/agentic wallets only for live automation. Fail-closed killswitches. Paper first.
 
-- 7,941+ passing tests across 486 files
+- 7,943+ passing tests across 486 files
 
 ---
 

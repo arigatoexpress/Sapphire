@@ -351,6 +351,59 @@ def test_verified_git_object_rejects_preflight_size_before_content_read(
     assert caught.value.code == f"{kind}_too_large"
 
 
+def test_snapshot_pins_object_instance_across_size_content_boundary(
+    tmp_path: Path,
+    monkeypatch,
+):
+    mod = _load()
+    original = _frontmatter(body="ORIGINAL\n").encode()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": original},
+    )
+    commit_oid = _git(repo, "rev-parse", "origin/main^{commit}")
+    commit = _git_bytes(repo, "cat-file", "commit", commit_oid)
+    oversized_commit = commit + b"x" * (mod.MAX_COMMIT_OBJECT_BYTES + 1 - len(commit))
+    real_size = mod._git_object_size
+    swapped = False
+
+    def size_then_swap(config, oid: str):
+        nonlocal swapped
+        size = real_size(config, oid)
+        if oid == commit_oid and not swapped:
+            _replace_loose_git_object(repo, oid, "commit", oversized_commit)
+            swapped = True
+        return size
+
+    monkeypatch.setattr(mod, "_git_object_size", size_then_swap)
+
+    result = mod.snapshot_exports(_config(mod, repo))
+
+    assert swapped is True
+    assert result.source_commit == commit_oid
+    assert result.receipt["files"][0]["sha256"] == hashlib.sha256(original).hexdigest()
+    assert not list((repo / ".git").glob("grok-snapshot-*"))
+
+
+def test_snapshot_rejects_alternate_object_databases(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": _frontmatter()},
+    )
+    objects = Path(_git(repo, "rev-parse", "--git-path", "objects"))
+    if not objects.is_absolute():
+        objects = repo / objects
+    alternates = objects / "info" / "alternates"
+    alternates.write_text(str(tmp_path / "external-objects") + "\n", encoding="utf-8")
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "object_store_alternates"
+    assert not list((repo / ".git").glob("grok-snapshot-*"))
+
+
 def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, monkeypatch):
     mod = _load()
     _, seed, repo = _fixture_repo(
@@ -1320,6 +1373,9 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     assert mod.POLICY["max_tree_object_bytes"] == mod.MAX_TREE_OBJECT_BYTES
     assert mod.POLICY["git_object_identity"] == "verify_preflight_bounded_commit_tree_blob_chain_v3"
     assert mod.POLICY["object_size_preflight"] == "cat_file_size_before_content"
+    assert mod.POLICY["object_store_view"] == "hardlink_pinned_pack_and_loose_v1"
+    assert mod.POLICY["alternate_object_databases"] == "reject"
+    assert mod.POLICY["max_pinned_pack_files"] == mod.MAX_PINNED_PACK_FILES
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",

@@ -13,11 +13,16 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import re
+import stat
 import subprocess
 import sys
+import tempfile
 import unicodedata
-from dataclasses import asdict, dataclass
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, replace
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -26,8 +31,8 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "18"
-POLICY_PROFILE = "grok-export-v18"
+VALIDATOR_VERSION = "19"
+POLICY_PROFILE = "grok-export-v19"
 SECRET_POLICY_REVISION = 14
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
@@ -37,6 +42,7 @@ MAX_STRUCTURED_NODES = 10_000
 OBJECT_READ_CHUNK_BYTES = 64 * 1024
 MAX_COMMIT_OBJECT_BYTES = 1024 * 1024
 MAX_TREE_OBJECT_BYTES = 4 * 1024 * 1024
+MAX_PINNED_PACK_FILES = 2048
 EXCLUDED_NAMES = frozenset({"README.md", "MANIFEST.json", ".gitkeep"})
 ALLOWED_SUFFIXES = frozenset({".md", ".json"})
 REQUIRED_PROVENANCE = ("source", "date", "type", "title")
@@ -90,6 +96,7 @@ CREDENTIAL_LABEL_PATTERN = (
     rb"password|private[_-]?key|secret(?:[_-]?key)?|authorization|credential(?:s)?)"
 )
 GIT_OID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+PACK_STORAGE_RE = re.compile(r"^pack-(?:[0-9a-f]{40}|[0-9a-f]{64})\.(?:idx|pack|promisor)$")
 FRONTMATTER_RE = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---\r?\n", re.DOTALL)
 JSON_SIMPLE_ESCAPES = {
     ord('"'): b'"',
@@ -192,6 +199,9 @@ POLICY = {
     "max_tree_object_bytes": MAX_TREE_OBJECT_BYTES,
     "git_object_identity": "verify_preflight_bounded_commit_tree_blob_chain_v3",
     "object_size_preflight": "cat_file_size_before_content",
+    "object_store_view": "hardlink_pinned_pack_and_loose_v1",
+    "alternate_object_databases": "reject",
+    "max_pinned_pack_files": MAX_PINNED_PACK_FILES,
     "regular_blob_mode": "100644",
     "json_duplicate_keys": "reject",
     "yaml_duplicate_keys": "reject",
@@ -248,6 +258,8 @@ class SnapshotConfig:
     max_file_bytes: int = 4 * 1024 * 1024
     max_total_bytes: int = 64 * 1024 * 1024
     git_bin: str = "git"
+    git_object_directory: Path | None = None
+    source_git_object_directory: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -331,12 +343,24 @@ def _policy_sha256(config: SnapshotConfig) -> str:
     )
 
 
+def _git_environment(config: SnapshotConfig) -> dict[str, str]:
+    env = os.environ.copy()
+    env.pop("GIT_OBJECT_DIRECTORY", None)
+    env.pop("GIT_ALTERNATE_OBJECT_DIRECTORIES", None)
+    env["GIT_NO_LAZY_FETCH"] = "1"
+    if config.git_object_directory is not None:
+        env["GIT_OBJECT_DIRECTORY"] = str(config.git_object_directory)
+        env["GIT_ALTERNATE_OBJECT_DIRECTORIES"] = ""
+    return env
+
+
 def _run_git(config: SnapshotConfig, *args: str, binary: bool = False) -> bytes | str:
     result = subprocess.run(
         [config.git_bin, "--no-replace-objects", "-C", str(config.repo), *args],
         check=False,
         capture_output=True,
         text=not binary,
+        env=_git_environment(config),
     )
     if result.returncode != 0:
         raise SnapshotRejected("git_command_failed")
@@ -359,9 +383,100 @@ def _fetch(config: SnapshotConfig) -> None:
         check=False,
         capture_output=True,
         text=True,
+        env=_git_environment(config),
     )
     if result.returncode != 0:
         raise SnapshotRejected("fetch_failed")
+
+
+def _object_directory(config: SnapshotConfig) -> Path:
+    raw = str(_run_git(config, "rev-parse", "--git-path", "objects")).strip()
+    if not raw:
+        raise SnapshotRejected("object_store_missing")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = config.repo / path
+    try:
+        return path.resolve(strict=True)
+    except OSError:
+        raise SnapshotRejected("object_store_missing")
+
+
+def _link_regular_file(source: Path, destination: Path) -> None:
+    try:
+        if not stat.S_ISREG(source.lstat().st_mode):
+            raise SnapshotRejected("object_store_unsafe")
+        os.link(source, destination)
+        if not stat.S_ISREG(destination.lstat().st_mode):
+            raise SnapshotRejected("object_store_unsafe")
+    except SnapshotRejected:
+        raise
+    except OSError:
+        raise SnapshotRejected("object_store_changed")
+
+
+@contextmanager
+def _pinned_object_store(config: SnapshotConfig) -> Iterator[SnapshotConfig]:
+    source_objects = _object_directory(config)
+    alternates = source_objects / "info" / "alternates"
+    if alternates.exists() or alternates.is_symlink():
+        raise SnapshotRejected("object_store_alternates")
+    source_pack = source_objects / "pack"
+    try:
+        pack_files = sorted(
+            path for path in source_pack.iterdir() if PACK_STORAGE_RE.fullmatch(path.name)
+        )
+    except OSError:
+        raise SnapshotRejected("object_store_changed")
+    if len(pack_files) > MAX_PINNED_PACK_FILES:
+        raise SnapshotRejected("object_store_too_large")
+
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix="grok-snapshot-",
+            dir=source_objects.parent,
+        ) as temporary:
+            pinned_root = source_objects.parent / PurePosixPath(temporary).name
+            pinned_objects = pinned_root / "objects"
+            pinned_pack = pinned_objects / "pack"
+            pinned_pack.mkdir(parents=True)
+            for source in pack_files:
+                _link_regular_file(source, pinned_pack / source.name)
+            yield replace(
+                config,
+                git_object_directory=pinned_objects,
+                source_git_object_directory=source_objects,
+            )
+    except SnapshotRejected:
+        raise
+    except OSError:
+        raise SnapshotRejected("object_store_pin_failed")
+
+
+def _pin_loose_object(config: SnapshotConfig, oid: str) -> None:
+    source_objects = config.source_git_object_directory
+    pinned_objects = config.git_object_directory
+    if source_objects is None or pinned_objects is None:
+        return
+    if not GIT_OID_RE.fullmatch(oid):
+        raise SnapshotRejected("invalid_object_oid")
+    source = source_objects / oid[:2] / oid[2:]
+    destination = pinned_objects / oid[:2] / oid[2:]
+    if destination.exists():
+        return
+    try:
+        source.lstat()
+    except FileNotFoundError:
+        return
+    except OSError:
+        raise SnapshotRejected("object_store_changed")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        _link_regular_file(source, destination)
+    except SnapshotRejected as exc:
+        if exc.code == "object_store_changed" and destination.exists():
+            return
+        raise
 
 
 def _validate_source_contract(config: SnapshotConfig) -> None:
@@ -389,6 +504,7 @@ def _read_git_object_bounded(
     *,
     max_bytes: int,
 ) -> bytes:
+    _pin_loose_object(config, recorded_oid)
     try:
         process = subprocess.Popen(
             [
@@ -402,6 +518,7 @@ def _read_git_object_bounded(
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
+            env=_git_environment(config),
         )
     except OSError:
         raise SnapshotRejected("git_command_failed")
@@ -517,6 +634,7 @@ def _resolve_source(config: SnapshotConfig, *, fetch: bool) -> tuple[str, str, b
 
 
 def _git_object_size(config: SnapshotConfig, oid: str) -> int:
+    _pin_loose_object(config, oid)
     raw_size = str(_run_git(config, "cat-file", "-s", oid)).strip()
     if len(raw_size) > 20 or not raw_size.isdecimal():
         raise SnapshotRejected("invalid_object_size")
@@ -986,64 +1104,90 @@ def _build_receipt(
     }
 
 
+@contextmanager
+def _immutable_source(
+    config: SnapshotConfig,
+    *,
+    fetch: bool,
+) -> Iterator[tuple[SnapshotConfig, str, str, bytes]]:
+    _validate_source_contract(config)
+    if fetch:
+        _fetch(config)
+    with _pinned_object_store(config) as pinned_config:
+        commit, tree, tree_content = _resolve_source(pinned_config, fetch=False)
+        yield pinned_config, commit, tree, tree_content
+
+
 def snapshot_exports(
     config: SnapshotConfig,
     *,
     fetch: bool = False,
 ) -> SnapshotResult:
     """Apply the bounded policy to one immutable source and return its receipt."""
-    commit, tree, tree_content = _resolve_source(config, fetch=fetch)
-    files = _policy_checked_files(config, tree, tree_content)
-    receipt = _build_receipt(config, commit, tree, files)
-    receipt_bytes = canonical_receipt(receipt)
-    receipt_sha = _sha256(receipt_bytes)
-    return SnapshotResult(
-        source_commit=commit,
-        source_tree=tree,
-        receipt_sha256=receipt_sha,
-        receipt=receipt,
-    )
+    with _immutable_source(config, fetch=fetch) as (
+        pinned_config,
+        commit,
+        tree,
+        tree_content,
+    ):
+        files = _policy_checked_files(pinned_config, tree, tree_content)
+        receipt = _build_receipt(pinned_config, commit, tree, files)
+        receipt_bytes = canonical_receipt(receipt)
+        receipt_sha = _sha256(receipt_bytes)
+        return SnapshotResult(
+            source_commit=commit,
+            source_tree=tree,
+            receipt_sha256=receipt_sha,
+            receipt=receipt,
+        )
 
 
 def inventory_exports(config: SnapshotConfig, *, fetch: bool = False) -> InventoryResult:
     """Return only paths and stable rejection codes; never content or content hashes."""
-    commit, tree, tree_content = _resolve_source(config, fetch=fetch)
-    entries = _tree_entries(config, tree, tree_content)
-    if not entries:
-        raise SnapshotRejected("empty_source")
-    _validate_limits(config, entries)
-    metadata = [entry for entry in entries if entry.relative_path in EXCLUDED_NAMES]
-    entries = [entry for entry in entries if entry.relative_path not in EXCLUDED_NAMES]
-    for entry in metadata:
-        _validate_excluded_metadata(config, entry)
-    if not entries:
-        raise SnapshotRejected("empty_source")
-    policy_checked: list[PolicyCheckedFile] = []
-    rejected: list[Rejection] = []
-    for entry in entries:
-        try:
-            policy_checked.append(_read_policy_checked_file(config, entry))
-        except SnapshotRejected as exc:
-            rejected.append(Rejection(path=exc.path or SECRET_PATH_REDACTION, code=exc.code))
+    with _immutable_source(config, fetch=fetch) as (
+        pinned_config,
+        commit,
+        tree,
+        tree_content,
+    ):
+        entries = _tree_entries(pinned_config, tree, tree_content)
+        if not entries:
+            raise SnapshotRejected("empty_source")
+        _validate_limits(pinned_config, entries)
+        metadata = [entry for entry in entries if entry.relative_path in EXCLUDED_NAMES]
+        entries = [entry for entry in entries if entry.relative_path not in EXCLUDED_NAMES]
+        for entry in metadata:
+            _validate_excluded_metadata(pinned_config, entry)
+        if not entries:
+            raise SnapshotRejected("empty_source")
+        policy_checked: list[PolicyCheckedFile] = []
+        rejected: list[Rejection] = []
+        for entry in entries:
+            try:
+                policy_checked.append(_read_policy_checked_file(pinned_config, entry))
+            except SnapshotRejected as exc:
+                rejected.append(Rejection(path=exc.path or SECRET_PATH_REDACTION, code=exc.code))
 
-    by_alias: dict[str, list[PolicyCheckedFile]] = {}
-    for item in policy_checked:
-        key = unicodedata.normalize("NFC", item.relative_path).casefold()
-        by_alias.setdefault(key, []).append(item)
-    policy_passed = 0
-    for items in by_alias.values():
-        if len(items) == 1:
-            policy_passed += 1
-        else:
-            rejected.extend(Rejection(path=item.relative_path, code="path_alias") for item in items)
-    rejected.sort(key=lambda item: (item.path, item.code))
-    return InventoryResult(
-        source_commit=commit,
-        source_tree=tree,
-        total=len(entries),
-        policy_passed=policy_passed,
-        rejected=rejected,
-    )
+        by_alias: dict[str, list[PolicyCheckedFile]] = {}
+        for item in policy_checked:
+            key = unicodedata.normalize("NFC", item.relative_path).casefold()
+            by_alias.setdefault(key, []).append(item)
+        policy_passed = 0
+        for items in by_alias.values():
+            if len(items) == 1:
+                policy_passed += 1
+            else:
+                rejected.extend(
+                    Rejection(path=item.relative_path, code="path_alias") for item in items
+                )
+        rejected.sort(key=lambda item: (item.path, item.code))
+        return InventoryResult(
+            source_commit=commit,
+            source_tree=tree,
+            total=len(entries),
+            policy_passed=policy_passed,
+            rejected=rejected,
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
