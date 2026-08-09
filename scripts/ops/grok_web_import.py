@@ -65,7 +65,8 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
             rb"gh[pousr]_[A-Za-z0-9]{20,}|"
             rb"xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|"
             rb"AIza[0-9A-Za-z_-]{20,}|ya29\.[A-Za-z0-9._/-]{12,}|"
-            rb"(?<![0-9])[0-9]{8,12}:[A-Za-z0-9_-]{30,}(?![A-Za-z0-9_-]))"
+            rb"(?<![0-9])[0-9]{8,12}:[A-Za-z0-9_-]{30,}(?![A-Za-z0-9_-])|"
+            rb"[sr]k_(?:live|test)_[A-Za-z0-9]{16,})"
         ),
     ),
     (
@@ -693,6 +694,18 @@ def _verify_retired_precondition(config: ImportConfig, item: dict[str, Any]) -> 
         raise ImportRejected("managed_drift", name)
 
 
+def _device_id(path: Path) -> int:
+    try:
+        return path.stat().st_dev
+    except OSError:
+        raise ImportRejected("device_check_failed")
+
+
+def _verify_quarantine_device(config: ImportConfig, retired: list[dict[str, Any]]) -> None:
+    if retired and _device_id(config.destination) != _device_id(config.state_root):
+        raise ImportRejected("cross_device_quarantine")
+
+
 def _verify_materialize_preconditions(
     config: ImportConfig,
     files: list[dict[str, Any]],
@@ -1094,6 +1107,7 @@ def _perform_import(
         current_sha,
         manifest_sha,
     )
+    _verify_quarantine_device(config, retired)
     if dry_run:
         return ImportResult(
             status="dry_run",

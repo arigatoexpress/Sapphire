@@ -13,6 +13,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 MOD_PATH = ROOT / "scripts" / "ops" / "grok_web_import.py"
@@ -217,6 +218,8 @@ def test_strict_validation_rejects_before_copy(tmp_path: Path, name: str, conten
         "AIza" + "A" * 35,
         "ya29." + "A" * 40,
         "123456789:" + "A" * 35,
+        "sk_live_" + "A" * 24,
+        "rk_live_" + "A" * 24,
     ],
 )
 def test_bare_known_token_is_rejected_without_persisting_secret(
@@ -540,6 +543,41 @@ def test_edit_during_quarantine_setup_blocks_retirement(tmp_path: Path, monkeypa
     assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
     assert not list(quarantine_root.rglob("2026-08-08_retire.md"))
     assert (config.state_root / "RECOVERY.json").exists()
+
+
+def test_cross_device_retirement_is_rejected_before_mutation(tmp_path: Path, monkeypatch):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_keep.md": _frontmatter("Keep"),
+            "2026-08-08_retire.md": _frontmatter("Retire"),
+        },
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_retire.md"
+    target_before = target.read_bytes()
+    (seed / "data/grok-web-exports/2026-08-08_retire.md").unlink()
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_retire.md")
+    _git(seed, "commit", "-m", "retire export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+
+    def different_devices(path: Path) -> int:
+        return 1 if path == config.destination else 2
+
+    monkeypatch.setattr(mod, "_device_id", different_devices, raising=False)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "cross_device_quarantine"
+    assert target.read_bytes() == target_before
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert not (config.state_root / "RECOVERY.json").exists()
+    assert not (config.state_root / "quarantine").exists()
 
 
 def test_out_of_band_edit_blocks_update_and_rollback(tmp_path: Path):
@@ -1017,6 +1055,23 @@ def test_live_importer_declares_yaml_runtime_dependency():
     assert "pyyaml==6.0.3" in [
         dependency.casefold() for dependency in metadata["project"]["dependencies"]
     ]
+
+
+def test_importer_is_registered_with_operational_consumers():
+    registry = yaml.safe_load((ROOT / "infra" / "tool-registry.yaml").read_text())
+    entry = next(
+        (item for item in registry["tools"] if item.get("name") == "grok_web_import"),
+        None,
+    )
+
+    assert entry is not None
+    assert entry["path"] == "scripts/ops/grok_web_import.py"
+    assert entry["status"] == "internal"
+    assert entry["owner"] == "sapphire"
+    assert {
+        "launchagent.com.sapphire.grok-web-bridge",
+        "ops-state.finish-line.sync-grok-web-exports",
+    }.issubset(entry["consumers"])
 
 
 def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):

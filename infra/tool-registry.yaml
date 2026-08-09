@@ -663,3 +663,13 @@ tools:
     consumers: [hermes-agent.trading-analysis, claude-code.manual]
     description: |
       Read-only TradingView orchestrator surface. Wraps lib.trading.tradingview_orchestrator + lib.trading.pine_templates behind one dispatcher; mutation paths (set_symbol/timeframe, setup_chart, apply_indicator_stack, pine_compile/save/promote/set_from_file, alert_create/delete) are intentionally NOT exposed and the dispatcher constructs the orchestrator with mutation_enabled=False regardless of the SAPPHIRE_TV_MUTATION_ENABLED env var. Actions, probe (state+quote+values), score (latest scoring rows from the most recent capture manifest), list_pine (TV account scripts + local generated under pine/generated/), list_alerts (active TV alerts), generate_pine (symbol, kind=indicator|strategy — emits a Sapphire Pine v5 file under pine/generated/, no TV push), sweep (offline=true, limit=N — read-only TA sweep, returns manifest summary). Mutation lives in scripts/ops/tradingview_ta_capture.py under operator supervision; see docs/ops/tradingview-orchestrator-runbook.md.
+
+  # Hash-addressed Grok web export admission boundary — Tranche 7
+  - name: grok_web_import
+    path: scripts/ops/grok_web_import.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - launchagent.com.sapphire.grok-web-bridge
+      - ops-state.finish-line.sync-grok-web-exports
+    description: Strict, secret-blind importer for immutable origin/main Grok web exports. Writes content-addressed receipts and a managed raw Knowledge Inbox only; activation through the stable plant wrapper and q30m LaunchAgent is gated on zero rejected exports.
