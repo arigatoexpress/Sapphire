@@ -542,6 +542,24 @@ def test_quoted_credential_label_in_markdown_body_is_rejected(tmp_path: Path):
     assert caught.value.code == "secret_detected"
 
 
+def test_escaped_credential_label_in_markdown_json_body_is_rejected_without_writes(
+    tmp_path: Path,
+):
+    mod = _load()
+    token = "AbCdEf01" * 5
+    body = '```json\n{"api\\u005fkey": "' + token + '"}\n```\n'
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_escaped-label.md": _frontmatter(body=body)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
 def test_unsupported_yaml_set_container_is_rejected(tmp_path: Path):
     mod = _load()
     encoded_token = "sk-" + "proj-" + "AAAA" + r"\u0041" + "A" * 20
@@ -691,6 +709,9 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     rule_ids = [rule["id"] for rule in mod.POLICY["secret_policy"]["rules"]]
     assert "mnemonic_assignment" in rule_ids
     assert "aws_secret_assignment" in rule_ids
+    assert mod.POLICY["secret_policy"]["decode_transforms"] == [
+        "markdown_body_json_ascii_unicode_escape"
+    ]
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",
         "apikey",

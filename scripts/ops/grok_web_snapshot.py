@@ -24,9 +24,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "5"
-VALIDATION_PROFILE = "grok-export-v5"
-SECRET_POLICY_REVISION = 5
+VALIDATOR_VERSION = "6"
+VALIDATION_PROFILE = "grok-export-v6"
+SECRET_POLICY_REVISION = 6
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -60,6 +60,8 @@ TREE_ROW_RE = re.compile(
     rb"(?P<oid>[0-9a-f]{40,64}) +(?P<size>-|[0-9]+)\t(?P<path>.+)$"
 )
 FRONTMATTER_RE = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---\r?\n", re.DOTALL)
+ASCII_UNICODE_ESCAPE_RE = re.compile(rb"\\u00(?P<byte>[2-7][0-9a-fA-F])")
+SECRET_DECODE_TRANSFORMS = ("markdown_body_json_ascii_unicode_escape",)
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "private_key_block",
@@ -118,6 +120,7 @@ POLICY = {
     "validation_profile": VALIDATION_PROFILE,
     "secret_policy": {
         "revision": SECRET_POLICY_REVISION,
+        "decode_transforms": list(SECRET_DECODE_TRANSFORMS),
         "path_names": sorted(SECRET_PATH_NAMES),
         "structured_key_names": sorted(STRUCTURED_SECRET_KEY_NAMES),
         "rules": [
@@ -365,6 +368,11 @@ def _detect_secret(data: bytes) -> str | None:
     return None
 
 
+def _detect_escaped_markdown_secret(data: bytes) -> str | None:
+    decoded = ASCII_UNICODE_ESCAPE_RE.sub(lambda match: bytes([int(match.group("byte"), 16)]), data)
+    return _detect_secret(decoded)
+
+
 def _decode_utf8(data: bytes, path: str) -> str:
     if b"\0" in data:
         raise SnapshotRejected("binary_content", path)
@@ -472,6 +480,8 @@ def _validate_content(path: str, data: bytes) -> str:
         match = FRONTMATTER_RE.match(text)
         if not match:
             raise SnapshotRejected("missing_frontmatter", path)
+        if _detect_escaped_markdown_secret(text[match.end() :].encode("utf-8")):
+            raise SnapshotRejected("secret_detected", path)
         try:
             value = yaml.safe_load(match.group("body"))
         except (yaml.YAMLError, ValueError, RecursionError):
@@ -531,11 +541,17 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
             raise SnapshotRejected("invalid_json", path)
         _validate_structure(value, path, "invalid_json")
     elif match := FRONTMATTER_RE.match(text):
+        if _detect_escaped_markdown_secret(text[match.end() :].encode("utf-8")):
+            raise SnapshotRejected("secret_detected", path)
         try:
             value = yaml.safe_load(match.group("body"))
         except (yaml.YAMLError, ValueError, RecursionError):
             raise SnapshotRejected("invalid_yaml", path)
         _validate_structure(value, path, "invalid_yaml", reject_aliases=True)
+    elif Path(path).suffix.casefold() == ".md" and _detect_escaped_markdown_secret(
+        text.encode("utf-8")
+    ):
+        raise SnapshotRejected("secret_detected", path)
 
 
 def _validate_aliases(files: list[ValidatedFile]) -> None:
