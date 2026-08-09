@@ -473,6 +473,49 @@ def test_removed_managed_file_is_quarantined_and_rollback_restores_it(tmp_path: 
     assert (config.destination / "2026-08-08_retire.md").exists()
 
 
+def test_edit_during_quarantine_setup_blocks_retirement(tmp_path: Path, monkeypatch):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_keep.md": _frontmatter("Keep"),
+            "2026-08-08_retire.md": _frontmatter("Retire"),
+        },
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_retire.md"
+    (seed / "data/grok-web-exports/2026-08-08_retire.md").unlink()
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_retire.md")
+    _git(seed, "commit", "-m", "retire export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    manual_edit = _frontmatter("Manual", body="MANUAL\n").encode()
+    quarantine_root = config.state_root / "quarantine"
+    real_ensure_dir = mod._ensure_dir
+    edited = False
+
+    def edit_during_quarantine_setup(path, mode, **kwargs):
+        nonlocal edited
+        result = real_ensure_dir(path, mode, **kwargs)
+        if not edited and quarantine_root in path.parents:
+            target.write_bytes(manual_edit)
+            edited = True
+        return result
+
+    monkeypatch.setattr(mod, "_ensure_dir", edit_during_quarantine_setup)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "managed_drift"
+    assert target.read_bytes() == manual_edit
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert not list(quarantine_root.rglob("2026-08-08_retire.md"))
+    assert (config.state_root / "RECOVERY.json").exists()
+
+
 def test_out_of_band_edit_blocks_update_and_rollback(tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})

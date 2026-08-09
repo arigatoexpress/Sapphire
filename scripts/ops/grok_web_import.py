@@ -726,6 +726,7 @@ def _materialize(
         _ensure_dir(quarantine.parent, 0o700)
         if quarantine.exists():
             raise ImportRejected("quarantine_collision", item["destination_relpath"])
+        _verify_retired_precondition(config, item)
         os.replace(source, quarantine)
         os.chmod(quarantine, 0o600)
         _fsync_dir(source.parent)
@@ -748,7 +749,7 @@ def _restore_materialization(
         quarantine = config.state_root / "quarantine" / item["quarantine_relpath"]
         if destination.exists() or destination.is_symlink():
             if _hash_file(destination, "activation_recovery_failed") != item["before_sha256"]:
-                raise ImportRejected("activation_recovery_failed", name)
+                raise ImportRejected("managed_drift", name)
             continue
         if not quarantine.exists():
             raise ImportRejected("activation_recovery_failed", name)
