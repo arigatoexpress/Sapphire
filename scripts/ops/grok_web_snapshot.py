@@ -26,8 +26,8 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "17"
-POLICY_PROFILE = "grok-export-v17"
+VALIDATOR_VERSION = "18"
+POLICY_PROFILE = "grok-export-v18"
 SECRET_POLICY_REVISION = 14
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
@@ -190,7 +190,8 @@ POLICY = {
     "object_read_chunk_bytes": OBJECT_READ_CHUNK_BYTES,
     "max_commit_object_bytes": MAX_COMMIT_OBJECT_BYTES,
     "max_tree_object_bytes": MAX_TREE_OBJECT_BYTES,
-    "git_object_identity": "verify_bounded_commit_tree_blob_chain_v2",
+    "git_object_identity": "verify_preflight_bounded_commit_tree_blob_chain_v3",
+    "object_size_preflight": "cat_file_size_before_content",
     "regular_blob_mode": "100644",
     "json_duplicate_keys": "reject",
     "yaml_duplicate_keys": "reject",
@@ -439,6 +440,8 @@ def _read_verified_git_object(
     }.get(kind)
     if max_bytes is None:
         raise SnapshotRejected("invalid_object_kind")
+    if _git_object_size(config, recorded_oid) > max_bytes:
+        raise SnapshotRejected(f"{kind}_too_large")
     content = _read_git_object_bounded(
         config,
         kind,

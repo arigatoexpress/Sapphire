@@ -324,6 +324,33 @@ def test_git_object_read_stops_at_bound(tmp_path: Path, monkeypatch):
     assert process.waited is True
 
 
+@pytest.mark.parametrize(
+    ("kind", "limit"),
+    [
+        ("commit", 1024 * 1024),
+        ("tree", 4 * 1024 * 1024),
+    ],
+)
+def test_verified_git_object_rejects_preflight_size_before_content_read(
+    tmp_path: Path,
+    monkeypatch,
+    kind: str,
+    limit: int,
+):
+    mod = _load()
+    monkeypatch.setattr(mod, "_git_object_size", lambda *_args: limit + 1)
+
+    def reject_content_read(*_args, **_kwargs):
+        raise AssertionError("oversized object reached content mode")
+
+    monkeypatch.setattr(mod, "_read_git_object_bounded", reject_content_read)
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod._read_verified_git_object(mod.SnapshotConfig(repo=tmp_path), kind, "a" * 40)
+
+    assert caught.value.code == f"{kind}_too_large"
+
+
 def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, monkeypatch):
     mod = _load()
     _, seed, repo = _fixture_repo(
@@ -1291,7 +1318,8 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     assert mod.POLICY["object_read_chunk_bytes"] == mod.OBJECT_READ_CHUNK_BYTES
     assert mod.POLICY["max_commit_object_bytes"] == mod.MAX_COMMIT_OBJECT_BYTES
     assert mod.POLICY["max_tree_object_bytes"] == mod.MAX_TREE_OBJECT_BYTES
-    assert mod.POLICY["git_object_identity"] == "verify_bounded_commit_tree_blob_chain_v2"
+    assert mod.POLICY["git_object_identity"] == "verify_preflight_bounded_commit_tree_blob_chain_v3"
+    assert mod.POLICY["object_size_preflight"] == "cat_file_size_before_content"
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",
