@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tomllib
 from dataclasses import asdict
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 import yaml
@@ -297,6 +298,22 @@ def test_backslash_git_path_is_rejected_consistently(tmp_path: Path):
     assert caught.value.code == "nested_path"
 
 
+def test_git_filename_semantics_stay_posix_when_host_path_rules_are_windows(
+    tmp_path: Path,
+    monkeypatch,
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"C:credentials.md": _frontmatter()},
+    )
+    monkeypatch.setattr(mod, "Path", PureWindowsPath)
+
+    result = mod.snapshot_exports(_config(mod, repo))
+
+    assert result.receipt["files"][0]["source_relpath"].endswith("C:credentials.md")
+
+
 def test_excluded_metadata_is_still_scanned_for_secrets(tmp_path: Path):
     mod = _load()
     label = "AWS_" + "SECRET_ACCESS_KEY"
@@ -560,6 +577,23 @@ def test_escaped_credential_label_in_markdown_json_body_is_rejected_without_writ
     assert not (tmp_path / "receipts").exists()
 
 
+def test_escaped_solidus_in_markdown_json_secret_is_rejected_without_writes(
+    tmp_path: Path,
+):
+    mod = _load()
+    body = '```json\n{"api_key": "AbCdEf01AbCdEf01\\/AbCdEf01AbCdEf01"}\n```\n'
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_escaped-solidus.md": _frontmatter(body=body)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
 def test_unsupported_yaml_set_container_is_rejected(tmp_path: Path):
     mod = _load()
     encoded_token = "sk-" + "proj-" + "AAAA" + r"\u0041" + "A" * 20
@@ -709,9 +743,7 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     rule_ids = [rule["id"] for rule in mod.POLICY["secret_policy"]["rules"]]
     assert "mnemonic_assignment" in rule_ids
     assert "aws_secret_assignment" in rule_ids
-    assert mod.POLICY["secret_policy"]["decode_transforms"] == [
-        "markdown_body_json_ascii_unicode_escape"
-    ]
+    assert mod.POLICY["secret_policy"]["decode_transforms"] == ["markdown_body_json_escape_view_v1"]
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",
         "apikey",
@@ -730,6 +762,20 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     file_schema = schema["$defs"]["file"]["properties"]
     assert validator_schema["version"]["const"] == mod.VALIDATOR_VERSION
     assert file_schema["validation_profile"]["const"] == mod.VALIDATION_PROFILE
+
+
+def test_receipt_schema_accepts_only_sha1_or_sha256_git_oid_lengths():
+    mod = _load()
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    pattern = schema["$defs"]["gitOid"]["pattern"]
+
+    assert re.fullmatch(pattern, "a" * 40)
+    assert re.fullmatch(pattern, "b" * 64)
+    assert mod.GIT_OID_RE.fullmatch("a" * 40)
+    assert mod.GIT_OID_RE.fullmatch("b" * 64)
+    for length in (39, 41, 63, 65):
+        assert re.fullmatch(pattern, "c" * length) is None
+        assert mod.GIT_OID_RE.fullmatch("c" * length) is None
 
 
 def test_cli_has_no_live_projection_or_rollback_options():

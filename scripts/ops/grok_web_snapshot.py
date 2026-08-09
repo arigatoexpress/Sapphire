@@ -17,16 +17,16 @@ import sys
 import unicodedata
 from dataclasses import asdict, dataclass
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "6"
-VALIDATION_PROFILE = "grok-export-v6"
-SECRET_POLICY_REVISION = 6
+VALIDATOR_VERSION = "7"
+VALIDATION_PROFILE = "grok-export-v7"
+SECRET_POLICY_REVISION = 7
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -54,14 +54,23 @@ STRUCTURED_SECRET_KEY_NAMES = frozenset(
         "seedphrase",
     }
 )
-GIT_OID_RE = re.compile(r"^[0-9a-f]{40,64}$")
+GIT_OID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 TREE_ROW_RE = re.compile(
     rb"^(?P<mode>[0-9]{6}) (?P<kind>blob|tree|commit) "
-    rb"(?P<oid>[0-9a-f]{40,64}) +(?P<size>-|[0-9]+)\t(?P<path>.+)$"
+    rb"(?P<oid>(?:[0-9a-f]{40}|[0-9a-f]{64})) +(?P<size>-|[0-9]+)\t(?P<path>.+)$"
 )
 FRONTMATTER_RE = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---\r?\n", re.DOTALL)
-ASCII_UNICODE_ESCAPE_RE = re.compile(rb"\\u00(?P<byte>[2-7][0-9a-fA-F])")
-SECRET_DECODE_TRANSFORMS = ("markdown_body_json_ascii_unicode_escape",)
+JSON_SIMPLE_ESCAPES = {
+    ord('"'): b'"',
+    ord("\\"): b"\\",
+    ord("/"): b"/",
+    ord("b"): b"\b",
+    ord("f"): b"\f",
+    ord("n"): b"\n",
+    ord("r"): b"\r",
+    ord("t"): b"\t",
+}
+SECRET_DECODE_TRANSFORMS = ("markdown_body_json_escape_view_v1",)
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "private_key_block",
@@ -338,7 +347,7 @@ def _tree_entries(config: SnapshotConfig, commit: str) -> list[TreeEntry]:
 
 
 def _secret_path(path: str) -> bool:
-    candidate = Path(path)
+    candidate = PurePosixPath(path)
     return (
         candidate.stem.casefold() in SECRET_PATH_NAMES
         or candidate.name.casefold() in SECRET_PATH_NAMES
@@ -349,7 +358,7 @@ def _validate_entry(config: SnapshotConfig, entry: TreeEntry) -> None:
     path = entry.relative_path
     if not path or "/" in path or "\\" in path or path in {".", ".."}:
         raise SnapshotRejected("nested_path", path)
-    if Path(path).suffix.casefold() not in ALLOWED_SUFFIXES:
+    if PurePosixPath(path).suffix.casefold() not in ALLOWED_SUFFIXES:
         raise SnapshotRejected("unsupported_extension", path)
     if entry.mode != "100644" or entry.kind != "blob":
         raise SnapshotRejected("forbidden_tree_entry", path)
@@ -368,9 +377,50 @@ def _detect_secret(data: bytes) -> str | None:
     return None
 
 
+def _json_escape_view(data: bytes) -> bytes:
+    decoded = bytearray()
+    index = 0
+    while index < len(data):
+        if data[index] != ord("\\") or index + 1 >= len(data):
+            decoded.append(data[index])
+            index += 1
+            continue
+        marker = data[index + 1]
+        if marker in JSON_SIMPLE_ESCAPES:
+            decoded.extend(JSON_SIMPLE_ESCAPES[marker])
+            index += 2
+            continue
+        if marker != ord("u") or index + 6 > len(data):
+            decoded.append(data[index])
+            index += 1
+            continue
+        try:
+            codepoint = int(data[index + 2 : index + 6], 16)
+        except ValueError:
+            decoded.append(data[index])
+            index += 1
+            continue
+        consumed = 6
+        if 0xD800 <= codepoint <= 0xDBFF and index + 12 <= len(data):
+            following = data[index + 6 : index + 12]
+            if following[:2] == b"\\u":
+                try:
+                    low = int(following[2:], 16)
+                except ValueError:
+                    low = -1
+                if 0xDC00 <= low <= 0xDFFF:
+                    codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00)
+                    consumed = 12
+        if 0xD800 <= codepoint <= 0xDFFF:
+            decoded.extend(data[index : index + consumed])
+        else:
+            decoded.extend(chr(codepoint).encode("utf-8"))
+        index += consumed
+    return bytes(decoded)
+
+
 def _detect_escaped_markdown_secret(data: bytes) -> str | None:
-    decoded = ASCII_UNICODE_ESCAPE_RE.sub(lambda match: bytes([int(match.group("byte"), 16)]), data)
-    return _detect_secret(decoded)
+    return _detect_secret(_json_escape_view(data))
 
 
 def _decode_utf8(data: bytes, path: str) -> str:
@@ -475,7 +525,7 @@ def _validate_content(path: str, data: bytes) -> str:
     if _detect_secret(data):
         raise SnapshotRejected("secret_detected", path)
     text = _decode_utf8(data, path)
-    suffix = Path(path).suffix.casefold()
+    suffix = PurePosixPath(path).suffix.casefold()
     if suffix == ".md":
         match = FRONTMATTER_RE.match(text)
         if not match:
@@ -534,7 +584,7 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
     if _detect_secret(blob):
         raise SnapshotRejected("secret_detected", path)
     text = _decode_utf8(blob, path)
-    if Path(path).suffix.casefold() == ".json":
+    if PurePosixPath(path).suffix.casefold() == ".json":
         try:
             value = json.loads(text, parse_constant=_reject_json_constant)
         except (json.JSONDecodeError, ValueError, RecursionError):
@@ -548,7 +598,7 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
         except (yaml.YAMLError, ValueError, RecursionError):
             raise SnapshotRejected("invalid_yaml", path)
         _validate_structure(value, path, "invalid_yaml", reject_aliases=True)
-    elif Path(path).suffix.casefold() == ".md" and _detect_escaped_markdown_secret(
+    elif PurePosixPath(path).suffix.casefold() == ".md" and _detect_escaped_markdown_secret(
         text.encode("utf-8")
     ):
         raise SnapshotRejected("secret_detected", path)
