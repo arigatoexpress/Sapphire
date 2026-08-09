@@ -544,6 +544,22 @@ def test_decoded_escaped_scalar_secrets_are_rejected(tmp_path: Path, suffix: str
     assert caught.value.code == "secret_detected"
 
 
+def test_duplicate_json_keys_cannot_hide_a_decoded_secret(tmp_path: Path):
+    mod = _load()
+    encoded_token = "sk" + r"\u002d" + "proj-" + "A" * 24
+    content = (
+        '{"source":"grok-web","date":"2026-08-08","type":"note",'
+        f'"title":"Duplicate","note":"{encoded_token}","note":"safe"}}'
+    )
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_duplicate.json": content})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "invalid_json"
+    assert not (tmp_path / "receipts").exists()
+
+
 def test_quoted_credential_label_in_markdown_body_is_rejected(tmp_path: Path):
     mod = _load()
     token = "AbCdEf01" * 5
@@ -592,6 +608,37 @@ def test_escaped_solidus_in_markdown_json_secret_is_rejected_without_writes(
 
     assert caught.value.code == "secret_detected"
     assert not (tmp_path / "receipts").exists()
+
+
+def test_punctuated_quoted_password_in_markdown_body_is_rejected_without_writes(
+    tmp_path: Path,
+):
+    mod = _load()
+    password = "Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx"
+    body = f'```json\n{{"password": "{password}"}}\n```\n'
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_punctuated.md": _frontmatter(body=body)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
+def test_redacted_quoted_credential_in_markdown_body_remains_allowed(tmp_path: Path):
+    mod = _load()
+    body = '```json\n{"api_key": "<redacted>"}\n```\n'
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_redacted.md": _frontmatter(body=body)},
+    )
+
+    result = mod.snapshot_exports(_config(mod, repo))
+
+    assert result.receipt["summary"]["files"] == 1
 
 
 def test_unsupported_yaml_set_container_is_rejected(tmp_path: Path):
@@ -713,6 +760,22 @@ def test_content_blind_inventory_reports_paths_and_codes_only(tmp_path: Path):
     assert "git_blob_oid" not in serialized
 
 
+def test_secret_shaped_filename_is_rejected_and_redacted_from_inventory(tmp_path: Path):
+    mod = _load()
+    secret_name = "sk-proj-" + "A" * 24 + ".md"
+    _, _, repo = _fixture_repo(tmp_path, {secret_name: _frontmatter()})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_path"
+    assert caught.value.path is None
+    inventory = mod.inventory_exports(_config(mod, repo))
+    serialized = json.dumps(asdict(inventory), sort_keys=True)
+    assert secret_name not in serialized
+    assert inventory.rejected == [mod.Rejection(path="[secret-path-redacted]", code="secret_path")]
+
+
 def test_inventory_cli_fails_closed_without_writing(capsys, tmp_path: Path):
     mod = _load()
     token = "AbCdEf01" * 5
@@ -743,7 +806,11 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     rule_ids = [rule["id"] for rule in mod.POLICY["secret_policy"]["rules"]]
     assert "mnemonic_assignment" in rule_ids
     assert "aws_secret_assignment" in rule_ids
+    assert "quoted_credential_assignment" in rule_ids
+    assert mod.POLICY["json_duplicate_keys"] == "reject"
     assert mod.POLICY["secret_policy"]["decode_transforms"] == ["markdown_body_json_escape_view_v1"]
+    assert mod.POLICY["secret_policy"]["scan_filenames"] is True
+    assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",
         "apikey",

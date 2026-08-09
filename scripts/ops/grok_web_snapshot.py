@@ -24,9 +24,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "7"
-VALIDATION_PROFILE = "grok-export-v7"
-SECRET_POLICY_REVISION = 7
+VALIDATOR_VERSION = "8"
+VALIDATION_PROFILE = "grok-export-v8"
+SECRET_POLICY_REVISION = 8
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -35,6 +35,7 @@ MAX_STRUCTURED_NODES = 10_000
 EXCLUDED_NAMES = frozenset({"README.md", "MANIFEST.json", ".gitkeep"})
 ALLOWED_SUFFIXES = frozenset({".md", ".json"})
 REQUIRED_PROVENANCE = ("source", "date", "type", "title")
+SECRET_PATH_REDACTION = "[secret-path-redacted]"
 SECRET_PATH_NAMES = frozenset(
     {"auth", "credential", "credentials", "secret", "secrets", "private-key", ".env"}
 )
@@ -88,6 +89,16 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
         ),
     ),
     (
+        "quoted_credential_assignment",
+        re.compile(
+            rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
+            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*['\"]?\s*[:=]\s*"
+            rb"(?P<quote>['\"])[ \t]*"
+            rb"(?!(?:<redacted>|redacted|placeholder|example|none|null|unset)"
+            rb"[ \t]*(?P=quote))(?!\$\{)[^'\"\r\n]+(?P=quote)"
+        ),
+    ),
+    (
         "credential_assignment",
         re.compile(
             rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
@@ -126,11 +137,14 @@ POLICY = {
     "max_structured_depth": MAX_STRUCTURED_DEPTH,
     "max_structured_nodes": MAX_STRUCTURED_NODES,
     "regular_blob_mode": "100644",
+    "json_duplicate_keys": "reject",
     "validation_profile": VALIDATION_PROFILE,
     "secret_policy": {
         "revision": SECRET_POLICY_REVISION,
         "decode_transforms": list(SECRET_DECODE_TRANSFORMS),
+        "inventory_path_redaction": SECRET_PATH_REDACTION,
         "path_names": sorted(SECRET_PATH_NAMES),
+        "scan_filenames": True,
         "structured_key_names": sorted(STRUCTURED_SECRET_KEY_NAMES),
         "rules": [
             {
@@ -366,6 +380,8 @@ def _validate_entry(config: SnapshotConfig, entry: TreeEntry) -> None:
         raise SnapshotRejected("missing_blob_size", path)
     if entry.size > config.max_file_bytes:
         raise SnapshotRejected("file_too_large", path)
+    if _detect_secret(path.encode("utf-8")):
+        raise SnapshotRejected("secret_path")
     if _secret_path(path):
         raise SnapshotRejected("secret_path", path)
 
@@ -521,6 +537,15 @@ def _reject_json_constant(_: str) -> Any:
     raise ValueError
 
 
+def _reject_duplicate_json_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError
+        result[key] = value
+    return result
+
+
 def _validate_content(path: str, data: bytes) -> str:
     if _detect_secret(data):
         raise SnapshotRejected("secret_detected", path)
@@ -541,7 +566,11 @@ def _validate_content(path: str, data: bytes) -> str:
         return "text/markdown"
     if suffix == ".json":
         try:
-            value = json.loads(text, parse_constant=_reject_json_constant)
+            value = json.loads(
+                text,
+                parse_constant=_reject_json_constant,
+                object_pairs_hook=_reject_duplicate_json_pairs,
+            )
         except (json.JSONDecodeError, ValueError, RecursionError):
             raise SnapshotRejected("invalid_json", path)
         _validate_structure(value, path, "invalid_json")
@@ -586,7 +615,11 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
     text = _decode_utf8(blob, path)
     if PurePosixPath(path).suffix.casefold() == ".json":
         try:
-            value = json.loads(text, parse_constant=_reject_json_constant)
+            value = json.loads(
+                text,
+                parse_constant=_reject_json_constant,
+                object_pairs_hook=_reject_duplicate_json_pairs,
+            )
         except (json.JSONDecodeError, ValueError, RecursionError):
             raise SnapshotRejected("invalid_json", path)
         _validate_structure(value, path, "invalid_json")
@@ -718,7 +751,7 @@ def inventory_exports(config: SnapshotConfig, *, fetch: bool = False) -> Invento
         try:
             validated.append(_read_validated_file(config, entry))
         except SnapshotRejected as exc:
-            rejected.append(Rejection(path=entry.relative_path, code=exc.code))
+            rejected.append(Rejection(path=exc.path or SECRET_PATH_REDACTION, code=exc.code))
 
     by_alias: dict[str, list[ValidatedFile]] = {}
     for item in validated:
