@@ -155,9 +155,12 @@ def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, mon
         return real_run(command, **kwargs)
 
     monkeypatch.setattr(mod.subprocess, "run", recording_run)
+    fetch_head = repo / ".git" / "FETCH_HEAD"
+    fetch_head.write_text("operator-owned\n", encoding="utf-8")
     result = mod.snapshot_exports(_config(mod, repo), fetch=True)
 
     assert result.receipt["summary"]["files"] == 2
+    assert fetch_head.read_text(encoding="utf-8") == "operator-owned\n"
     assert [
         "git",
         "--no-replace-objects",
@@ -165,6 +168,7 @@ def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, mon
         str(repo),
         "fetch",
         "--no-tags",
+        "--no-write-fetch-head",
         "origin",
         "+refs/heads/main:refs/remotes/origin/main",
     ] in seen
@@ -291,6 +295,42 @@ def test_backslash_git_path_is_rejected_consistently(tmp_path: Path):
         mod.snapshot_exports(_config(mod, repo))
 
     assert caught.value.code == "nested_path"
+
+
+def test_excluded_metadata_is_still_scanned_for_secrets(tmp_path: Path):
+    mod = _load()
+    label = "AWS_" + "SECRET_ACCESS_KEY"
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_clean.md": _frontmatter(),
+            "README.md": f"{label}={'A' * 40}\n",
+        },
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert caught.value.path == "README.md"
+
+
+def test_excluded_metadata_is_still_subject_to_byte_limits(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_clean.md": _frontmatter(),
+            "README.md": "metadata\n" * 100,
+        },
+    )
+    config = mod.SnapshotConfig(repo=repo, max_file_bytes=512)
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(config)
+
+    assert caught.value.code == "file_too_large"
+    assert caught.value.path == "README.md"
 
 
 @pytest.mark.parametrize("field", ["source", "date", "type", "title"])
@@ -447,7 +487,7 @@ def test_quoted_json_generic_credential_keys_are_rejected(tmp_path: Path, key: s
     with pytest.raises(mod.SnapshotRejected) as caught:
         mod.snapshot_exports(_config(mod, repo))
 
-    assert caught.value.code == "structured_secret_key"
+    assert caught.value.code == "secret_detected"
 
 
 def test_folded_yaml_generic_credential_key_is_rejected(tmp_path: Path):
@@ -485,6 +525,72 @@ def test_decoded_escaped_scalar_secrets_are_rejected(tmp_path: Path, suffix: str
         mod.snapshot_exports(_config(mod, repo))
 
     assert caught.value.code == "secret_detected"
+
+
+def test_quoted_credential_label_in_markdown_body_is_rejected(tmp_path: Path):
+    mod = _load()
+    token = "AbCdEf01" * 5
+    body = '```json\n{"api_key": "' + token + '"}\n```\n'
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_body.md": _frontmatter(body=body)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+
+
+def test_unsupported_yaml_set_container_is_rejected(tmp_path: Path):
+    mod = _load()
+    encoded_token = "sk-" + "proj-" + "AAAA" + r"\u0041" + "A" * 20
+    content = (
+        "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\n"
+        f'title: Set\npayload: !!set {{"{encoded_token}": null}}\n---\n'
+    )
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_set.md": content})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "invalid_yaml"
+
+
+@pytest.mark.parametrize(
+    ("suffix", "content", "code"),
+    [
+        (
+            "json",
+            '{"source":"grok-web","date":"2026-08-08","type":"note",'
+            '"title":"Surrogate","note":"\\ud800"}',
+            "invalid_json",
+        ),
+        (
+            "md",
+            "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\n"
+            'title: Surrogate\nnote: "\\uD800"\n---\n',
+            "invalid_yaml",
+        ),
+    ],
+)
+def test_unpaired_surrogate_is_a_stable_content_rejection(
+    capsys,
+    tmp_path: Path,
+    suffix: str,
+    content: str,
+    code: str,
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {f"2026-08-08_surrogate.{suffix}": content})
+
+    exit_code = mod.main(["--repo", str(repo)])
+    output = capsys.readouterr()
+
+    assert exit_code == 2
+    assert output.out == ""
+    assert json.loads(output.err)["error"] == code
+    assert "Traceback" not in output.err
 
 
 @pytest.mark.parametrize(

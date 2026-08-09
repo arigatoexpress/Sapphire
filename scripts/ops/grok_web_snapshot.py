@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import subprocess
 import sys
@@ -23,9 +24,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "3"
-VALIDATION_PROFILE = "grok-export-v3"
-SECRET_POLICY_REVISION = 3
+VALIDATOR_VERSION = "5"
+VALIDATION_PROFILE = "grok-export-v5"
+SECRET_POLICY_REVISION = 5
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -79,7 +80,7 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
         "credential_assignment",
         re.compile(
             rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
-            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*[:=]\s*['\"]?"
+            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*['\"]?\s*[:=]\s*['\"]?"
             rb"(?!<redacted>|redacted|placeholder|example|none|null|unset|\$\{)"
             rb"[A-Za-z0-9_./+=-]{20,}"
         ),
@@ -87,7 +88,8 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "aws_secret_assignment",
         re.compile(
-            rb"(?im)\baws[_-]?secret(?:[_-]?access)?[_-]?key\b\s*[:=]\s*['\"]?"
+            rb"(?im)\baws[_-]?secret(?:[_-]?access)?[_-]?key\b\s*['\"]?\s*[:=]"
+            rb"\s*['\"]?"
             rb"(?!<redacted>|redacted|placeholder|example|none|null|unset|\$\{)"
             rb"[A-Za-z0-9/+=]{40}"
         ),
@@ -96,7 +98,7 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
         "mnemonic_assignment",
         re.compile(
             rb"(?im)\b(?:mnemonic|seed[_-]?phrase|recovery[_-]?phrase)\b"
-            rb"\s*[:=]\s*['\"]?"
+            rb"\s*['\"]?\s*[:=]\s*['\"]?"
             rb"(?!<redacted>|redacted|placeholder|example|none|null|unset|\$\{)"
             rb"(?:[a-z]{2,}\s+){11,23}[a-z]{2,}\b"
         ),
@@ -246,6 +248,7 @@ def _fetch(config: SnapshotConfig) -> None:
             str(config.repo),
             "fetch",
             "--no-tags",
+            "--no-write-fetch-head",
             config.remote,
             FETCH_REFSPEC,
         ],
@@ -316,8 +319,6 @@ def _tree_entries(config: SnapshotConfig, commit: str) -> list[TreeEntry]:
         if not source_path.startswith(prefix):
             raise SnapshotRejected("path_outside_prefix")
         relative = source_path[len(prefix) :]
-        if relative in EXCLUDED_NAMES:
-            continue
         size_raw = match.group("size")
         entries.append(
             TreeEntry(
@@ -403,16 +404,38 @@ def _validate_structure(
             seen_containers.add(identity)
         if isinstance(current, dict):
             for key, item in current.items():
+                if not isinstance(key, str):
+                    raise SnapshotRejected(code, path)
                 if _normalized_key(key) in STRUCTURED_SECRET_KEY_NAMES:
                     raise SnapshotRejected("structured_secret_key", path)
+                try:
+                    encoded_key = key.encode("utf-8")
+                except UnicodeEncodeError:
+                    raise SnapshotRejected(code, path)
+                if _detect_secret(encoded_key):
+                    raise SnapshotRejected("secret_detected", path)
                 stack.append((item, depth + 1))
         elif isinstance(current, list):
             stack.extend((item, depth + 1) for item in current)
         elif isinstance(current, str):
-            if _detect_secret(current.encode("utf-8")):
+            try:
+                encoded = current.encode("utf-8")
+            except UnicodeEncodeError:
+                raise SnapshotRejected(code, path)
+            if _detect_secret(encoded):
                 raise SnapshotRejected("secret_detected", path)
-        elif isinstance(current, bytes) and _detect_secret(current):
-            raise SnapshotRejected("secret_detected", path)
+        elif isinstance(current, bytes):
+            if _detect_secret(current):
+                raise SnapshotRejected("secret_detected", path)
+            raise SnapshotRejected(code, path)
+        elif (
+            current is None
+            or type(current) in {bool, int, date}
+            or (isinstance(current, float) and math.isfinite(current))
+        ):
+            continue
+        else:
+            raise SnapshotRejected(code, path)
 
 
 def _validate_provenance(value: Any, path: str) -> None:
@@ -484,6 +507,37 @@ def _read_validated_file(config: SnapshotConfig, entry: TreeEntry) -> ValidatedF
     )
 
 
+def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> None:
+    path = entry.relative_path
+    if path not in EXCLUDED_NAMES:
+        raise SnapshotRejected("metadata_contract", path)
+    if entry.mode != "100644" or entry.kind != "blob":
+        raise SnapshotRejected("forbidden_tree_entry", path)
+    if entry.size is None:
+        raise SnapshotRejected("missing_blob_size", path)
+    if entry.size > config.max_file_bytes:
+        raise SnapshotRejected("file_too_large", path)
+    blob = _run_git(config, "cat-file", "blob", entry.git_blob_oid, binary=True)
+    assert isinstance(blob, bytes)
+    if len(blob) != entry.size:
+        raise SnapshotRejected("blob_size_mismatch", path)
+    if _detect_secret(blob):
+        raise SnapshotRejected("secret_detected", path)
+    text = _decode_utf8(blob, path)
+    if Path(path).suffix.casefold() == ".json":
+        try:
+            value = json.loads(text, parse_constant=_reject_json_constant)
+        except (json.JSONDecodeError, ValueError, RecursionError):
+            raise SnapshotRejected("invalid_json", path)
+        _validate_structure(value, path, "invalid_json")
+    elif match := FRONTMATTER_RE.match(text):
+        try:
+            value = yaml.safe_load(match.group("body"))
+        except (yaml.YAMLError, ValueError, RecursionError):
+            raise SnapshotRejected("invalid_yaml", path)
+        _validate_structure(value, path, "invalid_yaml", reject_aliases=True)
+
+
 def _validate_aliases(files: list[ValidatedFile]) -> None:
     seen: dict[str, str] = {}
     for item in files:
@@ -506,7 +560,13 @@ def _validated_files(config: SnapshotConfig, commit: str) -> list[ValidatedFile]
     if not entries:
         raise SnapshotRejected("empty_source")
     _validate_limits(config, entries)
-    files = [_read_validated_file(config, entry) for entry in entries]
+    metadata = [entry for entry in entries if entry.relative_path in EXCLUDED_NAMES]
+    exports = [entry for entry in entries if entry.relative_path not in EXCLUDED_NAMES]
+    for entry in metadata:
+        _validate_excluded_metadata(config, entry)
+    if not exports:
+        raise SnapshotRejected("empty_source")
+    files = [_read_validated_file(config, entry) for entry in exports]
     _validate_aliases(files)
     return files
 
@@ -580,6 +640,12 @@ def inventory_exports(config: SnapshotConfig, *, fetch: bool = False) -> Invento
     if not entries:
         raise SnapshotRejected("empty_source")
     _validate_limits(config, entries)
+    metadata = [entry for entry in entries if entry.relative_path in EXCLUDED_NAMES]
+    entries = [entry for entry in entries if entry.relative_path not in EXCLUDED_NAMES]
+    for entry in metadata:
+        _validate_excluded_metadata(config, entry)
+    if not entries:
+        raise SnapshotRejected("empty_source")
     validated: list[ValidatedFile] = []
     rejected: list[Rejection] = []
     for entry in entries:
