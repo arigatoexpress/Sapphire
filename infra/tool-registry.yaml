@@ -590,6 +590,13 @@ tools:
   # parallel-merge wave does not collide with prior-tranche tails. Bump the
   # divider to ``Tranche 8 reserved`` once Tranche 7 closes out.
 
+  - name: grok_web_snapshot
+    path: scripts/ops/grok_web_snapshot.py
+    status: internal
+    owner: sapphire
+    consumers: [claude-code.manual, codex.manual]
+    description: Read the immutable origin/main Grok export Git tree, apply bounded provenance and secret validation, and emit a deterministic content-addressed snapshot receipt or content-blind inventory. Writes no export, receipt, or projection state; optional fetch updates only the exact remote-tracking ref. Never reads the checkout and exposes no destination projection, pointer activation, rollback, publisher, scheduler, or service activation.
+
   # 0G hackathon integration (Track 2: Verifiable Finance) — Tranche 7
   - name: og_publish
     path: plugins/claw-sapphire/tools/og_publish.py

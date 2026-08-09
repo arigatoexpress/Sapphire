@@ -1,0 +1,472 @@
+"""Goldens for the immutable Grok web snapshot boundary."""
+
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import subprocess
+import sys
+import tomllib
+from dataclasses import asdict
+from pathlib import Path
+
+import pytest
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+MOD_PATH = ROOT / "scripts" / "ops" / "grok_web_snapshot.py"
+SCHEMA_PATH = ROOT / "projects" / "grok" / "schemas" / "grok-web-snapshot-v1.schema.json"
+
+
+def _load():
+    spec = importlib.util.spec_from_file_location("grok_web_snapshot", MOD_PATH)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _git(cwd: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def _frontmatter(title: str = "Validated snapshot", body: str = "# Body\n") -> str:
+    return (
+        "---\n"
+        "source: grok-web\n"
+        "date: 2026-08-08\n"
+        "type: architecture\n"
+        f'title: "{title}"\n'
+        "---\n\n"
+        f"{body}"
+    )
+
+
+def _write_exports(repo: Path, files: dict[str, str | bytes]) -> None:
+    export_dir = repo / "data" / "grok-web-exports"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        path = export_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(content, bytes):
+            path.write_bytes(content)
+        else:
+            path.write_text(content, encoding="utf-8")
+
+
+def _fixture_repo(tmp_path: Path, files: dict[str, str | bytes]) -> tuple[Path, Path, Path]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    work = tmp_path / "work"
+    _git(tmp_path, "init", "--bare", "--initial-branch=main", str(origin))
+    _git(tmp_path, "init", "--initial-branch=main", str(seed))
+    _git(seed, "config", "user.name", "Codex Test")
+    _git(seed, "config", "user.email", "codex-test@example.invalid")
+    _write_exports(seed, files)
+    _git(seed, "add", "data/grok-web-exports")
+    _git(seed, "commit", "-m", "fixture exports")
+    _git(seed, "remote", "add", "origin", str(origin))
+    _git(seed, "push", "-u", "origin", "main")
+    _git(tmp_path, "clone", str(origin), str(work))
+    return origin, seed, work
+
+
+def _config(mod, repo: Path):
+    return mod.SnapshotConfig(repo=repo)
+
+
+def test_snapshot_reads_pinned_remote_tree_not_dirty_checkout(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": _frontmatter(body="REMOTE\n")},
+    )
+    _write_exports(
+        repo,
+        {
+            "2026-08-08_clean.md": _frontmatter(body="DIRTY\n"),
+            "2026-08-08_untracked.md": _frontmatter(body="UNTRACKED\n"),
+        },
+    )
+
+    result = mod.snapshot_exports(_config(mod, repo))
+
+    assert result.source_commit == _git(repo, "rev-parse", "origin/main^{commit}")
+    assert [item["source_relpath"] for item in result.receipt["files"]] == [
+        "data/grok-web-exports/2026-08-08_clean.md"
+    ]
+    assert (
+        result.receipt["files"][0]["sha256"]
+        == hashlib.sha256(_frontmatter(body="REMOTE\n").encode()).hexdigest()
+    )
+    assert "DIRTY" not in json.dumps(result.receipt)
+
+
+def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, monkeypatch):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_one.md": _frontmatter("One")},
+    )
+    _write_exports(seed, {"2026-08-08_two.md": _frontmatter("Two")})
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_two.md")
+    _git(seed, "commit", "-m", "second export")
+    _git(seed, "push", "origin", "main")
+    seen: list[list[str]] = []
+    real_run = mod.subprocess.run
+
+    def recording_run(command, **kwargs):
+        seen.append([str(part) for part in command])
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr(mod.subprocess, "run", recording_run)
+    result = mod.snapshot_exports(_config(mod, repo), fetch=True)
+
+    assert result.receipt["summary"]["files"] == 2
+    assert [
+        "git",
+        "-C",
+        str(repo),
+        "fetch",
+        "--no-tags",
+        "origin",
+        "+refs/heads/main:refs/remotes/origin/main",
+    ] in seen
+    forbidden = {"pull", "merge", "checkout", "switch", "reset", "clean", "push"}
+    assert not any(forbidden.intersection(command) for command in seen)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"remote": "upstream"},
+        {"source_ref": "refs/remotes/origin/dev"},
+        {"source_prefix": "data/other"},
+    ],
+)
+def test_source_contract_is_fixed_to_origin_main_exports(
+    tmp_path: Path,
+    overrides: dict[str, str],
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": _frontmatter()},
+    )
+    config = mod.SnapshotConfig(repo=repo, **overrides)
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(config)
+
+    assert caught.value.code == "source_contract"
+
+
+def test_receipt_is_deterministic_content_addressed_and_has_no_projection_state(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": _frontmatter()},
+    )
+
+    first = mod.snapshot_exports(_config(mod, repo))
+    second = mod.snapshot_exports(_config(mod, repo))
+
+    assert first.receipt == second.receipt
+    assert first.receipt_sha256 == second.receipt_sha256
+    assert hashlib.sha256(mod.canonical_receipt(first.receipt)).hexdigest() == first.receipt_sha256
+    assert set(first.receipt) == {
+        "schema",
+        "validator",
+        "source",
+        "content_manifest_sha256",
+        "files",
+        "summary",
+    }
+    serialized = json.dumps(first.receipt).casefold()
+    assert "destination" not in serialized
+    assert "current" not in serialized
+    assert "rollback" not in serialized
+    assert "publisher" not in serialized
+
+
+def test_snapshot_cli_emits_the_content_addressed_receipt(capsys, tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": _frontmatter()},
+    )
+
+    exit_code = mod.main(["--repo", str(repo)])
+    output = capsys.readouterr()
+    payload = json.loads(output.out)
+
+    assert exit_code == 0
+    assert output.err == ""
+    assert payload["ok"] is True
+    assert payload["receipt"]["schema"] == mod.SCHEMA_NAME
+    assert (
+        hashlib.sha256(mod.canonical_receipt(payload["receipt"])).hexdigest()
+        == payload["receipt_sha256"]
+    )
+    assert not (tmp_path / "receipts").exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "code"),
+    [
+        (
+            "2026-08-08_bad-yaml.md",
+            "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\ntitle: local-export: bad\n---\n",
+            "invalid_yaml",
+        ),
+        (
+            "2026-08-08_bad-timestamp.md",
+            "---\nsource: grok-web\ndate: 2026-99-99\ntype: note\ntitle: Bad date\n---\n",
+            "invalid_yaml",
+        ),
+        ("2026-08-08_missing.md", "# no frontmatter\n", "missing_frontmatter"),
+        ("credentials.md", _frontmatter(), "secret_path"),
+        ("nested/note.md", _frontmatter(), "nested_path"),
+    ],
+)
+def test_strict_rejection_never_writes_state(
+    tmp_path: Path,
+    name: str,
+    content: str,
+    code: str,
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {name: content})
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == code
+    assert not (tmp_path / "receipts").exists()
+
+
+@pytest.mark.parametrize("field", ["source", "date", "type", "title"])
+def test_non_scalar_provenance_is_rejected(tmp_path: Path, field: str):
+    mod = _load()
+    payload: dict[str, object] = {
+        "source": "grok-web",
+        "date": "2026-08-08",
+        "type": "note",
+        "title": "Provenance",
+    }
+    payload[field] = []
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_bad.json": json.dumps(payload)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == f"invalid_{field}"
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "code"),
+    [
+        (
+            "2026-08-08_alias.md",
+            "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\ntitle: Alias\n"
+            "left: &shared [1, 2]\nright: *shared\n---\n",
+            "invalid_yaml",
+        ),
+        (
+            "2026-08-08_constant.json",
+            '{"source":"grok-web","date":"2026-08-08","type":"note",'
+            '"title":"Constant","value":NaN}',
+            "invalid_json",
+        ),
+        (
+            "2026-08-08_nodes.json",
+            json.dumps(
+                {
+                    "source": "grok-web",
+                    "date": "2026-08-08",
+                    "type": "note",
+                    "title": "Nodes",
+                    "values": list(range(10_001)),
+                }
+            ),
+            "invalid_json",
+        ),
+    ],
+)
+def test_structured_parsers_are_bounded(
+    tmp_path: Path,
+    name: str,
+    content: str,
+    code: str,
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {name: content})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == code
+
+
+@pytest.mark.parametrize(
+    "label", ["AWS_SECRET_ACCESS_KEY", "aws_secret_key", "secret", "secretKey"]
+)
+def test_secret_assignments_are_rejected_without_writes(tmp_path: Path, label: str):
+    mod = _load()
+    token = "AbCdEf01" * 5
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_secret.md": _frontmatter(body=f"{label}: {token}\n")},
+    )
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
+@pytest.mark.parametrize("label", ["mnemonic", "seed_phrase", "recoveryPhrase"])
+def test_mnemonic_assignments_are_rejected_without_writes(tmp_path: Path, label: str):
+    mod = _load()
+    words = " ".join(["abandon"] * 11 + ["about"])
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_mnemonic.md": _frontmatter(body=f"{label}: {words}\n")},
+    )
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["privateKey", "secretKey", "mnemonic", "seedPhrase", "recovery_phrase"],
+)
+def test_structured_secret_keys_reject_scalar_or_container_without_writes(
+    tmp_path: Path,
+    key: str,
+):
+    mod = _load()
+    payload = {
+        "source": "grok-web",
+        "date": "2026-08-08",
+        "type": "note",
+        "title": "Structured secret",
+        key: list(range(64)),
+    }
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_structured.json": json.dumps(payload)},
+    )
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "structured_secret_key"
+    assert not (tmp_path / "receipts").exists()
+
+
+def test_content_blind_inventory_reports_paths_and_codes_only(tmp_path: Path):
+    mod = _load()
+    token = "AbCdEf01" * 5
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_clean.md": _frontmatter("Clean"),
+            "2026-08-08_secret.md": _frontmatter(body=f"secret_key: {token}\n"),
+        },
+    )
+
+    inventory = mod.inventory_exports(_config(mod, repo))
+    serialized = json.dumps(asdict(inventory), sort_keys=True)
+
+    assert inventory.total == 2
+    assert inventory.accepted == 1
+    assert inventory.rejected == [
+        mod.Rejection(path="2026-08-08_secret.md", code="secret_detected")
+    ]
+    assert token not in serialized
+    assert "sha256" not in serialized
+    assert "git_blob_oid" not in serialized
+
+
+def test_inventory_cli_fails_closed_without_writing(capsys, tmp_path: Path):
+    mod = _load()
+    token = "AbCdEf01" * 5
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_clean.md": _frontmatter("Clean"),
+            "2026-08-08_secret.md": _frontmatter(body=f"secret_key: {token}\n"),
+        },
+    )
+
+    exit_code = mod.main(["--repo", str(repo), "--inventory"])
+    output = capsys.readouterr()
+    payload = json.loads(output.out)
+
+    assert exit_code == 3
+    assert payload["ok"] is False
+    assert payload["accepted"] == 1
+    assert payload["rejected"] == [{"path": "2026-08-08_secret.md", "code": "secret_detected"}]
+    assert token not in output.out
+    assert output.err == ""
+
+
+def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
+    mod = _load()
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+    rule_ids = [rule["id"] for rule in mod.POLICY["secret_policy"]["rules"]]
+    assert "mnemonic_assignment" in rule_ids
+    assert "aws_secret_assignment" in rule_ids
+    assert mod.POLICY["secret_policy"]["structured_key_names"] == [
+        "mnemonic",
+        "privatekey",
+        "recoveryphrase",
+        "secretkey",
+        "seedphrase",
+    ]
+    validator_schema = schema["properties"]["validator"]["properties"]
+    file_schema = schema["$defs"]["file"]["properties"]
+    assert validator_schema["version"]["const"] == mod.VALIDATOR_VERSION
+    assert file_schema["validation_profile"]["const"] == mod.VALIDATION_PROFILE
+
+
+def test_cli_has_no_live_projection_or_rollback_options():
+    mod = _load()
+    help_text = mod.build_parser().format_help()
+
+    assert "--inventory" in help_text
+    assert "--receipt-root" not in help_text
+    assert "--destination" not in help_text
+    assert "--state-root" not in help_text
+    assert "--rollback" not in help_text
+    assert "--publish" not in help_text
+
+
+def test_runtime_dependency_and_registry_contracts():
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    dependencies = pyproject["project"]["dependencies"]
+    assert any(dependency.casefold().startswith("pyyaml") for dependency in dependencies)
+
+    registry = yaml.safe_load((ROOT / "infra" / "tool-registry.yaml").read_text())
+    entry = next(tool for tool in registry["tools"] if tool["name"] == "grok_web_snapshot")
+    assert entry["path"] == "scripts/ops/grok_web_snapshot.py"
+    assert entry["status"] == "internal"
+    assert entry["consumers"] == ["claude-code.manual", "codex.manual"]
+    assert "Knowledge" not in entry["description"]
+    assert "LaunchAgent" not in entry["description"]

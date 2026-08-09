@@ -3,6 +3,9 @@ name = "sapphire-os"
 version = "0.1.0"
 description = "Sapphire OS — autonomous trading + PM + intelligence system"
 requires-python = ">=3.11"
+dependencies = [
+    "PyYAML>=6.0.2,<7",
+]
 
 [project.optional-dependencies]
 # `pip install -e '.[dev]'` sets up the lint + test toolchain.
