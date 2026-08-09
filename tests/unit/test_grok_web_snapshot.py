@@ -466,7 +466,14 @@ def test_mnemonic_assignments_are_rejected_without_writes(tmp_path: Path, label:
 
 @pytest.mark.parametrize(
     "key",
-    ["privateKey", "secretKey", "mnemonic", "seedPhrase", "recovery_phrase"],
+    [
+        "privateKey",
+        "secretKey",
+        "mnemonic",
+        "seedPhrase",
+        "recovery_phrase",
+        "refreshToken",
+    ],
 )
 def test_structured_secret_keys_reject_scalar_or_container_without_writes(
     tmp_path: Path,
@@ -501,6 +508,7 @@ def test_structured_secret_keys_reject_scalar_or_container_without_writes(
         "secret",
         "aws_secret_key",
         "AWS_SECRET_ACCESS_KEY",
+        "refresh_token",
     ],
 )
 def test_quoted_json_generic_credential_keys_are_rejected(tmp_path: Path, key: str):
@@ -692,6 +700,30 @@ def test_multiline_yaml_password_in_markdown_body_is_rejected_without_writes(
     _, _, repo = _fixture_repo(
         tmp_path,
         {"2026-08-08_multiline.md": _frontmatter(body=body)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        '```json\n{"password":["Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx"]}\n```\n',
+        "```yaml\npassword:\n  - Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx\n```\n",
+    ],
+)
+def test_container_or_continuation_credentials_in_markdown_body_are_rejected(
+    tmp_path: Path,
+    body: str,
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_container.md": _frontmatter(body=body)},
     )
 
     with pytest.raises(mod.SnapshotRejected) as caught:
@@ -911,6 +943,7 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     assert "quoted_credential_assignment" in rule_ids
     assert "unquoted_credential_assignment" in rule_ids
     assert "yaml_block_credential_assignment" in text_rule_ids
+    assert "credential_container_assignment" in text_rule_ids
     assert mod.POLICY["json_duplicate_keys"] == "reject"
     assert mod.POLICY["yaml_duplicate_keys"] == "reject"
     assert mod.POLICY["secret_policy"]["decode_transforms"] == [
@@ -932,6 +965,27 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
         "secret",
         "secretkey",
         "seedphrase",
+    ]
+    assert mod.POLICY["secret_policy"]["structured_key_suffixes"] == [
+        "accesskey",
+        "accesstoken",
+        "apikey",
+        "authtoken",
+        "bearertoken",
+        "bottoken",
+        "clientsecret",
+        "credential",
+        "credentials",
+        "idtoken",
+        "mnemonic",
+        "password",
+        "privatekey",
+        "recoveryphrase",
+        "refreshtoken",
+        "secret",
+        "secretkey",
+        "seedphrase",
+        "sessiontoken",
     ]
     validator_schema = schema["properties"]["validator"]["properties"]
     file_schema = schema["$defs"]["file"]["properties"]

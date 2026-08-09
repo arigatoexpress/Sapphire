@@ -24,9 +24,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "10"
-VALIDATION_PROFILE = "grok-export-v10"
-SECRET_POLICY_REVISION = 10
+VALIDATOR_VERSION = "11"
+VALIDATION_PROFILE = "grok-export-v11"
+SECRET_POLICY_REVISION = 11
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -54,6 +54,34 @@ STRUCTURED_SECRET_KEY_NAMES = frozenset(
         "secretkey",
         "seedphrase",
     }
+)
+STRUCTURED_SECRET_KEY_SUFFIXES = frozenset(
+    {
+        "accesskey",
+        "accesstoken",
+        "apikey",
+        "authtoken",
+        "bearertoken",
+        "bottoken",
+        "clientsecret",
+        "credential",
+        "credentials",
+        "idtoken",
+        "mnemonic",
+        "password",
+        "privatekey",
+        "recoveryphrase",
+        "refreshtoken",
+        "secret",
+        "secretkey",
+        "seedphrase",
+        "sessiontoken",
+    }
+)
+CREDENTIAL_LABEL_PATTERN = (
+    rb"(?:[A-Za-z][A-Za-z0-9]*[_-])*(?:api[_-]?key|"
+    rb"(?:access|auth|bearer|id|refresh|session)[_-]?token|client[_-]?secret|"
+    rb"password|private[_-]?key|secret(?:[_-]?key)?|authorization|credential(?:s)?)"
 )
 GIT_OID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 TREE_ROW_RE = re.compile(
@@ -94,8 +122,7 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "quoted_credential_assignment",
         re.compile(
-            rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
-            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*['\"]?\s*[:=]\s*"
+            rb"(?im)\b" + CREDENTIAL_LABEL_PATTERN + rb"\b\s*['\"]?\s*[:=]\s*"
             rb"(?P<quote>['\"])[ \t]*"
             rb"(?!(?:<redacted>|redacted|placeholder|example|none|null|unset)"
             rb"[ \t]*(?P=quote))(?!\$\{)[^'\"\r\n]+(?P=quote)"
@@ -104,8 +131,7 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "unquoted_credential_assignment",
         re.compile(
-            rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
-            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*['\"]?\s*[:=]"
+            rb"(?im)\b" + CREDENTIAL_LABEL_PATTERN + rb"\b\s*['\"]?\s*[:=]"
             rb"(?![ \t]*['\"\[{|>])"
             rb"(?![ \t]*(?:<redacted>|redacted|placeholder|example|none|null|unset)"
             rb"[ \t]*$)(?![ \t]*\$\{)[ \t]*\S[^\r\n]*$"
@@ -134,14 +160,18 @@ UNSTRUCTURED_TEXT_SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "yaml_block_credential_assignment",
         re.compile(
-            rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
-            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*['\"]?\s*[:=][ \t]*"
-            rb"[>|](?:[+-][1-9]?|[1-9][+-]?)?[ \t]*(?:#[^\r\n]*)?\r?\n"
+            rb"(?im)\b" + CREDENTIAL_LABEL_PATTERN + rb"\b\s*['\"]?\s*[:=][ \t]*"
+            rb"(?:[>|](?:[+-][1-9]?|[1-9][+-]?)?[ \t]*)?"
+            rb"(?:#[^\r\n]*)?\r?\n"
             rb"(?:(?:[ \t]*\r?\n)|(?:[ \t]+(?:<redacted>|redacted|placeholder|"
             rb"example|none|null|unset|\$\{[A-Za-z_][A-Za-z0-9_]*\})[ \t]*\r?\n))*"
             rb"(?![ \t]+(?:<redacted>|redacted|placeholder|example|"
             rb"none|null|unset)[ \t]*$)(?![ \t]+\$\{)[ \t]+\S[^\r\n]*$"
         ),
+    ),
+    (
+        "credential_container_assignment",
+        re.compile(rb"(?im)\b" + CREDENTIAL_LABEL_PATTERN + rb"\b\s*['\"]?\s*[:=][ \t]*[\[{]"),
     ),
 )
 POLICY = {
@@ -165,6 +195,7 @@ POLICY = {
         "path_names": sorted(SECRET_PATH_NAMES),
         "scan_filenames": True,
         "structured_key_names": sorted(STRUCTURED_SECRET_KEY_NAMES),
+        "structured_key_suffixes": sorted(STRUCTURED_SECRET_KEY_SUFFIXES),
         "rules": [
             {
                 "id": rule_id,
@@ -490,6 +521,14 @@ def _normalized_key(value: Any) -> str | None:
     return re.sub(r"[^a-z0-9]", "", value.casefold())
 
 
+def _structured_secret_key(value: Any) -> bool:
+    normalized = _normalized_key(value)
+    return normalized is not None and (
+        normalized in STRUCTURED_SECRET_KEY_NAMES
+        or any(normalized.endswith(suffix) for suffix in STRUCTURED_SECRET_KEY_SUFFIXES)
+    )
+
+
 def _validate_structure(
     value: Any,
     path: str,
@@ -516,7 +555,7 @@ def _validate_structure(
             for key, item in current.items():
                 if not isinstance(key, str):
                     raise SnapshotRejected(code, path)
-                if _normalized_key(key) in STRUCTURED_SECRET_KEY_NAMES:
+                if _structured_secret_key(key):
                     raise SnapshotRejected("structured_secret_key", path)
                 try:
                     encoded_key = key.encode("utf-8")
