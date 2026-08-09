@@ -5,6 +5,11 @@ This boundary reads only the configured remote-tracking Git tree. It never reads
 checkout, mutates the Knowledge vault, activates a pointer, publishes, or rolls back.
 The receipt records source identity and known-policy results; it does not certify
 secret-free content or grant admission, projection, or execution authority.
+Same-owner Git object files are assumed to obey normal Git immutability during a
+read. The ephemeral hardlink view is namespace-pinned, not byte-private. Hostile or
+corrupt in-place inode mutation is out of scope: object-ID verification rejects
+altered content absent a collision, but mutation may cause fail-closed child-process
+resource exhaustion.
 """
 
 from __future__ import annotations

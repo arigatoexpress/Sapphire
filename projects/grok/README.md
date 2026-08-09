@@ -48,6 +48,15 @@ scripts/ops/grok_*.py   status + loop tick + bridge tools
 data/grok-web-exports/  git knowledge plane
 ```
 
+### Snapshot reader boundary
+
+The source snapshot reader assumes same-owner Git object files obey normal Git
+immutability during a read. Its ephemeral hardlink view is namespace-pinned, not
+byte-private. Hostile or corrupt in-place inode mutation is out of scope: object-ID
+verification rejects altered content absent a collision, but mutation may cause
+fail-closed child-process resource exhaustion. Its receipt records bounded policy
+results only; it grants no admission, projection, or execution authority.
+
 ## Fences
 
 - Paper / research / docs / tests: **yes**

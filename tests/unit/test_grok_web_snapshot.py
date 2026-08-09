@@ -539,6 +539,7 @@ def test_receipt_and_inventory_make_only_bounded_policy_claims(tmp_path: Path):
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     registry = yaml.safe_load((ROOT / "infra" / "tool-registry.yaml").read_text())
     entry = next(tool for tool in registry["tools"] if tool["name"] == "grok_web_snapshot")
+    project_readme = (ROOT / "projects" / "grok" / "README.md").read_text(encoding="utf-8")
 
     assert "policy_profile" in receipt["validator"]
     assert "validation_profile" not in receipt["validator"]
@@ -549,6 +550,14 @@ def test_receipt_and_inventory_make_only_bounded_policy_claims(tmp_path: Path):
     assert "known-secret-pattern" in entry["description"]
     assert "grants no admission or projection authority" in entry["description"]
     assert "not a secret-free certificate" in entry["description"]
+    for claim_surface in (mod.__doc__ or "", entry["description"], project_readme):
+        claim_surface = " ".join(claim_surface.casefold().split())
+        assert "same-owner git object files" in claim_surface
+        assert "normal git immutability" in claim_surface
+        assert "namespace-pinned" in claim_surface
+        assert "not byte-private" in claim_surface
+        assert "fail-closed child-process resource exhaustion" in claim_surface
+        assert "private hardlink-pinned" not in claim_surface
 
 
 def test_snapshot_cli_emits_the_content_addressed_receipt(capsys, tmp_path: Path):
