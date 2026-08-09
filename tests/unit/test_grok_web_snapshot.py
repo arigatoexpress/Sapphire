@@ -112,6 +112,31 @@ def test_snapshot_reads_pinned_remote_tree_not_dirty_checkout(tmp_path: Path):
     assert "DIRTY" not in json.dumps(result.receipt)
 
 
+def test_snapshot_ignores_local_git_blob_replacement_refs(tmp_path: Path):
+    mod = _load()
+    original = _frontmatter(body="ORIGINAL\n")
+    replacement = _frontmatter(body="REPLACED\n")
+    assert len(original.encode()) == len(replacement.encode())
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": original},
+    )
+    original_oid = _git(
+        repo,
+        "rev-parse",
+        "origin/main:data/grok-web-exports/2026-08-08_clean.md",
+    )
+    replacement_path = repo / "replacement.tmp"
+    replacement_path.write_text(replacement, encoding="utf-8")
+    replacement_oid = _git(repo, "hash-object", "-w", str(replacement_path))
+    _git(repo, "replace", original_oid, replacement_oid)
+
+    result = mod.snapshot_exports(_config(mod, repo))
+
+    assert result.receipt["files"][0]["git_blob_oid"] == original_oid
+    assert result.receipt["files"][0]["sha256"] == hashlib.sha256(original.encode()).hexdigest()
+
+
 def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, monkeypatch):
     mod = _load()
     _, seed, repo = _fixture_repo(
@@ -135,6 +160,7 @@ def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, mon
     assert result.receipt["summary"]["files"] == 2
     assert [
         "git",
+        "--no-replace-objects",
         "-C",
         str(repo),
         "fetch",
@@ -252,6 +278,19 @@ def test_strict_rejection_never_writes_state(
 
     assert caught.value.code == code
     assert not (tmp_path / "receipts").exists()
+
+
+def test_backslash_git_path_is_rejected_consistently(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"folder\\credentials.md": _frontmatter()},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "nested_path"
 
 
 @pytest.mark.parametrize("field", ["source", "date", "type", "title"])
@@ -424,6 +463,28 @@ def test_folded_yaml_generic_credential_key_is_rejected(tmp_path: Path):
         mod.snapshot_exports(_config(mod, repo))
 
     assert caught.value.code == "structured_secret_key"
+
+
+@pytest.mark.parametrize("suffix", ["json", "md"])
+def test_decoded_escaped_scalar_secrets_are_rejected(tmp_path: Path, suffix: str):
+    mod = _load()
+    encoded_token = "sk-" + "proj-" + "AAAA" + r"\u0041" + "A" * 20
+    if suffix == "json":
+        content = (
+            '{"source":"grok-web","date":"2026-08-08","type":"note",'
+            f'"title":"Escaped scalar","note":"{encoded_token}"}}'
+        )
+    else:
+        content = (
+            "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\n"
+            f'title: Escaped scalar\nnote: "{encoded_token}"\n---\n'
+        )
+    _, _, repo = _fixture_repo(tmp_path, {f"2026-08-08_escaped.{suffix}": content})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
 
 
 @pytest.mark.parametrize(

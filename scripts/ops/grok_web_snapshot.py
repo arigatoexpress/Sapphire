@@ -23,9 +23,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "2"
-VALIDATION_PROFILE = "grok-export-v2"
-SECRET_POLICY_REVISION = 2
+VALIDATOR_VERSION = "3"
+VALIDATION_PROFILE = "grok-export-v3"
+SECRET_POLICY_REVISION = 3
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -227,7 +227,7 @@ def _policy_sha256(config: SnapshotConfig) -> str:
 
 def _run_git(config: SnapshotConfig, *args: str, binary: bool = False) -> bytes | str:
     result = subprocess.run(
-        [config.git_bin, "-C", str(config.repo), *args],
+        [config.git_bin, "--no-replace-objects", "-C", str(config.repo), *args],
         check=False,
         capture_output=True,
         text=not binary,
@@ -241,6 +241,7 @@ def _fetch(config: SnapshotConfig) -> None:
     result = subprocess.run(
         [
             config.git_bin,
+            "--no-replace-objects",
             "-C",
             str(config.repo),
             "fetch",
@@ -342,7 +343,7 @@ def _secret_path(path: str) -> bool:
 
 def _validate_entry(config: SnapshotConfig, entry: TreeEntry) -> None:
     path = entry.relative_path
-    if not path or "/" in path or path in {".", ".."}:
+    if not path or "/" in path or "\\" in path or path in {".", ".."}:
         raise SnapshotRejected("nested_path", path)
     if Path(path).suffix.casefold() not in ALLOWED_SUFFIXES:
         raise SnapshotRejected("unsupported_extension", path)
@@ -407,6 +408,11 @@ def _validate_structure(
                 stack.append((item, depth + 1))
         elif isinstance(current, list):
             stack.extend((item, depth + 1) for item in current)
+        elif isinstance(current, str):
+            if _detect_secret(current.encode("utf-8")):
+                raise SnapshotRejected("secret_detected", path)
+        elif isinstance(current, bytes) and _detect_secret(current):
+            raise SnapshotRejected("secret_detected", path)
 
 
 def _validate_provenance(value: Any, path: str) -> None:
