@@ -202,6 +202,22 @@ def test_source_contract_is_fixed_to_origin_main_exports(
     assert caught.value.code == "source_contract"
 
 
+def test_tree_row_parser_rejects_unconsumed_trailing_newline(
+    tmp_path: Path,
+    monkeypatch,
+):
+    mod = _load()
+    oid = "a" * 40
+    raw_row = (f"100644 blob {oid} 1\tdata/grok-web-exports/2026-08-08_bad.md\n\0").encode()
+
+    monkeypatch.setattr(mod, "_run_git", lambda *_args, **_kwargs: raw_row)
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod._tree_entries(mod.SnapshotConfig(repo=tmp_path), oid)
+
+    assert caught.value.code == "invalid_tree_row"
+
+
 def test_receipt_is_deterministic_content_addressed_and_has_no_projection_state(tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(
@@ -560,6 +576,22 @@ def test_duplicate_json_keys_cannot_hide_a_decoded_secret(tmp_path: Path):
     assert not (tmp_path / "receipts").exists()
 
 
+def test_duplicate_yaml_keys_cannot_hide_a_decoded_secret(tmp_path: Path):
+    mod = _load()
+    encoded_token = "sk" + r"\u002d" + "proj-" + "A" * 24
+    content = (
+        "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\n"
+        f'title: Duplicate\nnote: "{encoded_token}"\nnote: safe\n---\n'
+    )
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_duplicate.md": content})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "invalid_yaml"
+    assert not (tmp_path / "receipts").exists()
+
+
 def test_quoted_credential_label_in_markdown_body_is_rejected(tmp_path: Path):
     mod = _load()
     token = "AbCdEf01" * 5
@@ -619,6 +651,27 @@ def test_punctuated_quoted_password_in_markdown_body_is_rejected_without_writes(
     _, _, repo = _fixture_repo(
         tmp_path,
         {"2026-08-08_punctuated.md": _frontmatter(body=body)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
+
+
+@pytest.mark.parametrize(
+    "password",
+    ["Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx", "shortsecret"],
+)
+def test_unquoted_password_in_markdown_body_is_rejected_without_writes(
+    tmp_path: Path,
+    password: str,
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_punctuated.md": _frontmatter(body=f"password: {password}\n")},
     )
 
     with pytest.raises(mod.SnapshotRejected) as caught:
@@ -760,9 +813,19 @@ def test_content_blind_inventory_reports_paths_and_codes_only(tmp_path: Path):
     assert "git_blob_oid" not in serialized
 
 
-def test_secret_shaped_filename_is_rejected_and_redacted_from_inventory(tmp_path: Path):
+@pytest.mark.parametrize(
+    "secret_name",
+    [
+        "sk-proj-" + "A" * 24 + ".md",
+        "sk-proj-" + "A" * 24 + ".txt",
+        "nested/sk-proj-" + "A" * 24 + ".md",
+    ],
+)
+def test_secret_shaped_filename_is_rejected_and_redacted_from_inventory(
+    tmp_path: Path,
+    secret_name: str,
+):
     mod = _load()
-    secret_name = "sk-proj-" + "A" * 24 + ".md"
     _, _, repo = _fixture_repo(tmp_path, {secret_name: _frontmatter()})
 
     with pytest.raises(mod.SnapshotRejected) as caught:
@@ -774,6 +837,24 @@ def test_secret_shaped_filename_is_rejected_and_redacted_from_inventory(tmp_path
     serialized = json.dumps(asdict(inventory), sort_keys=True)
     assert secret_name not in serialized
     assert inventory.rejected == [mod.Rejection(path="[secret-path-redacted]", code="secret_path")]
+
+
+def test_escaped_secret_in_gitkeep_metadata_is_rejected_without_writes(tmp_path: Path):
+    mod = _load()
+    encoded_token = "sk" + r"\u002d" + "proj-" + "A" * 24
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_clean.md": _frontmatter(),
+            ".gitkeep": encoded_token,
+        },
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
 
 
 def test_inventory_cli_fails_closed_without_writing(capsys, tmp_path: Path):
@@ -807,8 +888,13 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     assert "mnemonic_assignment" in rule_ids
     assert "aws_secret_assignment" in rule_ids
     assert "quoted_credential_assignment" in rule_ids
+    assert "unquoted_credential_assignment" in rule_ids
     assert mod.POLICY["json_duplicate_keys"] == "reject"
-    assert mod.POLICY["secret_policy"]["decode_transforms"] == ["markdown_body_json_escape_view_v1"]
+    assert mod.POLICY["yaml_duplicate_keys"] == "reject"
+    assert mod.POLICY["secret_policy"]["decode_transforms"] == [
+        "markdown_body_json_escape_view_v1",
+        "excluded_text_json_escape_view_v1",
+    ]
     assert mod.POLICY["secret_policy"]["scan_filenames"] is True
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [

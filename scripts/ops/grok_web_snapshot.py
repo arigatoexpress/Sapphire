@@ -24,9 +24,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "8"
-VALIDATION_PROFILE = "grok-export-v8"
-SECRET_POLICY_REVISION = 8
+VALIDATOR_VERSION = "9"
+VALIDATION_PROFILE = "grok-export-v9"
+SECRET_POLICY_REVISION = 9
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -58,7 +58,7 @@ STRUCTURED_SECRET_KEY_NAMES = frozenset(
 GIT_OID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 TREE_ROW_RE = re.compile(
     rb"^(?P<mode>[0-9]{6}) (?P<kind>blob|tree|commit) "
-    rb"(?P<oid>(?:[0-9a-f]{40}|[0-9a-f]{64})) +(?P<size>-|[0-9]+)\t(?P<path>.+)$"
+    rb"(?P<oid>(?:[0-9a-f]{40}|[0-9a-f]{64})) +(?P<size>-|[0-9]+)\t(?P<path>.+)\Z"
 )
 FRONTMATTER_RE = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---\r?\n", re.DOTALL)
 JSON_SIMPLE_ESCAPES = {
@@ -71,7 +71,10 @@ JSON_SIMPLE_ESCAPES = {
     ord("r"): b"\r",
     ord("t"): b"\t",
 }
-SECRET_DECODE_TRANSFORMS = ("markdown_body_json_escape_view_v1",)
+SECRET_DECODE_TRANSFORMS = (
+    "markdown_body_json_escape_view_v1",
+    "excluded_text_json_escape_view_v1",
+)
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "private_key_block",
@@ -99,12 +102,13 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
         ),
     ),
     (
-        "credential_assignment",
+        "unquoted_credential_assignment",
         re.compile(
             rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
-            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*['\"]?\s*[:=]\s*['\"]?"
-            rb"(?!<redacted>|redacted|placeholder|example|none|null|unset|\$\{)"
-            rb"[A-Za-z0-9_./+=-]{20,}"
+            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*['\"]?\s*[:=]"
+            rb"(?![ \t]*['\"\[{|>])"
+            rb"(?![ \t]*(?:<redacted>|redacted|placeholder|example|none|null|unset)"
+            rb"[ \t]*$)(?![ \t]*\$\{)[ \t]*\S[^\r\n]*$"
         ),
     ),
     (
@@ -138,6 +142,7 @@ POLICY = {
     "max_structured_nodes": MAX_STRUCTURED_NODES,
     "regular_blob_mode": "100644",
     "json_duplicate_keys": "reject",
+    "yaml_duplicate_keys": "reject",
     "validation_profile": VALIDATION_PROFILE,
     "secret_policy": {
         "revision": SECRET_POLICY_REVISION,
@@ -335,7 +340,7 @@ def _tree_entries(config: SnapshotConfig, commit: str) -> list[TreeEntry]:
     for raw_row in raw_rows.split(b"\0"):
         if not raw_row:
             continue
-        match = TREE_ROW_RE.match(raw_row)
+        match = TREE_ROW_RE.fullmatch(raw_row)
         if not match:
             raise SnapshotRejected("invalid_tree_row")
         try:
@@ -370,6 +375,8 @@ def _secret_path(path: str) -> bool:
 
 def _validate_entry(config: SnapshotConfig, entry: TreeEntry) -> None:
     path = entry.relative_path
+    if _detect_secret(path.encode("utf-8")):
+        raise SnapshotRejected("secret_path")
     if not path or "/" in path or "\\" in path or path in {".", ".."}:
         raise SnapshotRejected("nested_path", path)
     if PurePosixPath(path).suffix.casefold() not in ALLOWED_SUFFIXES:
@@ -380,8 +387,6 @@ def _validate_entry(config: SnapshotConfig, entry: TreeEntry) -> None:
         raise SnapshotRejected("missing_blob_size", path)
     if entry.size > config.max_file_bytes:
         raise SnapshotRejected("file_too_large", path)
-    if _detect_secret(path.encode("utf-8")):
-        raise SnapshotRejected("secret_path")
     if _secret_path(path):
         raise SnapshotRejected("secret_path", path)
 
@@ -435,7 +440,7 @@ def _json_escape_view(data: bytes) -> bytes:
     return bytes(decoded)
 
 
-def _detect_escaped_markdown_secret(data: bytes) -> str | None:
+def _detect_json_escape_secret(data: bytes) -> str | None:
     return _detect_secret(_json_escape_view(data))
 
 
@@ -546,6 +551,21 @@ def _reject_duplicate_json_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]
     return result
 
 
+class _UniqueKeySafeLoader(yaml.SafeLoader):
+    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
+        self.flatten_mapping(node)
+        result: dict[Any, Any] = {}
+        for key, value in self.construct_pairs(node, deep=deep):
+            try:
+                duplicate = key in result
+            except TypeError as exc:
+                raise ValueError from exc
+            if duplicate:
+                raise ValueError
+            result[key] = value
+        return result
+
+
 def _validate_content(path: str, data: bytes) -> str:
     if _detect_secret(data):
         raise SnapshotRejected("secret_detected", path)
@@ -555,10 +575,10 @@ def _validate_content(path: str, data: bytes) -> str:
         match = FRONTMATTER_RE.match(text)
         if not match:
             raise SnapshotRejected("missing_frontmatter", path)
-        if _detect_escaped_markdown_secret(text[match.end() :].encode("utf-8")):
+        if _detect_json_escape_secret(text[match.end() :].encode("utf-8")):
             raise SnapshotRejected("secret_detected", path)
         try:
-            value = yaml.safe_load(match.group("body"))
+            value = yaml.load(match.group("body"), Loader=_UniqueKeySafeLoader)
         except (yaml.YAMLError, ValueError, RecursionError):
             raise SnapshotRejected("invalid_yaml", path)
         _validate_structure(value, path, "invalid_yaml", reject_aliases=True)
@@ -613,6 +633,8 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
     if _detect_secret(blob):
         raise SnapshotRejected("secret_detected", path)
     text = _decode_utf8(blob, path)
+    if _detect_json_escape_secret(text.encode("utf-8")):
+        raise SnapshotRejected("secret_detected", path)
     if PurePosixPath(path).suffix.casefold() == ".json":
         try:
             value = json.loads(
@@ -624,17 +646,11 @@ def _validate_excluded_metadata(config: SnapshotConfig, entry: TreeEntry) -> Non
             raise SnapshotRejected("invalid_json", path)
         _validate_structure(value, path, "invalid_json")
     elif match := FRONTMATTER_RE.match(text):
-        if _detect_escaped_markdown_secret(text[match.end() :].encode("utf-8")):
-            raise SnapshotRejected("secret_detected", path)
         try:
-            value = yaml.safe_load(match.group("body"))
+            value = yaml.load(match.group("body"), Loader=_UniqueKeySafeLoader)
         except (yaml.YAMLError, ValueError, RecursionError):
             raise SnapshotRejected("invalid_yaml", path)
         _validate_structure(value, path, "invalid_yaml", reject_aliases=True)
-    elif PurePosixPath(path).suffix.casefold() == ".md" and _detect_escaped_markdown_secret(
-        text.encode("utf-8")
-    ):
-        raise SnapshotRejected("secret_detected", path)
 
 
 def _validate_aliases(files: list[ValidatedFile]) -> None:
