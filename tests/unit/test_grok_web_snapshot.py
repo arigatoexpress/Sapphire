@@ -236,6 +236,94 @@ def test_snapshot_rejects_source_tree_with_wrong_object_hash(tmp_path: Path):
     assert not (tmp_path / "receipts").exists()
 
 
+def test_snapshot_traverses_verified_leaf_tree_bytes_after_object_swap(
+    tmp_path: Path,
+    monkeypatch,
+):
+    mod = _load()
+    original = _frontmatter(body="ORIGINAL\n").encode()
+    replacement = _frontmatter(body="REPLACED\n").encode()
+    assert len(original) == len(replacement)
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_clean.md": original},
+    )
+    original_blob_oid = _git(
+        repo,
+        "rev-parse",
+        "origin/main:data/grok-web-exports/2026-08-08_clean.md",
+    )
+    replacement_path = repo / "replacement.tmp"
+    replacement_path.write_bytes(replacement)
+    replacement_blob_oid = _git(repo, "hash-object", "-w", str(replacement_path))
+    tree_oid = _git(repo, "rev-parse", "origin/main:data/grok-web-exports")
+    original_tree = _git_bytes(repo, "cat-file", "tree", tree_oid)
+    replacement_tree = original_tree.replace(
+        bytes.fromhex(original_blob_oid),
+        bytes.fromhex(replacement_blob_oid),
+    )
+    real_read = mod._read_verified_git_object
+    swapped = False
+
+    def read_then_swap(config, kind: str, oid: str):
+        nonlocal swapped
+        content = real_read(config, kind, oid)
+        if kind == "tree" and oid == tree_oid and not swapped:
+            _replace_loose_git_object(repo, tree_oid, "tree", replacement_tree)
+            swapped = True
+        return content
+
+    monkeypatch.setattr(mod, "_read_verified_git_object", read_then_swap)
+
+    result = mod.snapshot_exports(_config(mod, repo))
+
+    assert swapped is True
+    assert result.receipt["files"][0]["git_blob_oid"] == original_blob_oid
+    assert result.receipt["files"][0]["sha256"] == hashlib.sha256(original).hexdigest()
+
+
+def test_git_object_read_stops_at_bound(tmp_path: Path, monkeypatch):
+    mod = _load()
+
+    class ChunkedObject:
+        def __init__(self):
+            self.chunks = iter((b"x" * 8, b"x", b"forbidden"))
+            self.reads = 0
+            self.closed = False
+
+        def read(self, _size: int) -> bytes:
+            self.reads += 1
+            return next(self.chunks)
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakeProcess:
+        def __init__(self):
+            self.stdout = ChunkedObject()
+            self.waited = False
+
+        def wait(self) -> int:
+            self.waited = True
+            return 0
+
+    process = FakeProcess()
+    monkeypatch.setattr(mod.subprocess, "Popen", lambda *_args, **_kwargs: process)
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod._read_git_object_bounded(
+            mod.SnapshotConfig(repo=tmp_path),
+            "commit",
+            "a" * 40,
+            max_bytes=8,
+        )
+
+    assert caught.value.code == "commit_too_large"
+    assert process.stdout.reads == 2
+    assert process.stdout.closed is True
+    assert process.waited is True
+
+
 def test_fetch_uses_exact_refspec_and_never_pull_or_checkout(tmp_path: Path, monkeypatch):
     mod = _load()
     _, seed, repo = _fixture_repo(
@@ -300,103 +388,35 @@ def test_source_contract_is_fixed_to_origin_main_exports(
     assert caught.value.code == "source_contract"
 
 
-def test_tree_row_parser_rejects_unconsumed_trailing_newline(
-    tmp_path: Path,
-    monkeypatch,
-):
+def test_tree_parser_preserves_trailing_newline_in_filename(tmp_path: Path):
     mod = _load()
-    oid = "a" * 40
-    raw_row = (f"100644 blob {oid} 1\tdata/grok-web-exports/2026-08-08_bad.md\n").encode()
-
-    monkeypatch.setattr(
-        mod,
-        "_stream_tree_rows",
-        lambda *_args, **_kwargs: (row for row in (raw_row,)),
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_bad.md\n": _frontmatter()},
     )
 
     with pytest.raises(mod.SnapshotRejected) as caught:
-        mod._tree_entries(mod.SnapshotConfig(repo=tmp_path), oid)
+        mod.snapshot_exports(_config(mod, repo))
 
-    assert caught.value.code == "invalid_tree_row"
+    assert caught.value.code == "unsupported_extension"
+    assert caught.value.path == "2026-08-08_bad.md\n"
 
 
-def test_tree_stream_stops_immediately_after_file_limit(tmp_path: Path, monkeypatch):
+def test_verified_tree_rejects_file_count_over_limit(tmp_path: Path):
     mod = _load()
-    oid = "a" * 40
-
-    class ChunkedRows:
-        def __init__(self):
-            self.reads = 0
-            self.closed = False
-
-        def read(self, _size: int) -> bytes:
-            self.reads += 1
-            if self.reads > 3:
-                raise AssertionError("tree stream consumed beyond max_files + 1")
-            name = f"2026-08-08_{self.reads}.md"
-            return f"100644 blob {oid} 1\tdata/grok-web-exports/{name}\0".encode()
-
-        def close(self) -> None:
-            self.closed = True
-
-    class FakeProcess:
-        def __init__(self):
-            self.stdout = ChunkedRows()
-            self.waited = False
-
-        def wait(self) -> int:
-            self.waited = True
-            return 0
-
-    process = FakeProcess()
-    monkeypatch.setattr(mod.subprocess, "Popen", lambda *_args, **_kwargs: process)
-
-    def reject_buffered_tree_read(*_args, **_kwargs):
-        raise mod.SnapshotRejected("buffered_tree_read")
-
-    monkeypatch.setattr(mod, "_run_git", reject_buffered_tree_read)
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_one.md": _frontmatter("One"),
+            "2026-08-08_two.md": _frontmatter("Two"),
+            "2026-08-08_three.md": _frontmatter("Three"),
+        },
+    )
 
     with pytest.raises(mod.SnapshotRejected) as caught:
-        mod._tree_entries(mod.SnapshotConfig(repo=tmp_path, max_files=2), oid)
+        mod.snapshot_exports(mod.SnapshotConfig(repo=repo, max_files=2))
 
     assert caught.value.code == "too_many_files"
-    assert process.stdout.reads == 3
-    assert process.stdout.closed is True
-    assert process.waited is True
-
-
-def test_tree_stream_rejects_oversized_row_before_yield(tmp_path: Path, monkeypatch):
-    mod = _load()
-
-    class ChunkedRow:
-        def __init__(self):
-            self.chunks = iter((b"x" * mod.MAX_TREE_ROW_BYTES, b"x\0", b""))
-            self.closed = False
-
-        def read(self, _size: int) -> bytes:
-            return next(self.chunks)
-
-        def close(self) -> None:
-            self.closed = True
-
-    class FakeProcess:
-        def __init__(self):
-            self.stdout = ChunkedRow()
-            self.waited = False
-
-        def wait(self) -> int:
-            self.waited = True
-            return 0
-
-    process = FakeProcess()
-    monkeypatch.setattr(mod.subprocess, "Popen", lambda *_args, **_kwargs: process)
-
-    with pytest.raises(mod.SnapshotRejected) as caught:
-        list(mod._stream_tree_rows(mod.SnapshotConfig(repo=tmp_path), "a" * 40))
-
-    assert caught.value.code == "invalid_tree_row"
-    assert process.stdout.closed is True
-    assert process.waited is True
 
 
 def test_receipt_is_deterministic_content_addressed_and_has_no_projection_state(tmp_path: Path):
@@ -1161,16 +1181,26 @@ def test_content_blind_inventory_reports_paths_and_codes_only(tmp_path: Path):
 
 
 @pytest.mark.parametrize(
-    "secret_name",
+    ("secret_name", "expected_rejection"),
     [
-        "sk-proj-" + "A" * 24 + ".md",
-        "sk-proj-" + "A" * 24 + ".txt",
-        "nested/sk-proj-" + "A" * 24 + ".md",
+        (
+            "sk-proj-" + "A" * 24 + ".md",
+            ("[secret-path-redacted]", "secret_path"),
+        ),
+        (
+            "sk-proj-" + "A" * 24 + ".txt",
+            ("[secret-path-redacted]", "secret_path"),
+        ),
+        (
+            "nested/sk-proj-" + "A" * 24 + ".md",
+            ("nested", "nested_path"),
+        ),
     ],
 )
 def test_secret_shaped_filename_is_rejected_and_redacted_from_inventory(
     tmp_path: Path,
     secret_name: str,
+    expected_rejection: tuple[str, str],
 ):
     mod = _load()
     _, _, repo = _fixture_repo(tmp_path, {secret_name: _frontmatter()})
@@ -1178,12 +1208,15 @@ def test_secret_shaped_filename_is_rejected_and_redacted_from_inventory(
     with pytest.raises(mod.SnapshotRejected) as caught:
         mod.snapshot_exports(_config(mod, repo))
 
-    assert caught.value.code == "secret_path"
-    assert caught.value.path is None
+    expected_path, expected_code = expected_rejection
+    assert caught.value.code == expected_code
+    assert caught.value.path == (
+        None if expected_path == "[secret-path-redacted]" else expected_path
+    )
     inventory = mod.inventory_exports(_config(mod, repo))
     serialized = json.dumps(asdict(inventory), sort_keys=True)
     assert secret_name not in serialized
-    assert inventory.rejected == [mod.Rejection(path="[secret-path-redacted]", code="secret_path")]
+    assert inventory.rejected == [mod.Rejection(path=expected_path, code=expected_code)]
 
 
 def test_escaped_secret_in_gitkeep_metadata_is_rejected_without_writes(tmp_path: Path):
@@ -1255,8 +1288,10 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
         "unstructured_text_rules",
         "decoded_escape_views_unstructured_text_rules",
     ]
-    assert mod.POLICY["max_tree_row_bytes"] == mod.MAX_TREE_ROW_BYTES
-    assert mod.POLICY["git_object_identity"] == "verify_commit_tree_blob_chain_v1"
+    assert mod.POLICY["object_read_chunk_bytes"] == mod.OBJECT_READ_CHUNK_BYTES
+    assert mod.POLICY["max_commit_object_bytes"] == mod.MAX_COMMIT_OBJECT_BYTES
+    assert mod.POLICY["max_tree_object_bytes"] == mod.MAX_TREE_OBJECT_BYTES
+    assert mod.POLICY["git_object_identity"] == "verify_bounded_commit_tree_blob_chain_v2"
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",

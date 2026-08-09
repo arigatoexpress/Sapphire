@@ -17,7 +17,6 @@ import re
 import subprocess
 import sys
 import unicodedata
-from collections.abc import Generator
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
@@ -27,16 +26,17 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "16"
-POLICY_PROFILE = "grok-export-v16"
+VALIDATOR_VERSION = "17"
+POLICY_PROFILE = "grok-export-v17"
 SECRET_POLICY_REVISION = 14
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
 MAX_STRUCTURED_DEPTH = 100
 MAX_STRUCTURED_NODES = 10_000
-TREE_STREAM_CHUNK_BYTES = 64 * 1024
-MAX_TREE_ROW_BYTES = 64 * 1024
+OBJECT_READ_CHUNK_BYTES = 64 * 1024
+MAX_COMMIT_OBJECT_BYTES = 1024 * 1024
+MAX_TREE_OBJECT_BYTES = 4 * 1024 * 1024
 EXCLUDED_NAMES = frozenset({"README.md", "MANIFEST.json", ".gitkeep"})
 ALLOWED_SUFFIXES = frozenset({".md", ".json"})
 REQUIRED_PROVENANCE = ("source", "date", "type", "title")
@@ -90,10 +90,6 @@ CREDENTIAL_LABEL_PATTERN = (
     rb"password|private[_-]?key|secret(?:[_-]?key)?|authorization|credential(?:s)?)"
 )
 GIT_OID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
-TREE_ROW_RE = re.compile(
-    rb"^(?P<mode>[0-9]{6}) (?P<kind>blob|tree|commit) "
-    rb"(?P<oid>(?:[0-9a-f]{40}|[0-9a-f]{64})) +(?P<size>-|[0-9]+)\t(?P<path>.+)\Z"
-)
 FRONTMATTER_RE = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---\r?\n", re.DOTALL)
 JSON_SIMPLE_ESCAPES = {
     ord('"'): b'"',
@@ -191,8 +187,10 @@ POLICY = {
     "required_provenance": list(REQUIRED_PROVENANCE),
     "max_structured_depth": MAX_STRUCTURED_DEPTH,
     "max_structured_nodes": MAX_STRUCTURED_NODES,
-    "max_tree_row_bytes": MAX_TREE_ROW_BYTES,
-    "git_object_identity": "verify_commit_tree_blob_chain_v1",
+    "object_read_chunk_bytes": OBJECT_READ_CHUNK_BYTES,
+    "max_commit_object_bytes": MAX_COMMIT_OBJECT_BYTES,
+    "max_tree_object_bytes": MAX_TREE_OBJECT_BYTES,
+    "git_object_identity": "verify_bounded_commit_tree_blob_chain_v2",
     "regular_blob_mode": "100644",
     "json_duplicate_keys": "reject",
     "yaml_duplicate_keys": "reject",
@@ -259,6 +257,13 @@ class TreeEntry:
     kind: str
     git_blob_oid: str
     size: int | None
+
+
+@dataclass(frozen=True)
+class GitTreeRecord:
+    mode: bytes
+    name: bytes
+    oid: str
 
 
 @dataclass(frozen=True)
@@ -376,13 +381,70 @@ def _git_object_oid(kind: str, content: bytes, recorded_oid: str) -> str:
     raise SnapshotRejected(f"invalid_{kind}_oid")
 
 
+def _read_git_object_bounded(
+    config: SnapshotConfig,
+    kind: str,
+    recorded_oid: str,
+    *,
+    max_bytes: int,
+) -> bytes:
+    try:
+        process = subprocess.Popen(
+            [
+                config.git_bin,
+                "--no-replace-objects",
+                "-C",
+                str(config.repo),
+                "cat-file",
+                kind,
+                recorded_oid,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        raise SnapshotRejected("git_command_failed")
+    if process.stdout is None:
+        process.wait()
+        raise SnapshotRejected("git_command_failed")
+
+    content = bytearray()
+    too_large = False
+    try:
+        while chunk := process.stdout.read(
+            min(OBJECT_READ_CHUNK_BYTES, max_bytes + 1 - len(content))
+        ):
+            content.extend(chunk)
+            if len(content) > max_bytes:
+                too_large = True
+                break
+    finally:
+        process.stdout.close()
+        return_code = process.wait()
+    if too_large:
+        raise SnapshotRejected(f"{kind}_too_large")
+    if return_code != 0:
+        raise SnapshotRejected("git_command_failed")
+    return bytes(content)
+
+
 def _read_verified_git_object(
     config: SnapshotConfig,
     kind: str,
     recorded_oid: str,
 ) -> bytes:
-    content = _run_git(config, "cat-file", kind, recorded_oid, binary=True)
-    assert isinstance(content, bytes)
+    max_bytes = {
+        "commit": MAX_COMMIT_OBJECT_BYTES,
+        "tree": MAX_TREE_OBJECT_BYTES,
+    }.get(kind)
+    if max_bytes is None:
+        raise SnapshotRejected("invalid_object_kind")
+    content = _read_git_object_bounded(
+        config,
+        kind,
+        recorded_oid,
+        max_bytes=max_bytes,
+    )
     if _git_object_oid(kind, content, recorded_oid) != recorded_oid:
         raise SnapshotRejected(f"{kind}_oid_mismatch")
     return content
@@ -401,10 +463,11 @@ def _commit_root_tree_oid(commit: bytes, commit_oid: str) -> str:
     return tree_oid
 
 
-def _tree_child_oid(tree: bytes, tree_oid: str, component: str) -> str:
-    wanted = component.encode("utf-8")
+def _parse_git_tree(tree: bytes, tree_oid: str) -> list[GitTreeRecord]:
+    if not GIT_OID_RE.fullmatch(tree_oid):
+        raise SnapshotRejected("invalid_tree_oid")
     raw_oid_bytes = len(tree_oid) // 2
-    found: str | None = None
+    records: list[GitTreeRecord] = []
     cursor = 0
     while cursor < len(tree):
         mode_end = tree.find(b" ", cursor)
@@ -413,19 +476,28 @@ def _tree_child_oid(tree: bytes, tree_oid: str, component: str) -> str:
         oid_end = oid_start + raw_oid_bytes
         if mode_end <= cursor or name_end <= mode_end + 1 or oid_end > len(tree):
             raise SnapshotRejected("invalid_tree_object")
-        if tree[mode_end + 1 : name_end] == wanted:
-            if tree[cursor:mode_end] not in {b"40000", b"040000"} or found is not None:
-                raise SnapshotRejected("source_tree_missing")
-            found = tree[oid_start:oid_end].hex()
+        records.append(
+            GitTreeRecord(
+                mode=tree[cursor:mode_end],
+                name=tree[mode_end + 1 : name_end],
+                oid=tree[oid_start:oid_end].hex(),
+            )
+        )
         cursor = oid_end
     if cursor != len(tree):
         raise SnapshotRejected("invalid_tree_object")
-    if found is None:
+    return records
+
+
+def _tree_child_oid(tree: bytes, tree_oid: str, component: str) -> str:
+    wanted = component.encode("utf-8")
+    matches = [record for record in _parse_git_tree(tree, tree_oid) if record.name == wanted]
+    if len(matches) != 1 or matches[0].mode not in {b"40000", b"040000"}:
         raise SnapshotRejected("source_tree_missing")
-    return found
+    return matches[0].oid
 
 
-def _resolve_source(config: SnapshotConfig, *, fetch: bool) -> tuple[str, str]:
+def _resolve_source(config: SnapshotConfig, *, fetch: bool) -> tuple[str, str, bytes]:
     _validate_source_contract(config)
     if fetch:
         _fetch(config)
@@ -437,88 +509,49 @@ def _resolve_source(config: SnapshotConfig, *, fetch: bool) -> tuple[str, str]:
     for component in PurePosixPath(config.source_prefix).parts:
         tree_content = _read_verified_git_object(config, "tree", tree)
         tree = _tree_child_oid(tree_content, tree, component)
-    _read_verified_git_object(config, "tree", tree)
-    return commit, tree
+    tree_content = _read_verified_git_object(config, "tree", tree)
+    return commit, tree, tree_content
 
 
-def _stream_tree_rows(config: SnapshotConfig, commit: str) -> Generator[bytes, None, None]:
-    try:
-        process = subprocess.Popen(
-            [
-                config.git_bin,
-                "--no-replace-objects",
-                "-C",
-                str(config.repo),
-                "ls-tree",
-                "-r",
-                "-z",
-                "--long",
-                commit,
-                "--",
-                config.source_prefix,
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-    except OSError:
-        raise SnapshotRejected("git_command_failed")
-    if process.stdout is None:
-        process.wait()
-        raise SnapshotRejected("git_command_failed")
-
-    buffer = bytearray()
-    try:
-        while chunk := process.stdout.read(TREE_STREAM_CHUNK_BYTES):
-            buffer.extend(chunk)
-            while (delimiter := buffer.find(b"\0")) >= 0:
-                if delimiter > MAX_TREE_ROW_BYTES:
-                    raise SnapshotRejected("invalid_tree_row")
-                raw_row = bytes(buffer[:delimiter])
-                del buffer[: delimiter + 1]
-                if raw_row:
-                    yield raw_row
-            if len(buffer) > MAX_TREE_ROW_BYTES:
-                raise SnapshotRejected("invalid_tree_row")
-        if buffer:
-            raise SnapshotRejected("invalid_tree_row")
-    finally:
-        process.stdout.close()
-        return_code = process.wait()
-    if return_code != 0:
-        raise SnapshotRejected("git_command_failed")
+def _git_object_size(config: SnapshotConfig, oid: str) -> int:
+    raw_size = str(_run_git(config, "cat-file", "-s", oid)).strip()
+    if len(raw_size) > 20 or not raw_size.isdecimal():
+        raise SnapshotRejected("invalid_object_size")
+    return int(raw_size)
 
 
-def _tree_entries(config: SnapshotConfig, commit: str) -> list[TreeEntry]:
+def _tree_entries(
+    config: SnapshotConfig,
+    tree_oid: str,
+    tree_content: bytes,
+) -> list[TreeEntry]:
     entries: list[TreeEntry] = []
     prefix = f"{config.source_prefix}/"
-    row_stream = _stream_tree_rows(config, commit)
-    try:
-        for raw_row in row_stream:
-            match = TREE_ROW_RE.fullmatch(raw_row)
-            if not match:
-                raise SnapshotRejected("invalid_tree_row")
-            try:
-                source_path = match.group("path").decode("utf-8")
-            except UnicodeDecodeError:
-                raise SnapshotRejected("invalid_tree_path")
-            if not source_path.startswith(prefix):
-                raise SnapshotRejected("path_outside_prefix")
-            relative = source_path[len(prefix) :]
-            size_raw = match.group("size")
-            entries.append(
-                TreeEntry(
-                    source_relpath=source_path,
-                    relative_path=relative,
-                    mode=match.group("mode").decode("ascii"),
-                    kind=match.group("kind").decode("ascii"),
-                    git_blob_oid=match.group("oid").decode("ascii"),
-                    size=None if size_raw == b"-" else int(size_raw),
-                )
+    records = _parse_git_tree(tree_content, tree_oid)
+    if len(records) > config.max_files:
+        raise SnapshotRejected("too_many_files")
+    for record in records:
+        try:
+            relative = record.name.decode("utf-8")
+            mode = record.mode.decode("ascii")
+        except UnicodeDecodeError:
+            raise SnapshotRejected("invalid_tree_path")
+        if record.mode in {b"40000", b"040000"}:
+            kind = "tree"
+        elif record.mode == b"160000":
+            kind = "commit"
+        else:
+            kind = "blob"
+        entries.append(
+            TreeEntry(
+                source_relpath=f"{prefix}{relative}",
+                relative_path=relative,
+                mode=mode,
+                kind=kind,
+                git_blob_oid=record.oid,
+                size=_git_object_size(config, record.oid) if kind == "blob" else None,
             )
-            if len(entries) > config.max_files:
-                raise SnapshotRejected("too_many_files")
-    finally:
-        row_stream.close()
+        )
     entries.sort(key=lambda entry: entry.source_relpath)
     return entries
 
@@ -537,10 +570,12 @@ def _validate_entry(config: SnapshotConfig, entry: TreeEntry) -> None:
         raise SnapshotRejected("secret_path")
     if not path or "/" in path or "\\" in path or path in {".", ".."}:
         raise SnapshotRejected("nested_path", path)
-    if PurePosixPath(path).suffix.casefold() not in ALLOWED_SUFFIXES:
-        raise SnapshotRejected("unsupported_extension", path)
+    if entry.kind == "tree":
+        raise SnapshotRejected("nested_path", path)
     if entry.mode != "100644" or entry.kind != "blob":
         raise SnapshotRejected("forbidden_tree_entry", path)
+    if PurePosixPath(path).suffix.casefold() not in ALLOWED_SUFFIXES:
+        raise SnapshotRejected("unsupported_extension", path)
     if entry.size is None:
         raise SnapshotRejected("missing_blob_size", path)
     if entry.size > config.max_file_bytes:
@@ -653,8 +688,12 @@ def _decode_utf8(data: bytes, path: str) -> str:
 
 
 def _read_verified_blob(config: SnapshotConfig, entry: TreeEntry) -> bytes:
-    blob = _run_git(config, "cat-file", "blob", entry.git_blob_oid, binary=True)
-    assert isinstance(blob, bytes)
+    blob = _read_git_object_bounded(
+        config,
+        "blob",
+        entry.git_blob_oid,
+        max_bytes=config.max_file_bytes,
+    )
     if entry.size is None or len(blob) != entry.size:
         raise SnapshotRejected("blob_size_mismatch", entry.relative_path)
     if _git_object_oid("blob", blob, entry.git_blob_oid) != entry.git_blob_oid:
@@ -881,8 +920,12 @@ def _validate_limits(config: SnapshotConfig, entries: list[TreeEntry]) -> None:
         raise SnapshotRejected("source_too_large")
 
 
-def _policy_checked_files(config: SnapshotConfig, commit: str) -> list[PolicyCheckedFile]:
-    entries = _tree_entries(config, commit)
+def _policy_checked_files(
+    config: SnapshotConfig,
+    tree_oid: str,
+    tree_content: bytes,
+) -> list[PolicyCheckedFile]:
+    entries = _tree_entries(config, tree_oid, tree_content)
     if not entries:
         raise SnapshotRejected("empty_source")
     _validate_limits(config, entries)
@@ -946,8 +989,8 @@ def snapshot_exports(
     fetch: bool = False,
 ) -> SnapshotResult:
     """Apply the bounded policy to one immutable source and return its receipt."""
-    commit, tree = _resolve_source(config, fetch=fetch)
-    files = _policy_checked_files(config, commit)
+    commit, tree, tree_content = _resolve_source(config, fetch=fetch)
+    files = _policy_checked_files(config, tree, tree_content)
     receipt = _build_receipt(config, commit, tree, files)
     receipt_bytes = canonical_receipt(receipt)
     receipt_sha = _sha256(receipt_bytes)
@@ -961,8 +1004,8 @@ def snapshot_exports(
 
 def inventory_exports(config: SnapshotConfig, *, fetch: bool = False) -> InventoryResult:
     """Return only paths and stable rejection codes; never content or content hashes."""
-    commit, tree = _resolve_source(config, fetch=fetch)
-    entries = _tree_entries(config, commit)
+    commit, tree, tree_content = _resolve_source(config, fetch=fetch)
+    entries = _tree_entries(config, tree, tree_content)
     if not entries:
         raise SnapshotRejected("empty_source")
     _validate_limits(config, entries)
