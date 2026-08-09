@@ -28,7 +28,7 @@
       "required": ["name", "version", "policy_sha256"],
       "properties": {
         "name": {"const": "grok_web_import"},
-        "version": {"const": "1"},
+        "version": {"const": "2"},
         "policy_sha256": {"$ref": "#/$defs/sha256"}
       }
     },
@@ -119,7 +119,7 @@
         "sha256": {"$ref": "#/$defs/sha256"},
         "bytes": {"type": "integer", "minimum": 0},
         "media_type": {"enum": ["text/markdown", "application/json"]},
-        "validation_profile": {"const": "grok-export-v1"},
+        "validation_profile": {"const": "grok-export-v2"},
         "before_sha256": {
           "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
         },

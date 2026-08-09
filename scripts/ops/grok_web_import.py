@@ -32,9 +32,11 @@ SCHEMA_NAME = "sapphire.grok-web-import.receipt/v1"
 POINTER_SCHEMA = "sapphire.grok-web-import.pointer/v1"
 PUBLISH_MARKER_SCHEMA = "sapphire.grok-web-import.published/v1"
 RECOVERY_SCHEMA = "sapphire.grok-web-import.recovery/v1"
+DESTINATION_BINDING_SCHEMA = "sapphire.grok-web-import.destination/v1"
 IMPORTER_NAME = "grok_web_import"
-IMPORTER_VERSION = "1"
-VALIDATION_PROFILE = "grok-export-v1"
+IMPORTER_VERSION = "2"
+VALIDATION_PROFILE = "grok-export-v2"
+SECRET_POLICY_REVISION = 2
 MAX_STRUCTURED_DEPTH = 100
 MAX_STRUCTURED_NODES = 10_000
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
@@ -73,9 +75,17 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
         "credential_assignment",
         re.compile(
             rb"(?im)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|"
-            rb"private[_-]?key)\b\s*[:=]\s*['\"]?"
+            rb"private[_-]?key|secret(?:[_-]?key)?)\b\s*[:=]\s*['\"]?"
             rb"(?!<redacted>|redacted|placeholder|example|none|null|unset|\$\{)"
             rb"[A-Za-z0-9_./+=-]{20,}"
+        ),
+    ),
+    (
+        "aws_secret_assignment",
+        re.compile(
+            rb"(?im)\baws[_-]?secret(?:[_-]?access)?[_-]?key\b\s*[:=]\s*['\"]?"
+            rb"(?!<redacted>|redacted|placeholder|example|none|null|unset|\$\{)"
+            rb"[A-Za-z0-9/+=]{40}"
         ),
     ),
 )
@@ -91,6 +101,18 @@ POLICY = {
     "max_structured_nodes": MAX_STRUCTURED_NODES,
     "regular_blob_mode": "100644",
     "validation_profile": VALIDATION_PROFILE,
+    "secret_policy": {
+        "revision": SECRET_POLICY_REVISION,
+        "path_names": sorted(SECRET_PATH_NAMES),
+        "rules": [
+            {
+                "id": rule_id,
+                "pattern": pattern.pattern.decode("ascii"),
+                "flags": pattern.flags,
+            }
+            for rule_id, pattern in SECRET_PATTERNS
+        ],
+    },
 }
 
 
@@ -551,6 +573,12 @@ def _load_receipt(config: ImportConfig, digest: str) -> dict[str, Any]:
     return _validate_receipt(receipt)
 
 
+def _verify_receipt_destination(config: ImportConfig, receipt: dict[str, Any]) -> None:
+    destination = receipt.get("destination")
+    if not isinstance(destination, dict) or destination.get("root") != str(config.destination):
+        raise ImportRejected("destination_mismatch")
+
+
 def _load_current(config: ImportConfig) -> tuple[str, dict[str, Any]] | None:
     pointer_path = config.state_root / "CURRENT.json"
     if not pointer_path.exists():
@@ -565,10 +593,55 @@ def _load_current(config: ImportConfig) -> tuple[str, dict[str, Any]] | None:
     if not isinstance(digest, str):
         raise ImportRejected("current_pointer_digest")
     receipt = _load_receipt(config, digest)
-    destination = receipt.get("destination")
-    if not isinstance(destination, dict) or destination.get("root") != str(config.destination):
-        raise ImportRejected("destination_mismatch")
+    _verify_receipt_destination(config, receipt)
     return digest, receipt
+
+
+def _destination_binding_path(config: ImportConfig) -> Path:
+    return config.state_root / "DESTINATION.json"
+
+
+def _load_destination_binding(config: ImportConfig) -> str | None:
+    path = _destination_binding_path(config)
+    if not path.exists() and not path.is_symlink():
+        return None
+    metadata = path.lstat()
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ImportRejected("destination_binding_invalid")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise ImportRejected("destination_binding_invalid")
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != DESTINATION_BINDING_SCHEMA
+        or not isinstance(value.get("root"), str)
+    ):
+        raise ImportRejected("destination_binding_invalid")
+    return value["root"]
+
+
+def _verify_destination_binding(config: ImportConfig) -> None:
+    root = _load_destination_binding(config)
+    if root is not None and root != str(config.destination):
+        raise ImportRejected("destination_mismatch")
+
+
+def _bind_state_root(config: ImportConfig) -> None:
+    root = _load_destination_binding(config)
+    if root is not None:
+        if root != str(config.destination):
+            raise ImportRejected("destination_mismatch")
+        return
+    if (config.state_root / "CURRENT.json").exists():
+        _load_current(config)
+    payload = _canonical_json(
+        {
+            "schema": DESTINATION_BINDING_SCHEMA,
+            "root": str(config.destination),
+        }
+    )
+    _atomic_write(_destination_binding_path(config), payload, 0o600)
 
 
 def _hash_file(path: Path, code: str) -> str:
@@ -772,6 +845,11 @@ def _restore_materialization(
         if destination.exists() or destination.is_symlink():
             if _hash_file(destination, "activation_recovery_failed") != item["before_sha256"]:
                 raise ImportRejected("managed_drift", name)
+            if quarantine.exists() or quarantine.is_symlink():
+                if _hash_file(quarantine, "activation_recovery_failed") != item["before_sha256"]:
+                    raise ImportRejected("activation_recovery_failed", name)
+                quarantine.unlink()
+                _fsync_dir(quarantine.parent)
             continue
         if not quarantine.exists():
             raise ImportRejected("activation_recovery_failed", name)
@@ -967,18 +1045,20 @@ def _recover_interrupted(config: ImportConfig) -> None:
     current_pair = _load_current(config)
     current_sha, current = current_pair if current_pair else (None, None)
     if current_sha == journal["target_receipt_sha256"]:
-        _verify_managed(config, current)
+        _verify_activation_state(config, current)
         _clear_recovery_journal(config)
         return
     if current_sha != journal["previous_receipt_sha256"]:
         raise ImportRejected("recovery_pointer_mismatch")
     _restore_materialization(config, journal["files"], journal["retired"])
-    _verify_managed(config, current)
+    _verify_activation_state(config, current)
     _clear_recovery_journal(config)
 
 
-def _verify_activation_state(config: ImportConfig, receipt: dict[str, Any]) -> None:
+def _verify_activation_state(config: ImportConfig, receipt: dict[str, Any] | None) -> None:
     _verify_managed(config, receipt)
+    if receipt is None:
+        return
     for item in receipt["retired"]:
         name = item["destination_relpath"]
         destination = config.destination / name
@@ -1010,12 +1090,19 @@ def _write_receipt_and_pointer(
         "previous_receipt_sha256": receipt["previous_receipt_sha256"],
         "updated_at": receipt["activated_at"],
     }
-    _atomic_write(
-        config.state_root / "CURRENT.json",
-        _canonical_json(pointer),
-        0o600,
-        before_replace=lambda: _verify_activation_state(config, receipt),
-    )
+    try:
+        _atomic_write(
+            config.state_root / "CURRENT.json",
+            _canonical_json(pointer),
+            0o600,
+            before_replace=lambda: _verify_activation_state(config, receipt),
+        )
+    except Exception:
+        if _pointer_activates(config, receipt):
+            _verify_activation_state(config, receipt)
+            raise ImportRejected("pointer_durability_uncertain")
+        raise
+    _verify_activation_state(config, receipt)
     return receipt_digest
 
 
@@ -1044,11 +1131,12 @@ def _activate_receipt(
             fault_injector=fault_injector,
         )
     except Exception:
-        if not _pointer_activates(config, receipt):
-            _restore_materialization(config, files, retired)
-            _clear_recovery_journal(config)
+        if _pointer_activates(config, receipt):
+            _verify_activation_state(config, receipt)
             raise
-        receipt_sha = _sha256(_canonical_json(receipt))
+        _restore_materialization(config, files, retired)
+        _clear_recovery_journal(config)
+        raise
     if fault_injector:
         fault_injector("after_pointer")
     _clear_recovery_journal(config)
@@ -1112,7 +1200,7 @@ def _perform_import(
     manifest_sha = _manifest_sha256(candidates)
     current_pair = _load_current(config) if config.state_root.exists() else None
     current_sha, current = current_pair if current_pair else (None, None)
-    _verify_managed(config, current)
+    _verify_activation_state(config, current)
     if current and current["content_manifest_sha256"] == manifest_sha:
         assert current_sha
         _publish_receipt_once(config, current_sha, publisher)
@@ -1184,6 +1272,7 @@ def import_exports(
 ) -> ImportResult:
     """Import one resolved remote-tree snapshot; never read the checkout."""
     if dry_run:
+        _verify_destination_binding(config)
         if _recovery_path(config).exists() or _recovery_path(config).is_symlink():
             raise ImportRejected("recovery_pending")
         return _perform_import(
@@ -1194,6 +1283,8 @@ def import_exports(
             fault_injector=fault_injector,
         )
     with _import_lock(config):
+        if not dry_run:
+            _bind_state_root(config)
         _recover_interrupted(config)
         return _perform_import(
             config,
@@ -1230,16 +1321,21 @@ def rollback_import(
     fault_injector: Callable[[str], None] | None = None,
 ) -> ImportResult:
     """Restore the managed set described by a prior verified receipt without network I/O."""
-    if dry_run and (_recovery_path(config).exists() or _recovery_path(config).is_symlink()):
-        raise ImportRejected("recovery_pending")
+    if dry_run:
+        _verify_destination_binding(config)
+        if _recovery_path(config).exists() or _recovery_path(config).is_symlink():
+            raise ImportRejected("recovery_pending")
     with _import_lock(config):
+        if not dry_run:
+            _bind_state_root(config)
         _recover_interrupted(config)
         current_pair = _load_current(config)
         if not current_pair:
             raise ImportRejected("current_pointer_missing")
         current_sha, current = current_pair
-        _verify_managed(config, current)
+        _verify_activation_state(config, current)
         target = _load_receipt(config, target_receipt_sha256)
+        _verify_receipt_destination(config, target)
         if (
             current_sha == target_receipt_sha256
             or current["content_manifest_sha256"] == target["content_manifest_sha256"]

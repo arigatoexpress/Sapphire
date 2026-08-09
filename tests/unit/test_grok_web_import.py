@@ -269,6 +269,92 @@ def test_bare_known_token_is_rejected_without_persisting_secret(
     assert token.encode() not in serialized
 
 
+@pytest.mark.parametrize("label", ["AWS_SECRET_ACCESS_KEY", "aws_secret_key"])
+def test_aws_secret_assignment_is_rejected_without_persisting_secret(
+    tmp_path: Path,
+    label: str,
+):
+    mod = _load()
+    token = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_secret.md": _frontmatter(body=f"{label}={token}\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "secret_detected"
+    assert not config.destination.exists()
+    assert not (config.state_root / "CURRENT.json").exists()
+    serialized = b"".join(
+        path.read_bytes() for path in config.state_root.rglob("*") if path.is_file()
+    )
+    assert token.encode() not in serialized
+
+
+@pytest.mark.parametrize("label", ["secret", "secret_key"])
+def test_generic_secret_assignment_is_rejected_without_persisting_secret(
+    tmp_path: Path,
+    label: str,
+):
+    mod = _load()
+    token = "AbCdEf0123456789AbCdEf0123456789"
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_secret.md": _frontmatter(body=f"{label}: {token}\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "secret_detected"
+    assert not config.destination.exists()
+    assert not (config.state_root / "CURRENT.json").exists()
+    serialized = b"".join(
+        path.read_bytes() for path in config.state_root.rglob("*") if path.is_file()
+    )
+    assert token.encode() not in serialized
+
+
+def test_policy_hash_binds_versioned_aws_secret_rule(tmp_path: Path, monkeypatch):
+    mod = _load()
+    config = mod.ImportConfig(
+        repo=tmp_path / "repo",
+        destination=tmp_path / "Knowledge" / "0-Inbox" / "grok-web",
+        state_root=tmp_path / "ops-state" / "grok-web-import",
+    )
+
+    assert mod.IMPORTER_VERSION == "2"
+    assert mod.VALIDATION_PROFILE == "grok-export-v2"
+    assert mod.POLICY["secret_policy"]["revision"] == 2
+    rule_ids = [rule["id"] for rule in mod.POLICY["secret_policy"]["rules"]]
+    assert "aws_secret_assignment" in rule_ids
+    bound_hash = mod._policy_sha256(config)
+    without_aws = json.loads(json.dumps(mod.POLICY))
+    without_aws["secret_policy"]["rules"] = [
+        rule
+        for rule in without_aws["secret_policy"]["rules"]
+        if rule["id"] != "aws_secret_assignment"
+    ]
+    monkeypatch.setattr(mod, "POLICY", without_aws)
+
+    assert mod._policy_sha256(config) != bound_hash
+
+
+def test_receipt_schema_importer_revision_matches_runtime():
+    mod = _load()
+    schema_path = ROOT / "projects" / "grok" / "schemas" / "grok-web-import-receipt-v1.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+    importer_properties = schema["properties"]["importer"]["properties"]
+    file_properties = schema["$defs"]["file"]["properties"]
+    assert importer_properties["version"]["const"] == mod.IMPORTER_VERSION
+    assert file_properties["validation_profile"]["const"] == mod.VALIDATION_PROFILE
+
+
 @pytest.mark.parametrize(
     ("name", "content", "code"),
     [
@@ -410,6 +496,80 @@ def test_current_receipt_rejects_reused_state_root_with_new_destination(tmp_path
     assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
 
 
+def test_orphan_state_root_binding_rejects_a_new_destination(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Destination A")},
+    )
+    config_a = _config(mod, tmp_path, repo)
+
+    def fail_before_pointer(stage: str) -> None:
+        if stage == "before_pointer":
+            raise RuntimeError("injected")
+
+    with pytest.raises(RuntimeError, match="injected"):
+        mod.import_exports(config_a, fault_injector=fail_before_pointer)
+
+    assert not (config_a.state_root / "CURRENT.json").exists()
+    config_b = mod.ImportConfig(
+        repo=repo,
+        destination=tmp_path / "Knowledge" / "other-inbox",
+        state_root=config_a.state_root,
+    )
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config_b)
+
+    assert caught.value.code == "destination_mismatch"
+    assert not config_b.destination.exists()
+    assert not (config_a.state_root / "CURRENT.json").exists()
+
+
+def test_rollback_rejects_orphan_receipt_from_a_different_destination(tmp_path: Path):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Destination A", body="A\n")},
+    )
+    config_a = _config(mod, tmp_path, repo)
+
+    def fail_before_pointer(stage: str) -> None:
+        if stage == "before_pointer":
+            raise RuntimeError("injected")
+
+    with pytest.raises(RuntimeError, match="injected"):
+        mod.import_exports(config_a, fault_injector=fail_before_pointer)
+
+    orphan_path = next(config_a.state_root.glob("receipts/sha256/*/*.json"))
+    orphan_receipt_sha = orphan_path.stem
+    (config_a.state_root / "DESTINATION.json").unlink(missing_ok=True)
+    _write_exports(
+        seed,
+        {"2026-08-08_note.md": _frontmatter("Destination B", body="B\n")},
+    )
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "update export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    config_b = mod.ImportConfig(
+        repo=repo,
+        destination=tmp_path / "Knowledge" / "other-inbox",
+        state_root=config_a.state_root,
+    )
+    mod.import_exports(config_b)
+    pointer_before = (config_b.state_root / "CURRENT.json").read_bytes()
+    target = config_b.destination / "2026-08-08_note.md"
+    target_before = target.read_bytes()
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.rollback_import(config_b, orphan_receipt_sha)
+
+    assert caught.value.code == "destination_mismatch"
+    assert target.read_bytes() == target_before
+    assert (config_b.state_root / "CURRENT.json").read_bytes() == pointer_before
+
+
 def test_import_preserves_existing_restrictive_destination_mode(tmp_path: Path):
     mod = _load()
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
@@ -524,6 +684,37 @@ def test_removed_managed_file_is_quarantined_and_rollback_restores_it(tmp_path: 
     final_rollback = mod.rollback_import(config, first.receipt_sha256)
     assert final_rollback.status == "rolled_back"
     assert (config.destination / "2026-08-08_retire.md").exists()
+
+
+def test_unchanged_import_rejects_a_recreated_retired_path(tmp_path: Path):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_keep.md": _frontmatter("Keep"),
+            "2026-08-08_retire.md": _frontmatter("Retire"),
+        },
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    retired_target = config.destination / "2026-08-08_retire.md"
+    retired_bytes = retired_target.read_bytes()
+    (seed / "data/grok-web-exports/2026-08-08_retire.md").unlink()
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_retire.md")
+    _git(seed, "commit", "-m", "retire export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    retired = mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    retired_target.write_bytes(retired_bytes)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "retired_path_reappeared"
+    assert retired_target.read_bytes() == retired_bytes
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert retired.receipt_sha256 == json.loads(pointer_before)["receipt_sha256"]
 
 
 def test_edit_during_quarantine_setup_blocks_retirement(tmp_path: Path, monkeypatch):
@@ -954,6 +1145,164 @@ def test_recreated_retired_name_before_pointer_swap_blocks_activation(
     assert (config.state_root / "RECOVERY.json").exists()
 
 
+def test_matching_recreated_retired_path_does_not_strand_quarantine(
+    tmp_path: Path,
+    monkeypatch,
+):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_keep.md": _frontmatter("Keep"),
+            "2026-08-08_retire.md": _frontmatter("Retire"),
+        },
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    retired_target = config.destination / "2026-08-08_retire.md"
+    retired_bytes = retired_target.read_bytes()
+    (seed / "data/grok-web-exports/2026-08-08_retire.md").unlink()
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_retire.md")
+    _git(seed, "commit", "-m", "retire export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    real_atomic_write = mod._atomic_write
+
+    def recreate_before_pointer(path, data, mode, **kwargs):
+        if path == config.state_root / "CURRENT.json":
+            retired_target.write_bytes(retired_bytes)
+        return real_atomic_write(path, data, mode, **kwargs)
+
+    monkeypatch.setattr(mod, "_atomic_write", recreate_before_pointer)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "retired_path_reappeared"
+    assert retired_target.read_bytes() == retired_bytes
+    assert not (config.state_root / "RECOVERY.json").exists()
+    assert not list((config.state_root / "quarantine").rglob("2026-08-08_retire.md"))
+    monkeypatch.setattr(mod, "_atomic_write", real_atomic_write)
+    retry = mod.import_exports(config)
+    assert retry.status == "imported"
+    assert not retired_target.exists()
+
+
+def test_recreated_retired_name_inside_pointer_replace_stays_recoverable(
+    tmp_path: Path,
+    monkeypatch,
+):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_keep.md": _frontmatter("Keep"),
+            "2026-08-08_retire.md": _frontmatter("Retire"),
+        },
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    retired_target = config.destination / "2026-08-08_retire.md"
+    (seed / "data/grok-web-exports/2026-08-08_retire.md").unlink()
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_retire.md")
+    _git(seed, "commit", "-m", "retire export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    manual_edit = _frontmatter("Manual", body="MANUAL\n").encode()
+    real_replace = mod.os.replace
+
+    def recreate_inside_pointer_replace(source, destination):
+        if Path(destination) == config.state_root / "CURRENT.json":
+            retired_target.write_bytes(manual_edit)
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(mod.os, "replace", recreate_inside_pointer_replace)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "retired_path_reappeared"
+    assert retired_target.read_bytes() == manual_edit
+    assert (config.state_root / "CURRENT.json").read_bytes() != pointer_before
+    assert (config.state_root / "RECOVERY.json").exists()
+
+    with pytest.raises(mod.ImportRejected) as retry_error:
+        mod.import_exports(config)
+
+    assert retry_error.value.code == "retired_path_reappeared"
+    assert (config.state_root / "RECOVERY.json").exists()
+    retired_target.unlink()
+    recovered = mod.import_exports(config)
+    assert recovered.status == "unchanged"
+    assert not (config.state_root / "RECOVERY.json").exists()
+
+
+@pytest.mark.parametrize("retry_pointer", ["target", "previous"])
+def test_current_fsync_failure_preserves_recovery_for_both_visible_pointer_states(
+    tmp_path: Path,
+    monkeypatch,
+    retry_pointer: str,
+):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_note.md": _frontmatter("Before", body="BEFORE\n")},
+    )
+    config = _config(mod, tmp_path, repo)
+    first = mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_note.md"
+    target_before = target.read_bytes()
+    _write_exports(
+        seed,
+        {"2026-08-08_note.md": _frontmatter("After", body="AFTER\n")},
+    )
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_note.md")
+    _git(seed, "commit", "-m", "replace export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    real_fsync_dir = mod._fsync_dir
+    failed = False
+
+    def fail_after_current_replace(path: Path) -> None:
+        nonlocal failed
+        current_path = config.state_root / "CURRENT.json"
+        if (
+            not failed
+            and path == config.state_root
+            and current_path.exists()
+            and current_path.read_bytes() != pointer_before
+        ):
+            failed = True
+            raise OSError("injected CURRENT directory fsync failure")
+        real_fsync_dir(path)
+
+    monkeypatch.setattr(mod, "_fsync_dir", fail_after_current_replace)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "pointer_durability_uncertain"
+    assert (config.state_root / "CURRENT.json").read_bytes() != pointer_before
+    assert (config.state_root / "RECOVERY.json").exists()
+    monkeypatch.setattr(mod, "_fsync_dir", real_fsync_dir)
+
+    if retry_pointer == "previous":
+        (config.state_root / "CURRENT.json").write_bytes(pointer_before)
+        _git(repo, "update-ref", "refs/remotes/origin/main", first.source_commit)
+
+    recovered = mod.import_exports(config)
+
+    assert recovered.status == "unchanged"
+    assert not (config.state_root / "RECOVERY.json").exists()
+    if retry_pointer == "previous":
+        assert target.read_bytes() == target_before
+        assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    else:
+        assert target.read_bytes() != target_before
+
+
 def test_recovery_journal_repairs_simulated_uncatchable_interruption(tmp_path: Path):
     mod = _load()
     _, seed, repo = _fixture_repo(
@@ -1096,7 +1445,7 @@ def test_recovery_journal_rejects_retry_with_different_destination(tmp_path: Pat
     with pytest.raises(mod.ImportRejected) as caught:
         mod.import_exports(rebound)
 
-    assert caught.value.code == "recovery_destination_mismatch"
+    assert caught.value.code == "destination_mismatch"
     assert original_target.read_bytes() == original_bytes
     assert not rebound.destination.exists()
     assert (config.state_root / "RECOVERY.json").exists()
