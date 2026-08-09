@@ -21,6 +21,12 @@ fi
 if [[ -n "${KNOWLEDGE_INBOX:-}" ]]; then
   LEGACY_ARGS+=(--destination "$KNOWLEDGE_INBOX")
 fi
+if [[ -n "${GROK_IMPORT_STATE_ROOT:-}" ]]; then
+  LEGACY_ARGS+=(--state-root "$GROK_IMPORT_STATE_ROOT")
+elif [[ -n "${KNOWLEDGE_INBOX:-}" ]]; then
+  DESTINATION_KEY="$("$PYTHON_BIN" -c 'import hashlib, pathlib, sys; p = str(pathlib.Path(sys.argv[1]).absolute()); print(hashlib.sha256(p.encode()).hexdigest())' "$KNOWLEDGE_INBOX")"
+  LEGACY_ARGS+=(--state-root "$HOME/ops-state/grok-web-import/by-destination/$DESTINATION_KEY")
+fi
 
 LOG_DIR="${SAPPHIRE_BRIDGE_LOG_DIR:-$HOME/ops-state/logs}"
 LOG_FILE="$LOG_DIR/grok-web-bridge.log"

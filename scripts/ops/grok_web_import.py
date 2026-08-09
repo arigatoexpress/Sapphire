@@ -977,6 +977,15 @@ def _recover_interrupted(config: ImportConfig) -> None:
     _clear_recovery_journal(config)
 
 
+def _verify_activation_state(config: ImportConfig, receipt: dict[str, Any]) -> None:
+    _verify_managed(config, receipt)
+    for item in receipt["retired"]:
+        name = item["destination_relpath"]
+        destination = config.destination / name
+        if destination.exists() or destination.is_symlink():
+            raise ImportRejected("retired_path_reappeared", name)
+
+
 def _write_receipt_and_pointer(
     config: ImportConfig,
     receipt: dict[str, Any],
@@ -1005,7 +1014,7 @@ def _write_receipt_and_pointer(
         config.state_root / "CURRENT.json",
         _canonical_json(pointer),
         0o600,
-        before_replace=lambda: _verify_managed(config, receipt),
+        before_replace=lambda: _verify_activation_state(config, receipt),
     )
     return receipt_digest
 

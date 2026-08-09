@@ -914,6 +914,46 @@ def test_edit_before_pointer_swap_blocks_activation(tmp_path: Path, monkeypatch)
     assert (config.state_root / "RECOVERY.json").exists()
 
 
+def test_recreated_retired_name_before_pointer_swap_blocks_activation(
+    tmp_path: Path,
+    monkeypatch,
+):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {
+            "2026-08-08_keep.md": _frontmatter("Keep"),
+            "2026-08-08_retire.md": _frontmatter("Retire"),
+        },
+    )
+    config = _config(mod, tmp_path, repo)
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    retired_target = config.destination / "2026-08-08_retire.md"
+    (seed / "data/grok-web-exports/2026-08-08_retire.md").unlink()
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_retire.md")
+    _git(seed, "commit", "-m", "retire export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    manual_edit = _frontmatter("Manual", body="MANUAL\n").encode()
+    real_atomic_write = mod._atomic_write
+
+    def recreate_before_pointer(path, data, mode, **kwargs):
+        if path == config.state_root / "CURRENT.json":
+            retired_target.write_bytes(manual_edit)
+        return real_atomic_write(path, data, mode, **kwargs)
+
+    monkeypatch.setattr(mod, "_atomic_write", recreate_before_pointer)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == "managed_drift"
+    assert retired_target.read_bytes() == manual_edit
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert (config.state_root / "RECOVERY.json").exists()
+
+
 def test_recovery_journal_repairs_simulated_uncatchable_interruption(tmp_path: Path):
     mod = _load()
     _, seed, repo = _fixture_repo(
@@ -1169,7 +1209,7 @@ def test_importer_is_registered_with_operational_consumers():
 
 def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
     _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
-    fake_bin = tmp_path / "fake-bin"
+    fake_bin = tmp_path / "fake bin"
     fake_bin.mkdir()
     marker = tmp_path / "python-invoked"
     fake_python = fake_bin / "python3"
@@ -1186,13 +1226,12 @@ def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
     env["SAPPHIRE_DIR"] = str(repo)
     env["KNOWLEDGE_INBOX"] = str(legacy_destination)
     env["SAPPHIRE_BRIDGE_LOG_DIR"] = str(legacy_log_dir)
+    env["HOME"] = str(tmp_path / "home")
 
     subprocess.run(
         [
             "bash",
             str(ROOT / "scripts/ops/sync_grok_web_exports.sh"),
-            "--state-root",
-            str(tmp_path / "state"),
             "--no-publish",
         ],
         check=True,
@@ -1203,5 +1242,10 @@ def test_shell_wrapper_resolves_python_from_path(tmp_path: Path):
 
     assert marker.exists()
     assert (legacy_destination / "2026-08-08_note.md").exists()
+    destination_key = hashlib.sha256(str(legacy_destination.absolute()).encode()).hexdigest()
+    derived_state = (
+        Path(env["HOME"]) / "ops-state" / "grok-web-import" / "by-destination" / destination_key
+    )
+    assert (derived_state / "CURRENT.json").exists()
     bridge_log = legacy_log_dir / "grok-web-bridge.log"
     assert '"ok": true' in bridge_log.read_text(encoding="utf-8")
