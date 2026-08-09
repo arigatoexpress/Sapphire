@@ -498,6 +498,25 @@ def test_structured_secret_keys_reject_scalar_or_container_without_writes(
     assert not (tmp_path / "receipts").exists()
 
 
+def test_escaped_authorization_key_is_rejected_without_writes(tmp_path: Path):
+    mod = _load()
+    content = (
+        '{"source":"grok-web","date":"2026-08-08","type":"note",'
+        '"title":"Escaped authorization","authoriz\\u0061tion":'
+        '"Bearer Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx"}'
+    )
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_authorization.json": content},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "structured_secret_key"
+    assert not (tmp_path / "receipts").exists()
+
+
 @pytest.mark.parametrize(
     "key",
     [
@@ -566,6 +585,37 @@ def test_decoded_escaped_scalar_secrets_are_rejected(tmp_path: Path, suffix: str
         mod.snapshot_exports(_config(mod, repo))
 
     assert caught.value.code == "secret_detected"
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        "password: >\n  Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx",
+        'password: ["Abcd!Efgh@Ijkl#Mnop$Qrst%Uvwx"]',
+    ],
+)
+def test_decoded_scalar_credential_snippets_are_rejected_without_writes(
+    tmp_path: Path,
+    snippet: str,
+):
+    mod = _load()
+    payload = {
+        "source": "grok-web",
+        "date": "2026-08-08",
+        "type": "note",
+        "title": "Encoded snippet",
+        "note": snippet,
+    }
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_encoded-snippet.json": json.dumps(payload)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "secret_detected"
+    assert not (tmp_path / "receipts").exists()
 
 
 def test_duplicate_json_keys_cannot_hide_a_decoded_secret(tmp_path: Path):
@@ -951,6 +1001,7 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
         "excluded_text_json_escape_view_v1",
     ]
     assert mod.POLICY["secret_policy"]["scan_filenames"] is True
+    assert mod.POLICY["secret_policy"]["structured_scalar_scan"] == "unstructured_text_rules"
     assert mod.POLICY["secret_policy"]["inventory_path_redaction"] == mod.SECRET_PATH_REDACTION
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
         "accesstoken",
@@ -970,6 +1021,7 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
         "accesskey",
         "accesstoken",
         "apikey",
+        "authorization",
         "authtoken",
         "bearertoken",
         "bottoken",

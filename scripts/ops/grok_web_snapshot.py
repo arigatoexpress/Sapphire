@@ -24,9 +24,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "11"
-VALIDATION_PROFILE = "grok-export-v11"
-SECRET_POLICY_REVISION = 11
+VALIDATOR_VERSION = "12"
+VALIDATION_PROFILE = "grok-export-v12"
+SECRET_POLICY_REVISION = 12
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -60,6 +60,7 @@ STRUCTURED_SECRET_KEY_SUFFIXES = frozenset(
         "accesskey",
         "accesstoken",
         "apikey",
+        "authorization",
         "authtoken",
         "bearertoken",
         "bottoken",
@@ -194,6 +195,7 @@ POLICY = {
         "inventory_path_redaction": SECRET_PATH_REDACTION,
         "path_names": sorted(SECRET_PATH_NAMES),
         "scan_filenames": True,
+        "structured_scalar_scan": "unstructured_text_rules",
         "structured_key_names": sorted(STRUCTURED_SECRET_KEY_NAMES),
         "structured_key_suffixes": sorted(STRUCTURED_SECRET_KEY_SUFFIXES),
         "rules": [
@@ -571,7 +573,7 @@ def _validate_structure(
                 encoded = current.encode("utf-8")
             except UnicodeEncodeError:
                 raise SnapshotRejected(code, path)
-            if _detect_secret(encoded):
+            if _detect_unstructured_text_secret(encoded):
                 raise SnapshotRejected("secret_detected", path)
         elif isinstance(current, bytes):
             if _detect_secret(current):
