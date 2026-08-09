@@ -22,7 +22,7 @@ import unicodedata
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -247,6 +247,11 @@ def _validate_provenance(value: Any, relative_path: str) -> None:
         field = value.get(key)
         if field is None or (isinstance(field, str) and not field.strip()):
             raise ImportRejected(f"missing_{key}", relative_path)
+        if key == "date":
+            if not isinstance(field, str | date):
+                raise ImportRejected("invalid_date", relative_path)
+        elif not isinstance(field, str):
+            raise ImportRejected(f"invalid_{key}", relative_path)
 
 
 def _validate_structure_depth(
@@ -855,6 +860,13 @@ def _validate_recovery_journal(value: Any) -> dict[str, Any]:
         raise ImportRejected("recovery_journal_digest")
     if payload.get("operation") not in {"import", "rollback"}:
         raise ImportRejected("recovery_journal_invalid")
+    destination_root = payload.get("destination_root")
+    if (
+        not isinstance(destination_root, str)
+        or not destination_root
+        or not Path(destination_root).is_absolute()
+    ):
+        raise ImportRejected("recovery_journal_invalid")
     for field in ("target_receipt_sha256",):
         if not SHA256_RE.fullmatch(str(payload.get(field, ""))):
             raise ImportRejected("recovery_journal_invalid")
@@ -921,6 +933,7 @@ def _begin_recovery_journal(
         raise ImportRejected("recovery_pending")
     payload = {
         "operation": receipt["operation"],
+        "destination_root": str(config.destination),
         "previous_receipt_sha256": receipt["previous_receipt_sha256"],
         "target_receipt_sha256": _sha256(_canonical_json(receipt)),
         "files": files,
@@ -949,6 +962,8 @@ def _recover_interrupted(config: ImportConfig) -> None:
     journal = _load_recovery_journal(config)
     if not journal:
         return
+    if journal["destination_root"] != str(config.destination):
+        raise ImportRejected("recovery_destination_mismatch")
     current_pair = _load_current(config)
     current_sha, current = current_pair if current_pair else (None, None)
     if current_sha == journal["target_receipt_sha256"]:
@@ -1239,6 +1254,7 @@ def rollback_import(
             current_sha,
             manifest_sha,
         )
+        _verify_quarantine_device(config, retired)
         if dry_run:
             return ImportResult(
                 status="dry_run",

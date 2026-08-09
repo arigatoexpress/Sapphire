@@ -211,6 +211,30 @@ def test_strict_validation_rejects_before_copy(tmp_path: Path, name: str, conten
     assert "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456" not in serialized
 
 
+@pytest.mark.parametrize("field", ["source", "date", "type", "title"])
+def test_non_scalar_provenance_is_rejected_before_copy(tmp_path: Path, field: str):
+    mod = _load()
+    provenance = {
+        "source": "grok-web",
+        "date": "2026-08-08",
+        "type": "note",
+        "title": "Structured provenance",
+    }
+    provenance[field] = []
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_bad-provenance.json": json.dumps(provenance)},
+    )
+    config = _config(mod, tmp_path, repo)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(config)
+
+    assert caught.value.code == f"invalid_{field}"
+    assert not config.destination.exists()
+    assert not (config.state_root / "CURRENT.json").exists()
+
+
 @pytest.mark.parametrize(
     "token",
     [
@@ -572,6 +596,42 @@ def test_cross_device_retirement_is_rejected_before_mutation(tmp_path: Path, mon
 
     with pytest.raises(mod.ImportRejected) as caught:
         mod.import_exports(config)
+
+    assert caught.value.code == "cross_device_quarantine"
+    assert target.read_bytes() == target_before
+    assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before
+    assert not (config.state_root / "RECOVERY.json").exists()
+    assert not (config.state_root / "quarantine").exists()
+
+
+def test_cross_device_rollback_retirement_is_rejected_before_mutation(
+    tmp_path: Path,
+    monkeypatch,
+):
+    mod = _load()
+    _, seed, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_keep.md": _frontmatter("Keep")},
+    )
+    config = _config(mod, tmp_path, repo)
+    first = mod.import_exports(config)
+    _write_exports(seed, {"2026-08-08_extra.md": _frontmatter("Extra")})
+    _git(seed, "add", "data/grok-web-exports/2026-08-08_extra.md")
+    _git(seed, "commit", "-m", "add export")
+    _git(seed, "push", "origin", "main")
+    _git(repo, "fetch", "origin", "main:refs/remotes/origin/main")
+    mod.import_exports(config)
+    pointer_before = (config.state_root / "CURRENT.json").read_bytes()
+    target = config.destination / "2026-08-08_extra.md"
+    target_before = target.read_bytes()
+
+    def different_devices(path: Path) -> int:
+        return 1 if path == config.destination else 2
+
+    monkeypatch.setattr(mod, "_device_id", different_devices)
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.rollback_import(config, first.receipt_sha256)
 
     assert caught.value.code == "cross_device_quarantine"
     assert target.read_bytes() == target_before
@@ -968,6 +1028,39 @@ def test_recovery_journal_accepts_activation_completed_before_interruption(tmp_p
     assert not (config.state_root / "RECOVERY.json").exists()
     assert (config.state_root / "CURRENT.json").read_bytes() == pointer_before_recovery
     assert (config.destination / "2026-08-08_note.md").read_bytes() == target_before_recovery
+
+
+def test_recovery_journal_rejects_retry_with_different_destination(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_note.md": _frontmatter()})
+    config = _config(mod, tmp_path, repo)
+
+    class SimulatedCrash(BaseException):
+        pass
+
+    def crash_after_materialize(stage: str) -> None:
+        if stage == "after_materialize":
+            raise SimulatedCrash
+
+    with pytest.raises(SimulatedCrash):
+        mod.import_exports(config, fault_injector=crash_after_materialize)
+
+    original_target = config.destination / "2026-08-08_note.md"
+    original_bytes = original_target.read_bytes()
+    rebound = mod.ImportConfig(
+        repo=repo,
+        destination=tmp_path / "Knowledge" / "other-inbox",
+        state_root=config.state_root,
+    )
+
+    with pytest.raises(mod.ImportRejected) as caught:
+        mod.import_exports(rebound)
+
+    assert caught.value.code == "recovery_destination_mismatch"
+    assert original_target.read_bytes() == original_bytes
+    assert not rebound.destination.exists()
+    assert (config.state_root / "RECOVERY.json").exists()
+    assert not (config.state_root / "CURRENT.json").exists()
 
 
 def test_publisher_runs_only_after_material_change(tmp_path: Path):
