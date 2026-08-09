@@ -64,7 +64,8 @@ SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
             rb"(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
             rb"gh[pousr]_[A-Za-z0-9]{20,}|"
             rb"xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|"
-            rb"AIza[0-9A-Za-z_-]{20,}|ya29\.[A-Za-z0-9._/-]{12,})"
+            rb"AIza[0-9A-Za-z_-]{20,}|ya29\.[A-Za-z0-9._/-]{12,}|"
+            rb"(?<![0-9])[0-9]{8,12}:[A-Za-z0-9_-]{30,}(?![A-Za-z0-9_-]))"
         ),
     ),
     (

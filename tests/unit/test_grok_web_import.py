@@ -216,6 +216,7 @@ def test_strict_validation_rejects_before_copy(tmp_path: Path, name: str, conten
         "github_pat_11ABCDEFGHIJKLMNOP_abcdefghijklmnopqrstuvwxyz0123456789",
         "AIza" + "A" * 35,
         "ya29." + "A" * 40,
+        "123456789:" + "A" * 35,
     ],
 )
 def test_bare_known_token_is_rejected_without_persisting_secret(
