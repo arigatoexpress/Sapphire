@@ -379,6 +379,97 @@ def test_structured_secret_keys_reject_scalar_or_container_without_writes(
     assert not (tmp_path / "receipts").exists()
 
 
+@pytest.mark.parametrize(
+    "key",
+    [
+        "api_key",
+        "accessToken",
+        "client-secret",
+        "password",
+        "secret",
+        "aws_secret_key",
+        "AWS_SECRET_ACCESS_KEY",
+    ],
+)
+def test_quoted_json_generic_credential_keys_are_rejected(tmp_path: Path, key: str):
+    mod = _load()
+    payload = {
+        "source": "grok-web",
+        "date": "2026-08-08",
+        "type": "note",
+        "title": "Quoted credential",
+        key: "AbCdEf01" * 5,
+    }
+    _, _, repo = _fixture_repo(
+        tmp_path,
+        {"2026-08-08_quoted.json": json.dumps(payload)},
+    )
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "structured_secret_key"
+
+
+def test_folded_yaml_generic_credential_key_is_rejected(tmp_path: Path):
+    mod = _load()
+    content = (
+        "---\nsource: grok-web\ndate: 2026-08-08\ntype: note\n"
+        "title: Folded credential\npassword: >-\n  AbCdEf01AbCdEf01AbCdEf01\n"
+        "---\n"
+    )
+    _, _, repo = _fixture_repo(tmp_path, {"2026-08-08_folded.md": content})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "structured_secret_key"
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        (
+            "2026-08-08_bad-date.json",
+            json.dumps(
+                {
+                    "source": "grok-web",
+                    "date": "not-a-date",
+                    "type": "note",
+                    "title": "Bad date",
+                }
+            ),
+        ),
+        (
+            "2026-08-08_bad-date.md",
+            "---\nsource: grok-web\ndate: '2026-99-99'\ntype: note\ntitle: Bad date\n---\n",
+        ),
+    ],
+)
+def test_string_provenance_dates_must_be_valid_iso_dates(
+    tmp_path: Path,
+    name: str,
+    content: str,
+):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {name: content})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.snapshot_exports(_config(mod, repo))
+
+    assert caught.value.code == "invalid_date"
+
+
+def test_inventory_rejects_an_empty_export_tree(tmp_path: Path):
+    mod = _load()
+    _, _, repo = _fixture_repo(tmp_path, {"README.md": "metadata only\n"})
+
+    with pytest.raises(mod.SnapshotRejected) as caught:
+        mod.inventory_exports(_config(mod, repo))
+
+    assert caught.value.code == "empty_source"
+
+
 def test_content_blind_inventory_reports_paths_and_codes_only(tmp_path: Path):
     mod = _load()
     token = "AbCdEf01" * 5
@@ -434,9 +525,16 @@ def test_policy_and_schema_bind_secret_rules_and_runtime_revisions():
     assert "mnemonic_assignment" in rule_ids
     assert "aws_secret_assignment" in rule_ids
     assert mod.POLICY["secret_policy"]["structured_key_names"] == [
+        "accesstoken",
+        "apikey",
+        "awssecretaccesskey",
+        "awssecretkey",
+        "clientsecret",
         "mnemonic",
+        "password",
         "privatekey",
         "recoveryphrase",
+        "secret",
         "secretkey",
         "seedphrase",
     ]

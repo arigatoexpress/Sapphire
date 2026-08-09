@@ -23,9 +23,9 @@ import yaml
 
 SCHEMA_NAME = "sapphire.grok-web-snapshot.receipt/v1"
 VALIDATOR_NAME = "grok_web_snapshot"
-VALIDATOR_VERSION = "1"
-VALIDATION_PROFILE = "grok-export-v1"
-SECRET_POLICY_REVISION = 1
+VALIDATOR_VERSION = "2"
+VALIDATION_PROFILE = "grok-export-v2"
+SECRET_POLICY_REVISION = 2
 DEFAULT_SOURCE_REF = "refs/remotes/origin/main"
 DEFAULT_SOURCE_PREFIX = "data/grok-web-exports"
 FETCH_REFSPEC = "+refs/heads/main:refs/remotes/origin/main"
@@ -38,7 +38,20 @@ SECRET_PATH_NAMES = frozenset(
     {"auth", "credential", "credentials", "secret", "secrets", "private-key", ".env"}
 )
 STRUCTURED_SECRET_KEY_NAMES = frozenset(
-    {"privatekey", "secretkey", "mnemonic", "seedphrase", "recoveryphrase"}
+    {
+        "accesstoken",
+        "apikey",
+        "awssecretaccesskey",
+        "awssecretkey",
+        "clientsecret",
+        "mnemonic",
+        "password",
+        "privatekey",
+        "recoveryphrase",
+        "secret",
+        "secretkey",
+        "seedphrase",
+    }
 )
 GIT_OID_RE = re.compile(r"^[0-9a-f]{40,64}$")
 TREE_ROW_RE = re.compile(
@@ -404,7 +417,14 @@ def _validate_provenance(value: Any, path: str) -> None:
         if field is None or (isinstance(field, str) and not field.strip()):
             raise SnapshotRejected(f"missing_{key}", path)
         if key == "date":
-            if not isinstance(field, str | date):
+            if isinstance(field, str):
+                if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", field):
+                    raise SnapshotRejected("invalid_date", path)
+                try:
+                    date.fromisoformat(field)
+                except ValueError:
+                    raise SnapshotRejected("invalid_date", path)
+            elif type(field) is not date:
                 raise SnapshotRejected("invalid_date", path)
         elif not isinstance(field, str):
             raise SnapshotRejected(f"invalid_{key}", path)
@@ -551,6 +571,8 @@ def inventory_exports(config: SnapshotConfig, *, fetch: bool = False) -> Invento
     """Return only paths and stable rejection codes; never content or content hashes."""
     commit, tree = _resolve_source(config, fetch=fetch)
     entries = _tree_entries(config, commit)
+    if not entries:
+        raise SnapshotRejected("empty_source")
     _validate_limits(config, entries)
     validated: list[ValidatedFile] = []
     rejected: list[Rejection] = []
