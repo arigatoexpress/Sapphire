@@ -83,9 +83,7 @@ def save(settings: TelegramSettings, path: Path | None = None) -> Path:
     target = path or default_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     stamped = settings if settings.updated_at else settings.with_change()
-    fd, tmp_name = tempfile.mkstemp(
-        dir=target.parent, prefix=".telegram_settings.", suffix=".tmp"
-    )
+    fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=".telegram_settings.", suffix=".tmp")
     tmp_path = Path(tmp_name)
     try:
         with os.fdopen(fd, "w") as handle:

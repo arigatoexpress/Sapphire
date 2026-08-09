@@ -38,9 +38,7 @@ class TestMenuRouting:
         assert decision.requires_confirmation is False
         assert decision.external_side_effect is False
 
-    @pytest.mark.parametrize(
-        "data", ["m:h", "m:pf", "m:pf:r", "m:cfg:hb:on", "m:sg:acc", "m:"]
-    )
+    @pytest.mark.parametrize("data", ["m:h", "m:pf", "m:pf:r", "m:cfg:hb:on", "m:sg:acc", "m:"])
     def test_all_menu_shapes_route(self, data):
         assert agent_router.route_update(_callback_update(data)).route == "menu"
 
@@ -58,9 +56,7 @@ class TestMenuRouting:
         assert decision.external_side_effect is False
 
     def test_menu_callback_context_carries_message_coords(self):
-        decision = agent_router.route_update(
-            _callback_update("m:pf", chat_id=42, message_id=99)
-        )
+        decision = agent_router.route_update(_callback_update("m:pf", chat_id=42, message_id=99))
         assert decision.context.chat_id == 42
         assert decision.context.message_id == 99
 
@@ -136,9 +132,7 @@ class TestSettingsStore:
 
     def test_unknown_action_is_noop(self, tmp_path):
         path = tmp_path / "s.json"
-        settings_store.save(
-            settings_store.TelegramSettings(heartbeat_enabled=True), path
-        )
+        settings_store.save(settings_store.TelegramSettings(heartbeat_enabled=True), path)
         result = settings_store.apply_change("nonsense", path)
         assert result.heartbeat_enabled is True
 

@@ -59,10 +59,17 @@ DEFAULT_COMMANDS: list[dict[str, str]] = [
 # Old commands we've seen cached client-side that should NEVER re-appear.
 # We assert none of them accidentally slip into DEFAULT_COMMANDS — the
 # assertion runs even on a dry-run so drift is caught in CI.
-DEPRECATED: frozenset[str] = frozenset({
-    "bots", "pending", "skin", "tracks", "shield", "summary",
-    "digest",  # legacy top-level; still reachable as `/digest morning|dev`
-})
+DEPRECATED: frozenset[str] = frozenset(
+    {
+        "bots",
+        "pending",
+        "skin",
+        "tracks",
+        "shield",
+        "summary",
+        "digest",  # legacy top-level; still reachable as `/digest morning|dev`
+    }
+)
 
 TELEGRAM_API_BASE = "https://api.telegram.org/bot"
 
@@ -162,7 +169,8 @@ def summarize_diff(current: list[dict[str, str]], desired: list[dict[str, str]])
     added = sorted(set(desired_by_name) - set(current_by_name))
     removed = sorted(set(current_by_name) - set(desired_by_name))
     changed = sorted(
-        n for n in set(desired_by_name) & set(current_by_name)
+        n
+        for n in set(desired_by_name) & set(current_by_name)
         if desired_by_name[n] != current_by_name[n]
     )
 
@@ -197,9 +205,7 @@ def _telegram_api_call(
 
     url = f"{TELEGRAM_API_BASE}{token}/{method}"
     body = json.dumps(payload or {}).encode("utf-8")
-    request = urllib.request.Request(
-        url, data=body, headers={"Content-Type": "application/json"}
-    )
+    request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             data = json.loads(response.read())
@@ -296,8 +302,7 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
     print(
-        f"Desired registration: {len(desired)} command(s)"
-        + (" (CLEAR)" if args.clear else ""),
+        f"Desired registration: {len(desired)} command(s)" + (" (CLEAR)" if args.clear else ""),
         file=sys.stderr,
     )
     print("Diff:", file=sys.stderr)

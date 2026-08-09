@@ -60,10 +60,7 @@ def _write_all(descriptor: int, raw: bytes) -> None:
 
 
 def _valid_timestamp(value: str) -> str:
-    if (
-        type(value) is not str
-        or len(value.encode("utf-8")) > _MAX_TIMESTAMP_BYTES
-    ):
+    if type(value) is not str or len(value.encode("utf-8")) > _MAX_TIMESTAMP_BYTES:
         raise FoundryIncidentError("incident timestamp is invalid")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
