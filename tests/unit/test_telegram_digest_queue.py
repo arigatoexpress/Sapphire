@@ -77,7 +77,12 @@ class TestPeek:
         # Write a stale entry manually with a timestamp beyond max_age.
         old_ts = (datetime.now(UTC) - timedelta(days=3)).isoformat()
         with journal.open("w") as fh:
-            fh.write(json.dumps({"ts": old_ts, "kind": "old", "body": "x", "priority": "p3", "metadata": {}}) + "\n")
+            fh.write(
+                json.dumps(
+                    {"ts": old_ts, "kind": "old", "body": "x", "priority": "p3", "metadata": {}}
+                )
+                + "\n"
+            )
         dq.enqueue(kind="new", body="y", journal=journal)
         entries = dq.peek(journal=journal, max_age_hours=24)
         assert [e.kind for e in entries] == ["new"]
@@ -171,6 +176,5 @@ class TestOnlyOneOutwardGate:
     def test_module_exports_no_send_function(self):
         for name in dq.__all__:
             assert "send" not in name.lower(), (
-                f"digest_queue.{name} looks like a sender — outbound gate "
-                "must stay in notify.py"
+                f"digest_queue.{name} looks like a sender — outbound gate must stay in notify.py"
             )

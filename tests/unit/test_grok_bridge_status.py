@@ -13,6 +13,7 @@ MOD_PATH = ROOT / "scripts" / "ops" / "grok_bridge_status.py"
 
 def _load():
     import sys
+
     spec = importlib.util.spec_from_file_location("grok_bridge_status", MOD_PATH)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)

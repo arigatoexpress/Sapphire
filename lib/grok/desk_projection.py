@@ -80,9 +80,16 @@ def build_desk_projection(
     desk: dict[str, Any] = {
         "version": 1,
         "updated_at": now,
-        "posture": posture if posture in {
-            "capital_preservation", "selective_risk", "risk_seeking", "neutral", "unknown",
-        } else "unknown",
+        "posture": posture
+        if posture
+        in {
+            "capital_preservation",
+            "selective_risk",
+            "risk_seeking",
+            "neutral",
+            "unknown",
+        }
+        else "unknown",
         "leader": "unknown",
         "validation": {
             "oos_pass": None,
@@ -100,9 +107,16 @@ def build_desk_projection(
             "blocked": None,
             "pending_policy_blocked": None,
         },
-        "execution": execution if execution in {
-            "halted", "off", "gated", "paper", "unknown",
-        } else "unknown",
+        "execution": execution
+        if execution
+        in {
+            "halted",
+            "off",
+            "gated",
+            "paper",
+            "unknown",
+        }
+        else "unknown",
         "feeds": {"fresh": None, "total": None},
         "tracks": [],
         "risk": risk,
@@ -168,8 +182,12 @@ def markets_pulse(
         "feed_age_s": feed_age_s,
         "events_per_min": events_per_min,
         "paper_strategies": None,
-        "decision_gate": decision_gate if decision_gate in {"manual", "off", "unknown"} else "unknown",
-        "execution": execution if execution in {"off", "paper", "gated", "halted", "unknown"} else "unknown",
+        "decision_gate": decision_gate
+        if decision_gate in {"manual", "off", "unknown"}
+        else "unknown",
+        "execution": execution
+        if execution in {"off", "paper", "gated", "halted", "unknown"}
+        else "unknown",
     }
 
 

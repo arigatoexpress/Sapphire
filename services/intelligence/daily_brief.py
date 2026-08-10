@@ -180,9 +180,7 @@ def _section_vault_context(regime_state: str) -> dict:
 
     lines: list[str] = []
     if result.verdict == "weak":
-        lines.append(
-            f"  _Weak vault evidence (top {result.top1:.3f}) — for orientation only._"
-        )
+        lines.append(f"  _Weak vault evidence (top {result.top1:.3f}) — for orientation only._")
     for hit in result.results[:3]:
         title = hit.title.strip() or "Untitled"
         snippet = " ".join(hit.chunk.split())[:180]
@@ -1033,17 +1031,19 @@ def build_brief() -> str:
     ]
     if vault_ctx.get("status") == "ok" and vault_ctx.get("text"):
         parts.extend(["", "*Vault context*", vault_ctx["text"]])
-    parts.extend([
-        "",
-        "*Home leads (Houston)*",
-        _t(leads, "leads"),
-        "",
-        "*System health*",
-        _t(health, "health"),
-        "",
-        "*Daily Recommendation*",
-        rec,
-    ])
+    parts.extend(
+        [
+            "",
+            "*Home leads (Houston)*",
+            _t(leads, "leads"),
+            "",
+            "*System health*",
+            _t(health, "health"),
+            "",
+            "*Daily Recommendation*",
+            rec,
+        ]
+    )
     return "\n".join(parts)
 
 
