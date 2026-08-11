@@ -22,7 +22,10 @@ try:
     from playwright.sync_api import TimeoutError as PWTimeout
     from playwright.sync_api import sync_playwright
 except ImportError:
-    print("Install: python3 -m pip install --user playwright && python3 -m playwright install chromium", file=sys.stderr)
+    print(
+        "Install: python3 -m pip install --user playwright && python3 -m playwright install chromium",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 HOME = Path.home()
@@ -128,7 +131,7 @@ def delete_posts(page, username: str, ids: list[str]) -> None:
                     continue
             time.sleep(0.5)
             for sel in [
-                'text=Delete',
+                "text=Delete",
                 '[data-testid="Dropdown"] >> text=Delete',
                 'div[role="menuitem"]:has-text("Delete")',
             ]:
@@ -140,7 +143,7 @@ def delete_posts(page, username: str, ids: list[str]) -> None:
             time.sleep(0.5)
             for sel in [
                 '[data-testid="confirmationSheetConfirm"]',
-                'text=Delete',
+                "text=Delete",
                 'button:has-text("Delete")',
             ]:
                 try:

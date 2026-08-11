@@ -285,12 +285,8 @@ def alert_fingerprint(rows: list[Row], agents: list[AgentRow]) -> str:
     defeat dedup entirely.
     """
     payload = {
-        "stale": sorted(
-            {(r.label, r.path) for r in rows if r.status == "STALE"}
-        ),
-        "missing": sorted(
-            {(r.label, r.path) for r in rows if r.status == "MISSING"}
-        ),
+        "stale": sorted({(r.label, r.path) for r in rows if r.status == "STALE"}),
+        "missing": sorted({(r.label, r.path) for r in rows if r.status == "MISSING"}),
         "agents": sorted({(a.label, a.last_exit) for a in agents}),
     }
     encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
@@ -405,7 +401,9 @@ def emit_text(rows: list[Row], agents: list[AgentRow]) -> None:
         age = f"{row.age_hours:7.1f}" if row.age_hours is not None else "     -"
         thresh = f"{row.threshold_hours:6.1f}"
         location = row.resolved_path or row.path
-        print(f"{color[row.status]}{row.status:<8}{reset}{age}  {thresh}  {row.label}  →  {location}")
+        print(
+            f"{color[row.status]}{row.status:<8}{reset}{age}  {thresh}  {row.label}  →  {location}"
+        )
     if agents:
         print()
         print("Silently failing LaunchAgents:")

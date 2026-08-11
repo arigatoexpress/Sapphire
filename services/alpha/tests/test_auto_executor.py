@@ -303,9 +303,7 @@ def test_approved_signal_executes_exactly_once_across_repeated_passes(
     assert len(fills) == 1, f"duplicate fills: {len(fills)} (913x bug class)"
 
 
-def test_dedup_survives_fresh_process_state(
-    tmp_dirs, config, fake_signal_record, poll_pending
-):
+def test_dedup_survives_fresh_process_state(tmp_dirs, config, fake_signal_record, poll_pending):
     """Dedup must come from the on-disk audit ledger, not in-memory state —
     a restarted executor (new process) must not re-fill a consumed approval."""
     _, return_values = poll_pending
