@@ -59,6 +59,7 @@ audit.
 To make P0 green, an existing attended access path must permit a successful
 non-interactive SSH probe, exact hash readback of the Mac commander
 policy/killswitch state, and read-only calls through every required running
-inference-proxy alias. Every P0 pass must also be fresh and tied to the current
-Windows boot identity. Updating or enabling services/tasks, copying keys, or
-arming execution is outside this receipt's authority.
+inference-proxy alias. Every individual P0 observation must also be fresh, carry
+the current Windows boot identity, and postdate that boot. Updating or enabling
+services/tasks, copying keys, or arming execution is outside this receipt's
+authority.

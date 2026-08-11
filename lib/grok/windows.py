@@ -65,6 +65,12 @@ def _parse_timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+def _boot_started_at(boot_id: str | None) -> datetime | None:
+    if not isinstance(boot_id, str) or "@" not in boot_id:
+        return None
+    return _parse_timestamp(boot_id.rsplit("@", maxsplit=1)[1])
+
+
 def _p0_evidence_reason(
     key: str,
     *,
@@ -80,14 +86,24 @@ def _p0_evidence_reason(
         return "boot_identity_unverified"
     if receipt_boot_id != current_boot_id:
         return "boot_mismatch"
+    current_boot_started_at = _boot_started_at(current_boot_id)
+    if current_boot_started_at is None:
+        return "invalid_boot_identity"
     if not isinstance(evidence, Mapping):
         return "missing_evidence"
     if evidence.get("status") != "pass":
         return "evidence_not_pass"
+    evidence_boot_id = evidence.get("boot_id")
+    if not isinstance(evidence_boot_id, str) or not evidence_boot_id:
+        return "evidence_boot_identity_unverified"
+    if evidence_boot_id != current_boot_id:
+        return "evidence_boot_mismatch"
 
     observed_at = _parse_timestamp(evidence.get("observed_at"))
     if observed_at is None:
         return "invalid_evidence_timestamp"
+    if observed_at < current_boot_started_at:
+        return "evidence_predates_boot"
     age_seconds = (now - observed_at).total_seconds()
     if age_seconds < -60:
         return "future_evidence"

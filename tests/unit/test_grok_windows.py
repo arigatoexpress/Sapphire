@@ -23,7 +23,10 @@ def _green_state() -> dict[str, bool]:
 
 def _fresh_evidence(now: datetime) -> dict[str, dict[str, object]]:
     observed_at = (now - timedelta(seconds=30)).isoformat().replace("+00:00", "Z")
-    evidence = {key: {"status": "pass", "observed_at": observed_at} for key, _label in P0_CHECKS}
+    evidence = {
+        key: {"status": "pass", "observed_at": observed_at, "boot_id": BOOT_ID}
+        for key, _label in P0_CHECKS
+    }
     evidence["ollama_aliases"].update(
         {
             "probe": "inference_proxy_alias_calls",
@@ -105,12 +108,51 @@ def test_p0_rejects_receipt_without_live_boot_readback():
     assert {row["reason"] for row in result["p0"]} == {"boot_identity_unverified"}
 
 
+def test_p0_rejects_per_check_evidence_from_prior_boot():
+    now = datetime(2026, 8, 11, 14, 10, tzinfo=UTC)
+    evidence = _fresh_evidence(now)
+    evidence["no_sleep"]["boot_id"] = "DESKTOP-HFCK6U9@2026-08-09T21:54:33Z"
+
+    result = evaluate_windows_acceptance(
+        _green_state(),
+        evidence=evidence,
+        receipt_boot_id=BOOT_ID,
+        current_boot_id=BOOT_ID,
+        now=now,
+    )
+
+    no_sleep = next(row for row in result["p0"] if row["id"] == "no_sleep")
+    assert no_sleep["ok"] is False
+    assert no_sleep["reason"] == "evidence_boot_mismatch"
+    assert result["arm_l2_allowed"] is False
+
+
+def test_p0_rejects_evidence_that_predates_current_boot():
+    now = datetime(2026, 8, 11, 14, 10, tzinfo=UTC)
+    evidence = _fresh_evidence(now)
+    evidence["post_boot_report"]["observed_at"] = "2026-08-10T21:54:00Z"
+
+    result = evaluate_windows_acceptance(
+        _green_state(),
+        evidence=evidence,
+        receipt_boot_id=BOOT_ID,
+        current_boot_id=BOOT_ID,
+        now=now,
+    )
+
+    post_boot = next(row for row in result["p0"] if row["id"] == "post_boot_report")
+    assert post_boot["ok"] is False
+    assert post_boot["reason"] == "evidence_predates_boot"
+    assert result["arm_l2_allowed"] is False
+
+
 def test_p0_rejects_inventory_only_alias_claim():
     now = datetime(2026, 8, 11, 14, 10, tzinfo=UTC)
     evidence = _fresh_evidence(now)
     evidence["ollama_aliases"] = {
         "status": "pass",
         "observed_at": (now - timedelta(seconds=30)).isoformat().replace("+00:00", "Z"),
+        "boot_id": BOOT_ID,
         "probe": "ollama_model_inventory",
         "passed_aliases": sorted(WINDOWS_REQUIRED_MODELS),
     }

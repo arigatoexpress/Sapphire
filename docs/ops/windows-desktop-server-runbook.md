@@ -76,7 +76,8 @@ exercised through the live proxy and the evidence is fresh and boot-matched.
 ## Acceptance Evidence Lifetime
 
 Persisted P0 booleans are diagnostic snapshots, not evergreen ARM authority.
-Every pass must match the current Windows boot identity. Tailscale, SSH, and
+Every individual P0 observation must carry and match the current Windows boot
+identity, and its timestamp cannot predate that boot. Tailscale, SSH, and
 free-reign parity expire after 5 minutes; proxy-alias calls after 15 minutes;
 the Scheduled Task inventory after 60 minutes; and the post-boot and no-sleep
 checks after 24 hours. Missing, future-dated, stale, or boot-mismatched evidence
