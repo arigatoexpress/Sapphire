@@ -82,7 +82,10 @@ def diagnose_public_payloads(
                 "msg": "desk posture/execution unknown — trading intelligence looks empty",
             }
         )
-    if markets.get("decision_gate") in (None, "unknown") and markets.get("execution") in (None, "unknown"):
+    if markets.get("decision_gate") in (None, "unknown") and markets.get("execution") in (
+        None,
+        "unknown",
+    ):
         issues.append(
             {
                 "id": "MARKETS_GATE_UNKNOWN",

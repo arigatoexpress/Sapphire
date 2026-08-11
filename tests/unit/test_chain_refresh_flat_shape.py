@@ -263,7 +263,9 @@ def test_publish_funding_extreme_when_btc_crowded(fake_bus):
     assert payload["count"] == 1
     assert payload["crowded_count"] == 1
     assert payload["bias"] == "long"
-    assert payload["perps"] == [{"coin": "BTC", "rate_8h": pytest.approx(0.0009), "flag": "crowded_long"}]
+    assert payload["perps"] == [
+        {"coin": "BTC", "rate_8h": pytest.approx(0.0009), "flag": "crowded_long"}
+    ]
 
 
 def test_publish_funding_extreme_bias_short_when_shorts_dominant(fake_bus):

@@ -24,7 +24,9 @@ def main() -> int:
     if args.json:
         print(json.dumps(man, indent=2))
     else:
-        print(f"pack: data/grok-drive-pack/  files={man['copied_count']} skipped={man['skipped_count']}")
+        print(
+            f"pack: data/grok-drive-pack/  files={man['copied_count']} skipped={man['skipped_count']}"
+        )
         print(f"drive: {man.get('grok_bridge_url')}")
     return 0
 

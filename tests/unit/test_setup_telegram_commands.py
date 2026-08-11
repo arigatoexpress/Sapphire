@@ -41,9 +41,7 @@ class TestDefaultCommandSet:
     def test_deprecated_names_are_blocked(self):
         for name in ("bots", "pending", "skin", "tracks", "shield"):
             assert name in setup.DEPRECATED
-            errors = setup.validate_commands(
-                [{"command": name, "description": "x"}]
-            )
+            errors = setup.validate_commands([{"command": name, "description": "x"}])
             assert any("deprecated" in e for e in errors), errors
 
 
@@ -53,8 +51,8 @@ class TestValidation:
         [
             ("menu", False),
             ("brief", False),
-            ("Brief", True),           # upper-case not allowed by BotFather
-            ("with-dash", True),        # only alnum+underscore
+            ("Brief", True),  # upper-case not allowed by BotFather
+            ("with-dash", True),  # only alnum+underscore
             ("way_too_long_" + "x" * 40, True),
             ("", True),
         ],
@@ -71,9 +69,7 @@ class TestValidation:
         assert any("empty description" in e for e in errors)
 
     def test_description_over_256_flagged(self):
-        errors = setup.validate_commands(
-            [{"command": "menu", "description": "x" * 257}]
-        )
+        errors = setup.validate_commands([{"command": "menu", "description": "x" * 257}])
         assert any("256 chars" in e for e in errors)
 
     def test_duplicate_names_flagged(self):
@@ -105,9 +101,7 @@ class TestTokenResolution:
         monkeypatch.delenv("SAPPHIRE_PM_BOT_TOKEN", raising=False)
         monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
         # Point secret paths at empty tmpdir so the loop finds nothing.
-        monkeypatch.setattr(
-            setup, "_TOKEN_SECRET_PATHS", [tmp_path / "does_not_exist"]
-        )
+        monkeypatch.setattr(setup, "_TOKEN_SECRET_PATHS", [tmp_path / "does_not_exist"])
         token, source = setup.resolve_token()
         assert token == ""
         assert source == "missing"
