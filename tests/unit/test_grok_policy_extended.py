@@ -31,9 +31,7 @@ def test_hl_signing_gate():
 
 
 def test_regime_block_l2():
-    d = evaluate_proposal(
-        OrderProposal("ETH", "buy", "rh_l2", "l2_token", 5.0, regime="crisis")
-    )
+    d = evaluate_proposal(OrderProposal("ETH", "buy", "rh_l2", "l2_token", 5.0, regime="crisis"))
     assert d.code == "REGIME_BLOCK_L2"
 
 

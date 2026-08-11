@@ -85,7 +85,11 @@ def pick_transport(
         return TransportPick("api-key", None, "XAI_API_KEY/GROK_API_KEY present")
 
     if mode == "away-sim" or h.get("status") == "error":
-        return TransportPick("sim", url if mode == "away-sim" else None, f"fallback sim (health mode={mode or 'n/a'})")
+        return TransportPick(
+            "sim",
+            url if mode == "away-sim" else None,
+            f"fallback sim (health mode={mode or 'n/a'})",
+        )
 
     return TransportPick("sim", None, "no healthy mac-bridge / oidc / api key")
 

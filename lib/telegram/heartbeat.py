@@ -107,9 +107,7 @@ def run_once(*, dry_run: bool = False, now: datetime | None = None) -> int:
     if not _due(ts.hour, settings.heartbeat_hours):
         payload["skipped_reason"] = "not_scheduled"
         _write_state(payload)
-        logger.info(
-            "heartbeat not due (hour=%s interval=%s)", ts.hour, settings.heartbeat_hours
-        )
+        logger.info("heartbeat not due (hour=%s interval=%s)", ts.hour, settings.heartbeat_hours)
         return 0
 
     message = build_message()

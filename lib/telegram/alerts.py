@@ -183,20 +183,14 @@ def alert_regime_shift(
     ]
     if confidence is not None:
         body_rows.append(("Confidence", formatters.fmt_pct(confidence * 100)))
-    text = (
-        f"⚠️ {formatters.bold('Regime shift')}\n\n"
-        + formatters.kv_table(body_rows)
-    )
+    text = f"⚠️ {formatters.bold('Regime shift')}\n\n" + formatters.kv_table(body_rows)
     return _dispatch(text, priority="p1", dedup_key=key, kind="regime_shift", force=force)
 
 
 def alert_kill_switch(reason: str, *, force: bool = False) -> bool:
     """Fire on kill-switch arm/trip. Never deduped by default — safety event."""
     key = _dedup_key("kill_switch", reason, datetime.now(UTC).strftime("%Y%m%d%H%M"))
-    text = (
-        f"🚨 {formatters.bold('KILL SWITCH ARMED')}\n\n"
-        + formatters.esc(reason)
-    )
+    text = f"🚨 {formatters.bold('KILL SWITCH ARMED')}\n\n" + formatters.esc(reason)
     return _dispatch(text, priority="p1", dedup_key=key, kind="kill_switch", force=force or True)
 
 
