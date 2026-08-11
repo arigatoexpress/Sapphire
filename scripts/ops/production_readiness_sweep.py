@@ -1147,17 +1147,19 @@ def windows_ollama_inventory_check(base_url: str = DEFAULT_WINDOWS_GPU_URL) -> C
         for item in models
         if isinstance(item, dict) and (item.get("name") or item.get("model"))
     )
-    missing = [
+    missing_model_targets = [
         alias
         for alias, required_model in sorted(WINDOWS_REQUIRED_MODELS.items())
         if not model_inventory_has(names, required_model)
     ]
-    if missing:
+    if missing_model_targets:
         status = "WARN"
-    present = len(WINDOWS_REQUIRED_MODELS) - len(missing)
-    evidence += f"; models={len(names)}; required_present={present}/{len(WINDOWS_REQUIRED_MODELS)}"
-    if missing:
-        evidence += f"; missing_aliases={','.join(missing)}"
+    present = len(WINDOWS_REQUIRED_MODELS) - len(missing_model_targets)
+    evidence += (
+        f"; models={len(names)}; required_models_present={present}/{len(WINDOWS_REQUIRED_MODELS)}"
+    )
+    if missing_model_targets:
+        evidence += f"; missing_model_targets={','.join(missing_model_targets)}"
     return Check(
         "windows",
         "ollama_model_inventory",

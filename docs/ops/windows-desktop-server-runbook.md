@@ -64,9 +64,23 @@ official local tiers:
 | `qwen3.6` | `qwen3.6:35b-a3b` |
 | `large` | `qwen3-coder:30b` |
 
-Missing aliases are warnings, not hard failures, because the Mac and Kimi tiers
-remain fallbacks. A missing `reason`, `code`, or `large` alias should still be
-treated as an operator action item before overnight strategy research.
+Missing target model tags are warnings, not hard failures, because the Mac and
+Kimi tiers remain fallbacks. A missing target for `reason`, `code`, or `large`
+should still be treated as an operator action item before overnight strategy
+research.
+
+This inventory is not proof that the running inference proxy resolves or can
+call these aliases. Windows P0 keeps `ollama_aliases` false until every alias is
+exercised through the live proxy and the evidence is fresh and boot-matched.
+
+## Acceptance Evidence Lifetime
+
+Persisted P0 booleans are diagnostic snapshots, not evergreen ARM authority.
+Every pass must match the current Windows boot identity. Tailscale, SSH, and
+free-reign parity expire after 5 minutes; proxy-alias calls after 15 minutes;
+the Scheduled Task inventory after 60 minutes; and the post-boot and no-sleep
+checks after 24 hours. Missing, future-dated, stale, or boot-mismatched evidence
+fails closed.
 
 ## Backtesting
 

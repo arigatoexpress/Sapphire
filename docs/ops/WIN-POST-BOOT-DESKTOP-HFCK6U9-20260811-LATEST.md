@@ -7,17 +7,18 @@ Runtime checkout: `E:\Sapphire\Code\Sapphire` at `86848a81eb9a83b3d659ca4a5ef6e2
 
 ## Outcome
 
-Windows P0 is **not green** and L2 remains disarmed. Five of seven P0 checks
-have current evidence; SSH BatchMode and Mac↔Windows policy/killswitch parity
-remain failed. No service, Scheduled Task, credential, production, messaging,
-or money-path state was changed during this audit.
+Windows P0 is **not green** and L2 remains disarmed. Four of seven P0 checks
+have current evidence; SSH BatchMode, callable inference-proxy aliases, and
+Mac↔Windows policy/killswitch parity remain failed. No service, Scheduled Task,
+credential, production, messaging, or money-path state was changed during this
+audit.
 
 | P0 check | Result | Evidence |
 |---|---|---|
 | Post-boot recovery | PASS | Current boot began 2026-08-10 15:54 MDT after a planned shutdown; crash history and dump availability are recorded below. |
 | Tailscale | PASS | Service running/automatic; backend Running; self online; zero health issues. |
 | SSH BatchMode | FAIL | `sshd` and TCP/22 are listening, but the non-interactive self-probe failed public-key authentication. |
-| Ollama aliases | PASS | API healthy with 29 installed models; the current readiness contract reports 8/8 aliases present. |
+| Inference-proxy aliases | FAIL | Ollama inventory is healthy with 29 models and all 8 target tags installed, but no request traversed each running proxy alias. Inventory is not alias-call evidence. |
 | No sleep/lock | PASS | Ultimate Performance; AC sleep `0`; AC hibernate `0`; screen saver disabled. |
 | Free-reign/dens/killswitch parity | FAIL | Active Windows policy mirrors hash-identical; Mac is online but SSH is unreachable, so exact commander parity is unproven. Public execution is gated and the ledger is unknown. |
 | Scheduled Tasks inventoried | PASS | Inventory captured read-only; `rh-executor` absent and `sapphire-auto-arm-when-ready` disabled. |
@@ -38,7 +39,10 @@ or money-path state was changed during this audit.
 
 - NVIDIA GeForce RTX 5070 Ti, driver `610.88`, 16,303 MiB total VRAM.
 - At observation: 1,420 MiB VRAM used, 0% GPU utilization, 25°C.
-- Ollama `/api/tags`: HTTP 200, 29 models, current required inventory 8/8.
+- Ollama `/api/tags`: HTTP 200, 29 models, current target-model inventory 8/8.
+- The Mac inference-proxy health surface on port 11435 was unreachable from
+  Windows during the authorized read-only re-probe. No alias call was attempted,
+  so `ollama_aliases` remains false.
 - The runbook model table was stale and is corrected in this lane to match the
   tested `WINDOWS_REQUIRED_MODELS` contract.
 
@@ -52,7 +56,9 @@ or money-path state was changed during this audit.
 
 ## Exact remaining gate
 
-To make P0 green, an attended credential/access action must first restore a
-successful non-interactive SSH probe and permit exact hash readback of the Mac
-commander policy/killswitch state. Updating or enabling services/tasks, copying
-keys, or arming execution is outside this receipt's authority.
+To make P0 green, an existing attended access path must permit a successful
+non-interactive SSH probe, exact hash readback of the Mac commander
+policy/killswitch state, and read-only calls through every required running
+inference-proxy alias. Every P0 pass must also be fresh and tied to the current
+Windows boot identity. Updating or enabling services/tasks, copying keys, or
+arming execution is outside this receipt's authority.

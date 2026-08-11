@@ -353,8 +353,8 @@ def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> No
 
     assert check.status == "PASS"
     assert "models=7" in check.evidence
-    assert "required_present=8/8" in check.evidence
-    assert "missing_aliases" not in check.evidence
+    assert "required_models_present=8/8" in check.evidence
+    assert "missing_model_targets" not in check.evidence
 
 
 def test_windows_ollama_inventory_warns_on_missing_aliases(monkeypatch) -> None:
@@ -375,8 +375,8 @@ def test_windows_ollama_inventory_warns_on_missing_aliases(monkeypatch) -> None:
     check = sweep.windows_ollama_inventory_check("http://100.x.x.z:11434")
 
     assert check.status == "WARN"
-    assert "required_present=0/8" in check.evidence
-    assert "missing_aliases" in check.evidence
+    assert "required_models_present=0/8" in check.evidence
+    assert "missing_model_targets" in check.evidence
     assert "reason" in check.evidence
 
 

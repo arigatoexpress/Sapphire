@@ -14,7 +14,7 @@ from lib.grok.automations import summary as auto_summary  # noqa: E402
 from lib.grok.genome import LessonBook  # noqa: E402
 from lib.grok.policy import OrderProposal, evaluate_proposal  # noqa: E402
 from lib.grok.research_worker import validate_research_manifest  # noqa: E402
-from lib.grok.windows import evaluate_windows_acceptance  # noqa: E402
+from lib.grok.windows import evaluate_windows_acceptance_receipt  # noqa: E402
 
 
 def main() -> int:
@@ -27,7 +27,7 @@ def main() -> int:
     )
     good = json.loads((ROOT / "projects/grok/fixtures/research_worker_manifest_good.json").read_text())
     bad = json.loads((ROOT / "projects/grok/fixtures/research_worker_manifest_bad.json").read_text())
-    win_state = json.loads((ROOT / "projects/grok/data/windows_acceptance.json").read_text())["state"]
+    win_receipt = json.loads((ROOT / "projects/grok/data/windows_acceptance.json").read_text())
 
     report = {
         "project": "projects/grok",
@@ -36,7 +36,7 @@ def main() -> int:
         "genome": book.summary(),
         "research_good_ok": validate_research_manifest(good)["ok"],
         "research_bad_ok": validate_research_manifest(bad)["ok"],
-        "windows": evaluate_windows_acceptance(win_state),
+        "windows": evaluate_windows_acceptance_receipt(win_receipt),
         "automations": auto_summary(),
         "bridge_exports": len(list((ROOT / "data/grok-web-exports").glob("2026-*.md"))),
     }
