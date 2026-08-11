@@ -31,19 +31,35 @@ def build_desk_projection(
     regime_label: str = "unknown",
     thesis: str | None = None,
     win_state: Mapping[str, Any] | None = None,
+    win_evidence: Mapping[str, Any] | None = None,
+    win_receipt_boot_id: str | None = None,
+    win_current_boot_id: str | None = None,
     genome_path: Any | None = None,
     free_reign_armed: bool | None = None,
     moss_grant_hours_left: float | None = None,
     day_realized_pnl_usd: float | None = None,
     observed_extras: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a desk block. Prefer real plant observations via observed_extras."""
+    """Build a desk block. Prefer real plant observations via observed_extras.
+
+    A full Windows acceptance receipt needs ``win_current_boot_id`` from a
+    trusted live host readback. Legacy state-only callers must also supply the
+    matching evidence and receipt boot identity. Missing inputs fail closed.
+    """
     now = _utc()
     win_input = dict(win_state or {})
     win = (
-        evaluate_windows_acceptance_receipt(win_input)
+        evaluate_windows_acceptance_receipt(
+            win_input,
+            current_boot_id=win_current_boot_id,
+        )
         if "state" in win_input
-        else evaluate_windows_acceptance(win_input)
+        else evaluate_windows_acceptance(
+            win_input,
+            evidence=win_evidence,
+            receipt_boot_id=win_receipt_boot_id,
+            current_boot_id=win_current_boot_id,
+        )
     )
     book = LessonBook()
     if genome_path is not None:
