@@ -4,7 +4,7 @@
 > North star: [`docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md`](../strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md)  
 > Gemini Cloud Shell implementers: [`docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md`](../handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md)
 
-Last reviewed: 2026-08-06 (mission banner) · operational detail last bulk-reviewed 2026-04-29
+Last reviewed: 2026-08-11 (model inventory contract) · operational detail last bulk-reviewed 2026-04-29
 
 This runbook covers `DESKTOP-HFCK6U9`, the Windows machine on Tailscale
 `100.x.x.z`. Treat it as Sapphire's private desktop accelerator: GPU
@@ -55,15 +55,14 @@ official local tiers:
 
 | Alias | Model |
 |---|---|
-| `fast` | `nemotron-mini:4b` |
-| `balanced` | `hermes3:8b` |
-| `code` | `gemma4:latest` |
+| `fast` | `gemma3:4b` |
+| `balanced` | `gemma3:4b` |
+| `code` | `qwen2.5-coder:14b` |
 | `reason` | `deepseek-r1:14b` |
-| `qwen-reason` | `qwen3.5:9b` |
+| `qwen-reason` | `qwen3.5:4b` |
 | `deep` | `qwen3:14b` |
-| `qwen3.6` | `qwen3.6:27b` |
-| `cascade` | `nemotron-cascade-2` or `nemotron-cascade-2:latest` |
-| `large` | `qwen2.5:32b` |
+| `qwen3.6` | `qwen3.6:35b-a3b` |
+| `large` | `qwen3-coder:30b` |
 
 Missing aliases are warnings, not hard failures, because the Mac and Kimi tiers
 remain fallbacks. A missing `reason`, `code`, or `large` alias should still be
