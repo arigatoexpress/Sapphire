@@ -14,7 +14,10 @@ from typing import Any
 from lib.grok.genome import LessonBook
 from lib.grok.policy import FREE_REIGN_DEFAULTS
 from lib.grok.public_surface import public_operating_rules
-from lib.grok.windows import evaluate_windows_acceptance
+from lib.grok.windows import (
+    evaluate_windows_acceptance,
+    evaluate_windows_acceptance_receipt,
+)
 
 
 def _utc() -> str:
@@ -36,7 +39,12 @@ def build_desk_projection(
 ) -> dict[str, Any]:
     """Build a desk block. Prefer real plant observations via observed_extras."""
     now = _utc()
-    win = evaluate_windows_acceptance(dict(win_state or {}))
+    win_input = dict(win_state or {})
+    win = (
+        evaluate_windows_acceptance_receipt(win_input)
+        if "state" in win_input
+        else evaluate_windows_acceptance(win_input)
+    )
     book = LessonBook()
     if genome_path is not None:
         try:

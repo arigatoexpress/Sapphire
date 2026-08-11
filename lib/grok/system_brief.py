@@ -23,7 +23,7 @@ from lib.grok.policy import (
     evaluate_proposal,
     evaluate_scale_out,
 )
-from lib.grok.windows import evaluate_windows_acceptance
+from lib.grok.windows import evaluate_windows_acceptance_receipt
 
 ROOT = Path(__file__).resolve().parents[2]
 ALPHA_PATH = ROOT / "data" / "alpha" / "alpha_ledger.json"
@@ -210,9 +210,9 @@ def build_system_brief() -> dict[str, Any]:
     book = LessonBook.load(GENOME_SEED)
     if book.summary()["count"] == 0:
         book.seed_axti_and_dens()
-    win_state = {}
+    win_receipt = {}
     if WIN_STATE.is_file():
-        win_state = json.loads(WIN_STATE.read_text(encoding="utf-8")).get("state") or {}
+        win_receipt = json.loads(WIN_STATE.read_text(encoding="utf-8"))
 
     policy = policy_smoke()
     bridge = bridge_inventory()
@@ -281,7 +281,10 @@ def build_system_brief() -> dict[str, Any]:
         "invariants": alpha.get("invariants") or [],
         "policy_smoke": policy,
         "genome": book.summary(),
-        "windows": evaluate_windows_acceptance(win_state),
+        # A checked-in receipt has no live current-boot readback. The evaluator
+        # therefore keeps arm_l2_allowed false until a runtime caller supplies
+        # that identity along with fresh evidence.
+        "windows": evaluate_windows_acceptance_receipt(win_receipt),
         "bridge": bridge,
         "automations": autos,
         "alpha_critical": links,

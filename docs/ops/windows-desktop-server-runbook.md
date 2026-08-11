@@ -4,7 +4,7 @@
 > North star: [`docs/strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md`](../strategy/WINDOWS-DATACENTER-MASTERPLAN-2026-08-06.md)  
 > Gemini Cloud Shell implementers: [`docs/handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md`](../handoffs/GEMINI-CLOUDSHELL-MASTER-PROMPT-2026-08-06.md)
 
-Last reviewed: 2026-08-06 (mission banner) · operational detail last bulk-reviewed 2026-04-29
+Last reviewed: 2026-08-11 (model inventory contract) · operational detail last bulk-reviewed 2026-04-29
 
 This runbook covers `DESKTOP-HFCK6U9`, the Windows machine on Tailscale
 `100.x.x.z`. Treat it as Sapphire's private desktop accelerator: GPU
@@ -55,19 +55,33 @@ official local tiers:
 
 | Alias | Model |
 |---|---|
-| `fast` | `nemotron-mini:4b` |
-| `balanced` | `hermes3:8b` |
-| `code` | `gemma4:latest` |
+| `fast` | `gemma3:4b` |
+| `balanced` | `gemma3:4b` |
+| `code` | `qwen2.5-coder:14b` |
 | `reason` | `deepseek-r1:14b` |
-| `qwen-reason` | `qwen3.5:9b` |
+| `qwen-reason` | `qwen3.5:4b` |
 | `deep` | `qwen3:14b` |
-| `qwen3.6` | `qwen3.6:27b` |
-| `cascade` | `nemotron-cascade-2` or `nemotron-cascade-2:latest` |
-| `large` | `qwen2.5:32b` |
+| `qwen3.6` | `qwen3.6:35b-a3b` |
+| `large` | `qwen3-coder:30b` |
 
-Missing aliases are warnings, not hard failures, because the Mac and Kimi tiers
-remain fallbacks. A missing `reason`, `code`, or `large` alias should still be
-treated as an operator action item before overnight strategy research.
+Missing target model tags are warnings, not hard failures, because the Mac and
+Kimi tiers remain fallbacks. A missing target for `reason`, `code`, or `large`
+should still be treated as an operator action item before overnight strategy
+research.
+
+This inventory is not proof that the running inference proxy resolves or can
+call these aliases. Windows P0 keeps `ollama_aliases` false until every alias is
+exercised through the live proxy and the evidence is fresh and boot-matched.
+
+## Acceptance Evidence Lifetime
+
+Persisted P0 booleans are diagnostic snapshots, not evergreen ARM authority.
+Every individual P0 observation must carry and match the current Windows boot
+identity, and its timestamp cannot predate that boot. Tailscale, SSH, and
+free-reign parity expire after 5 minutes; proxy-alias calls after 15 minutes;
+the Scheduled Task inventory after 60 minutes; and the post-boot and no-sleep
+checks after 24 hours. Missing, future-dated, stale, or boot-mismatched evidence
+fails closed.
 
 ## Backtesting
 
