@@ -337,7 +337,23 @@ def blindspot_scoreboard() -> dict[str, Any]:
     for b in BLINDSPOTS:
         by_sev[b["severity"]] = by_sev.get(b["severity"], 0) + 1
         by_status[b["status"]] = by_status.get(b["status"], 0) + 1
-    open_p0 = [b for b in BLINDSPOTS if b["severity"] == "P0" and b["status"] not in ("encoded", "documented", "code_fixed_deploy_pending", "resolved_plant", "needs_operator_decision", "recommended_accept", "needs_operator", "blocked", "research_refresh")]
+    open_p0 = [
+        b
+        for b in BLINDSPOTS
+        if b["severity"] == "P0"
+        and b["status"]
+        not in (
+            "encoded",
+            "documented",
+            "code_fixed_deploy_pending",
+            "resolved_plant",
+            "needs_operator_decision",
+            "recommended_accept",
+            "needs_operator",
+            "blocked",
+            "research_refresh",
+        )
+    ]
     return {
         "count": len(BLINDSPOTS),
         "by_severity": by_sev,

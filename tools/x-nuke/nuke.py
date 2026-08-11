@@ -147,7 +147,7 @@ def write_checklist(data: dict, out: Path) -> None:
             rows.append(
                 f'<li data-priority="{html_lib.escape(p["priority"])}">'
                 f'<a href="{url}" target="_blank" rel="noopener">'
-                f'{html_lib.escape(p["priority"])} · @{html_lib.escape(meta["username"])} · {p["id"]}'
+                f"{html_lib.escape(p['priority'])} · @{html_lib.escape(meta['username'])} · {p['id']}"
                 f"</a> "
                 f'<span class="why">{reason}</span> '
                 f"<code>{snippet}</code></li>"
@@ -199,11 +199,7 @@ def run_delete(
     for _acct_key, meta in data["accounts"].items():
         if accounts and _acct_key not in accounts and meta.get("username") not in accounts:
             continue
-        posts = [
-            p
-            for p in (meta.get("posts") or [])
-            if p.get("priority", "P2") in priorities
-        ]
+        posts = [p for p in (meta.get("posts") or []) if p.get("priority", "P2") in priorities]
         if not posts:
             continue
         prefix = meta["env_prefix"]

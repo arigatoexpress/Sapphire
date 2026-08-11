@@ -108,9 +108,7 @@ def _advisory_to_decision(
         decision = "GO_SHORT"
         direction = "bearish"
         confidence = (
-            min(0.95, max(0.5, (abs(score) + 0.5) / 1.5))
-            if isinstance(score, int | float)
-            else 0.6
+            min(0.95, max(0.5, (abs(score) + 0.5) / 1.5)) if isinstance(score, int | float) else 0.6
         )
     else:
         decision = "WAIT"

@@ -254,9 +254,7 @@ def compute_sentiment(
     # Explanations cover every input (including the unavailable ones, so the
     # gap is visible); components carry only what actually scored.
     explanations = {name: expl for name, (_, expl) in scored.items()}
-    components = {
-        name: round(score, 1) for name, (score, _) in scored.items() if score is not None
-    }
+    components = {name: round(score, 1) for name, (score, _) in scored.items() if score is not None}
 
     # Renormalize over live inputs. Without this, an unavailable input scored
     # as a neutral 50 would pull the composite toward "no opinion" — the exact
