@@ -78,11 +78,16 @@ def _check_redis() -> bool:
 
 
 def _notify(message: str, priority: str = "p2") -> None:
-    """Send Telegram notification via notify tool."""
+    """Queue a transition notification through the notify CLI contract."""
     try:
         r = subprocess.run(
-            [sys.executable, str(NOTIFY_DIR / "notify.py")],
-            input=json.dumps({"message": message, "priority": priority}),
+            [
+                sys.executable,
+                str(NOTIFY_DIR / "notify.py"),
+                "--priority",
+                priority,
+                message,
+            ],
             capture_output=True,
             text=True,
             timeout=15,
