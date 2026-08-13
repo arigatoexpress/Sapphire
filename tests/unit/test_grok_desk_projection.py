@@ -6,7 +6,9 @@ from lib.grok.desk_projection import build_desk_projection, markets_pulse, publi
 from lib.grok.windows import P0_CHECKS, REQUIRED_WINDOWS_PROXY_ALIASES
 
 
-def _green_windows_acceptance() -> tuple[dict[str, object], dict[str, bool], dict[str, object], str]:
+def _green_windows_acceptance() -> tuple[
+    dict[str, object], dict[str, bool], dict[str, object], str
+]:
     now = datetime.now(UTC)
     boot_started = now - timedelta(minutes=10)
     boot_id = f"DESKTOP-HFCK6U9@{boot_started.isoformat().replace('+00:00', 'Z')}"

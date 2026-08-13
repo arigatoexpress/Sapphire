@@ -210,9 +210,7 @@ def fixed_table(
     """
     align = list(align or ["l"] * len(headers))
     # Strip any backticks so the outer fence never closes mid-cell.
-    cleaned = [
-        [str(cell).replace("`", "'") for cell in row] for row in rows
-    ]
+    cleaned = [[str(cell).replace("`", "'") for cell in row] for row in rows]
     cleaned_headers = [str(h).upper().replace("`", "'") for h in headers]
 
     widths = [
@@ -256,7 +254,7 @@ def fmt_portfolio_table(
     """Render a portfolio table with total row + last-updated stamp."""
     sorted_rows = sorted(
         list(rows),
-        key=lambda r: (r.value_usd or 0.0),
+        key=lambda r: r.value_usd or 0.0,
         reverse=True,
     )
 
@@ -284,8 +282,7 @@ def fmt_portfolio_table(
         return f"${value:,.2f}"
 
     table_rows = [
-        [row.symbol, _usd_cell(row.value_usd), _delta_cell(row.delta_pct)]
-        for row in sorted_rows
+        [row.symbol, _usd_cell(row.value_usd), _delta_cell(row.delta_pct)] for row in sorted_rows
     ]
     table = fixed_table(
         ["Ticker", "Value", "24h"],
@@ -312,7 +309,7 @@ def fmt_portfolio_table(
 @dataclass(frozen=True)
 class SignalCard:
     symbol: str
-    side: str           # "long" | "short" | "flat"
+    side: str  # "long" | "short" | "flat"
     confidence_pct: float
     entry: float | None = None
     stop: float | None = None
@@ -406,7 +403,7 @@ def fmt_brief(sections: Sequence[tuple[str, str]], *, banner: str = "📰 Mornin
 @dataclass(frozen=True)
 class ThreatCard:
     identifier: str
-    severity: str        # "critical" | "high" | "medium" | "low"
+    severity: str  # "critical" | "high" | "medium" | "low"
     package: str = ""
     summary: str = ""
     published: str = ""
@@ -527,14 +524,8 @@ def fmt_reports_list(
 ) -> str:
     """`reports` = sequence of (kind, title, mtime_iso)."""
     if not reports:
-        return (
-            f"{bold('📋 Reports')}\n\n"
-            f"{esc('No drafts or ready reports queued.')}"
-        )
-    rows = [
-        [kind, title[:32], mtime[:16]]
-        for kind, title, mtime in reports
-    ]
+        return f"{bold('📋 Reports')}\n\n{esc('No drafts or ready reports queued.')}"
+    rows = [[kind, title[:32], mtime[:16]] for kind, title, mtime in reports]
     table = fixed_table(
         ["Kind", "Title", "Updated"],
         rows,

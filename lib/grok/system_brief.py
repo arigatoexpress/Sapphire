@@ -250,11 +250,15 @@ def build_system_brief() -> dict[str, Any]:
     elif not bridge.get("executor_reloaded"):
         next_actions.append("Plant: reload rh-executor so gate_order is live in process")
     else:
-        next_actions.append("Plant: free-reign gate live and loaded — Ari RH re-auth if hung on login; then monitor denials")
+        next_actions.append(
+            "Plant: free-reign gate live and loaded — Ari RH re-auth if hung on login; then monitor denials"
+        )
     if not any((ROOT / "data/grok-web-exports").glob("*telemetry-desk*")) and not any(
         (ROOT / "data/grok-web-exports").glob("*desk-refresh*")
     ):
-        next_actions.append("Plant: fill desk.* via lib.grok.desk_projection (posture not stuck unknown)")
+        next_actions.append(
+            "Plant: fill desk.* via lib.grok.desk_projection (posture not stuck unknown)"
+        )
     if not bridge.get("genome_wired"):
         next_actions.append("Plant: wire record_closed_trade on full lot closes")
     else:
@@ -262,8 +266,12 @@ def build_system_brief() -> dict[str, Any]:
     if not bridge.get("gate_scope_accepted"):
         next_actions.append("Operator: accept free_reign-only gate scope")
     next_actions.append("Win: run P0 acceptance before ARM L2")
-    next_actions.append("Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)")
-    next_actions.append("Plant: telemetry desk refresh via lib.grok.desk_projection each publish cycle")
+    next_actions.append(
+        "Gemini: Phase 3 MC paint + data-truth UI (live pulse, stale honesty, operating rules)"
+    )
+    next_actions.append(
+        "Plant: telemetry desk refresh via lib.grok.desk_projection each publish cycle"
+    )
     next_actions.append("GCP: cost posture min-instances=0 + Vertex idle skim")
 
     return {
@@ -324,9 +332,7 @@ def render_brief_markdown(brief: Mapping[str, Any]) -> str:
     ]
     lines += ["", "## Critical alpha ↔ policy links", ""]
     for it in brief.get("alpha_critical") or []:
-        lines.append(
-            f"- `{it.get('id')}` **{it.get('severity')}** — {it.get('title')}"
-        )
+        lines.append(f"- `{it.get('id')}` **{it.get('severity')}** — {it.get('title')}")
         lines.append(f"  - fences: {', '.join(it.get('policy_links') or [])}")
         if it.get("action"):
             lines.append(f"  - action: {it.get('action')}")

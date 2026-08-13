@@ -4,9 +4,7 @@ from lib.grok.free_reign_gate import GateRequest, batch_gate, gate_option_manage
 
 
 def test_gate_blocks_dens_and_allows_defined_risk_option():
-    deny = gate_order(
-        GateRequest("BINGBONG", "buy", "rh_l2", "l2_token", 5.0)
-    )
+    deny = gate_order(GateRequest("BINGBONG", "buy", "rh_l2", "l2_token", 5.0))
     assert deny.allowed is False
     assert deny.code == "DENS_BLOCK"
 

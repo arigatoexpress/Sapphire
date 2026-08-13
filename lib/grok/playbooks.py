@@ -28,7 +28,13 @@ PLAYBOOKS: dict[str, dict[str, Any]] = {
         "manage": ["AXTI_SCALE_OUT at ~2×", "AXTI_SL at −40%", "Never hold to worthless"],
         "exit": ["Close before expiry when edge gone", "No equity re-buy of dust names"],
         "falsifiers": ["No catalyst and pure hope", "Illiquid options book", "Size > day cap"],
-        "gate_codes": ["AXTI_DEFINED_RISK", "AXTI_DTE", "AXTI_SCALE_OUT", "AXTI_SL", "OPTIONS_DAY_CAP"],
+        "gate_codes": [
+            "AXTI_DEFINED_RISK",
+            "AXTI_DTE",
+            "AXTI_SCALE_OUT",
+            "AXTI_SL",
+            "OPTIONS_DAY_CAP",
+        ],
     },
     "l2_dust_experimental": {
         "name": "RH Chain L2 experimental (≤$10)",

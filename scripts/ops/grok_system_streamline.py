@@ -56,8 +56,7 @@ def main() -> int:
             "type: system-brief\n"
             "topics: [streamline, alpha, policy, bridge, automations]\n"
             "title: Sapphire system brief (alpha + policy + bridge)\n"
-            "---\n\n"
-            + body,
+            "---\n\n" + body,
             encoding="utf-8",
         )
         print(f"wrote {exp.relative_to(ROOT)}", file=sys.stderr)
