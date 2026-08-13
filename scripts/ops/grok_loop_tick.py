@@ -26,18 +26,13 @@ AUTO_MD = ROOT / "projects/grok/AUTOMATIONS.md"
 def _detect_signals() -> dict:
     signals = {}
     signals["monorepo_bridge_tools_ok"] = (
-        (ROOT / "scripts/ops/sync_grok_web_exports.sh").is_file()
-        and (ROOT / "scripts/ops/grok_bridge_status.py").is_file()
+        ROOT / "scripts/ops/sync_grok_web_exports.sh"
+    ).is_file() and (ROOT / "scripts/ops/grok_bridge_status.py").is_file()
+    dens = evaluate_proposal(OrderProposal("BINGBONG", "buy", "rh_l2", "l2_token", 1.0))
+    dust = evaluate_proposal(OrderProposal("IBIT", "buy", "rh_agentic", "equity", 10.0))
+    signals["policy_tests_ok"] = (
+        (not dens.allow) and (not dust.allow) and (ROOT / "lib/grok/policy.py").is_file()
     )
-    dens = evaluate_proposal(
-        OrderProposal("BINGBONG", "buy", "rh_l2", "l2_token", 1.0)
-    )
-    dust = evaluate_proposal(
-        OrderProposal("IBIT", "buy", "rh_agentic", "equity", 10.0)
-    )
-    signals["policy_tests_ok"] = (not dens.allow) and (not dust.allow) and (
-        ROOT / "lib/grok/policy.py"
-    ).is_file()
 
     book = LessonBook.load(ROOT / "projects/grok/data/genome_seed_lessons.json")
     if book.summary()["count"] == 0:
@@ -56,8 +51,7 @@ def _detect_signals() -> dict:
     }
     bad = {**good, "paper_only": False, "live_trading_enabled": True}
     signals["research_validator_ok"] = (
-        validate_research_manifest(good)["ok"]
-        and not validate_research_manifest(bad)["ok"]
+        validate_research_manifest(good)["ok"] and not validate_research_manifest(bad)["ok"]
     )
     signals["automations_catalog_ok"] = (ROOT / "lib/grok/automations.py").is_file()
     try:
@@ -89,9 +83,7 @@ def _detect_signals() -> dict:
     )
     signals["genome_wired"] = any(exp.glob("*genome-closes-wired*"))
     signals["executor_reloaded"] = any(exp.glob("*executor-reload*"))
-    signals["desk_fresh"] = any(exp.glob("*telemetry-desk*")) or any(
-        exp.glob("*desk-refresh*")
-    )
+    signals["desk_fresh"] = any(exp.glob("*telemetry-desk*")) or any(exp.glob("*desk-refresh*"))
 
     return signals
 
@@ -128,9 +120,7 @@ def main() -> int:
             "|---|---|---|---|",
         ]
         for a in catalog():
-            lines.append(
-                f"| `{a['id']}` | {a['surface']} | {a['status']} | {a['action']} |"
-            )
+            lines.append(f"| `{a['id']}` | {a['surface']} | {a['status']} | {a['action']} |")
         lines.append("")
         AUTO_MD.write_text("\n".join(lines), encoding="utf-8")
         print(f"wrote {BOARD_MD.relative_to(ROOT)}", file=sys.stderr)

@@ -660,8 +660,7 @@ def _format_status_report() -> dict[str, Any]:
 
 def _handle_help() -> dict[str, Any]:
     rendered = STATUS_HELP_TEXT.format(
-        bot=os.getenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "").strip().lstrip("@")
-        or DEFAULT_BOT_MENTION
+        bot=os.getenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "").strip().lstrip("@") or DEFAULT_BOT_MENTION
     )
     escaped = "\n".join(escape_markdown_v2(line) for line in rendered.splitlines())
     return _response(escaped, "MarkdownV2")
@@ -1374,9 +1373,7 @@ def _menu_response(
         menus, ctx = _build_menu_context()
         render = menus.dispatch_menu_callback(f"{menus.CALLBACK_PREFIX}{token}", ctx)
     except Exception:
-        logger.warning(
-            "inline menu unavailable for token=%s; falling back to plain text", token
-        )
+        logger.warning("inline menu unavailable for token=%s; falling back to plain text", token)
         if fallback is not None:
             return fallback()
         return _handle_help()
